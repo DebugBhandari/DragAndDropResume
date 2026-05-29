@@ -1,0 +1,139 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  APP_DIR: /var/www/resume-debugbhandari-link
+  SERVICE_NAME: resume-debugbhandari
+  DOMAIN: resume.debugbhandari.link
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.9.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload application files
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=.github \
+            -czf - . | ssh -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "mkdir -p '$APP_DIR' && tar -xzf - -C '$APP_DIR'"
+
+      - name: Deploy on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          ssh -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "APP_DIR='$APP_DIR' SERVICE_NAME='$SERVICE_NAME' DOMAIN='$DOMAIN' bash -s" <<'EOF'
+          set -euo pipefail
+
+          export DEBIAN_FRONTEND=noninteractive
+
+          if ! command -v node >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y ca-certificates curl gnupg
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+            chmod a+r /etc/apt/keyrings/nodesource.gpg
+            echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+            apt-get update
+            apt-get install -y nodejs
+          fi
+
+          if ! command -v nginx >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y nginx
+          fi
+
+          cd "$APP_DIR"
+          npm ci
+          npm run build
+
+          cat >/etc/systemd/system/${SERVICE_NAME}.service <<UNIT
+          [Unit]
+          Description=Next.js Resume App (${DOMAIN})
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=${APP_DIR}
+          ExecStart=/usr/bin/npm run start:prod
+          Restart=always
+          RestartSec=5
+          Environment=NODE_ENV=production
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable ${SERVICE_NAME}
+          systemctl restart ${SERVICE_NAME}
+
+          cat >/etc/nginx/sites-available/${DOMAIN}.conf <<NGINX
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name ${DOMAIN};
+
+            location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade \$http_upgrade;
+              proxy_set_header Connection 'upgrade';
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+              proxy_cache_bypass \$http_upgrade;
+            }
+          }
+          NGINX
+
+          ln -sfn /etc/nginx/sites-available/${DOMAIN}.conf /etc/nginx/sites-enabled/${DOMAIN}.conf
+          nginx -t
+          systemctl reload nginx
+
+          systemctl is-active --quiet ${SERVICE_NAME}
+          EOF

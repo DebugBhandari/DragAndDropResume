@@ -1,26 +1,137 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --form-surface: #f8fafc;
+  --form-surface-strong: #eef2ff;
+  --form-border: #dbe4ff;
+  --form-border-strong: #8ba4ff;
+  --form-text: #0f172a;
+  --form-muted: #64748b;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply antialiased;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .input-field {
+    @apply w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-800 bg-white/90 transition-all duration-200;
+    border-color: var(--form-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .input-field::placeholder {
+    color: var(--form-muted);
+  }
+
+  .input-field:hover {
+    border-color: #c7d2fe;
+  }
+
+  .input-field:focus {
+    @apply outline-none;
+    border-color: var(--form-border-strong);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14), 0 4px 14px rgba(79, 70, 229, 0.12);
+  }
+
+  .form-card {
+    @apply p-3.5 rounded-2xl border space-y-2 relative;
+    border-color: var(--form-border);
+    background: linear-gradient(180deg, #ffffff 0%, var(--form-surface) 100%);
+    box-shadow: 0 10px 24px -18px rgba(30, 64, 175, 0.5);
+  }
+
+  .form-card:focus-within {
+    border-color: var(--form-border-strong);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1), 0 12px 30px -20px rgba(79, 70, 229, 0.5);
+  }
+
+  .remove-btn {
+    @apply absolute top-2 right-2 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center;
+    color: #b91c1c;
+    background: #fee2e2;
+  }
+
+  .remove-btn:hover {
+    background: #fecaca;
+    transform: scale(1.04);
+  }
+
+  .btn-add {
+    @apply w-full py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
+    border: 1px dashed #a5b4fc;
+    color: #3730a3;
+    background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+    box-shadow: 0 8px 20px -16px rgba(67, 56, 202, 0.65);
+  }
+
+  .btn-add:hover {
+    border-color: #6366f1;
+    background: linear-gradient(180deg, #e0e7ff 0%, #c7d2fe 100%);
+    color: #312e81;
+  }
+
+  .style-chip {
+    @apply px-3 py-1.5 text-xs rounded-xl border font-medium transition-all duration-200;
+    border-color: #cbd5e1;
+    color: #334155;
+    background: #ffffff;
+  }
+
+  .style-chip:hover {
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+
+  .style-chip-active {
+    border-color: #818cf8;
+    color: #312e81;
+    background: linear-gradient(180deg, #eef2ff 0%, var(--form-surface-strong) 100%);
+    box-shadow: 0 6px 18px -14px rgba(79, 70, 229, 0.8);
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .resume-pages,
+  .resume-pages * {
+    visibility: visible;
+    cursor: default !important;
+  }
+  .resume-pages {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    gap: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  .resume-page {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    padding: 48px 48px 8px 48px !important;
+    margin: 0 !important;
+    page-break-after: always;
+  }
+  .resume-page:last-child {
+    page-break-after: auto;
+  }
+  [data-page-section] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
 }
