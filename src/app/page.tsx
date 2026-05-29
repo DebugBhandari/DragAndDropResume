@@ -1393,6 +1393,12 @@ export default function Home() {
 
   const mainSections = sectionOrder.filter((sec) => sec.zone === "main");
   const sidebarSections = sectionOrder.filter((sec) => sec.zone === "sidebar");
+  const mainPageSplitIndex =
+    pageSplitIndex === -1
+      ? -1
+      : sectionOrder
+          .slice(0, pageSplitIndex)
+          .filter((section) => section.zone === "main").length;
   const allIds = sectionOrder.map((sec) => sec.id);
   const activeSectionByType = sectionOrder.reduce(
     (acc, section) => {
@@ -1842,7 +1848,7 @@ export default function Home() {
                         >
                           {(pageSplitIndex === -1
                             ? mainSections
-                            : mainSections.slice(0, pageSplitIndex)
+                            : mainSections.slice(0, mainPageSplitIndex)
                           ).map((sec) => (
                             <ResumeDraggableSection
                               key={sec.id}
@@ -1886,7 +1892,7 @@ export default function Home() {
                             }}
                           />
                           <div className="flex-1 p-8 pt-4">
-                            {mainSections.slice(pageSplitIndex).map((sec) => (
+                            {mainSections.slice(mainPageSplitIndex).map((sec) => (
                               <ResumeDraggableSection
                                 key={sec.id}
                                 section={sec}
