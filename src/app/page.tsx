@@ -93,7 +93,9 @@ function SectionContent({
   const {
     education,
     experience,
+    experienceManualOrder,
     projects,
+    projectsManualOrder,
     languages,
     skills,
     certificates,
@@ -146,7 +148,10 @@ function SectionContent({
       );
     case "experience":
       {
-      const experienceList = sortWorkExperienceByDateDesc(experienceItems ?? experience);
+      const baseExperience = experienceItems ?? experience;
+      const experienceList = experienceManualOrder && !experienceItems
+        ? baseExperience
+        : sortWorkExperienceByDateDesc(baseExperience);
       if (!experienceList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
@@ -195,7 +200,10 @@ function SectionContent({
       }
     case "projects":
       {
-      const projectList = sortProjectsByDateDesc(projectItems ?? projects);
+      const baseProjects = projectItems ?? projects;
+      const projectList = projectsManualOrder && !projectItems
+        ? baseProjects
+        : sortProjectsByDateDesc(baseProjects);
       if (!projectList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
@@ -1103,7 +1111,9 @@ export default function Home() {
     photo,
     education,
     experience,
+    experienceManualOrder,
     projects,
+    projectsManualOrder,
     languages,
     skills,
     certificates,
@@ -1371,8 +1381,8 @@ export default function Home() {
     overflow: "hidden",
   };
 
-  const sortedExperience = sortWorkExperienceByDateDesc(experience);
-  const sortedProjects = sortProjectsByDateDesc(projects);
+  const sortedExperience = experienceManualOrder ? experience : sortWorkExperienceByDateDesc(experience);
+  const sortedProjects = projectsManualOrder ? projects : sortProjectsByDateDesc(projects);
 
   const hasDetailSplit =
     detailSplitSectionType !== null &&

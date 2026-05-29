@@ -1,9 +1,13 @@
 'use client';
+import { useState } from 'react';
 import { useResumeStore } from '@/store/useResumeStore';
 import { SectionType, Language, Skill } from '@/types/resume';
+import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 
 export default function SectionEditor({ type }: { type: SectionType }) {
   const store = useResumeStore();
+  const [draggingExperienceId, setDraggingExperienceId] = useState<string | null>(null);
+  const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
 
   if (type === 'education') {
     return (
@@ -29,10 +33,30 @@ export default function SectionEditor({ type }: { type: SectionType }) {
   }
 
   if (type === 'experience') {
+    const experienceList = store.experienceManualOrder
+      ? store.experience
+      : sortWorkExperienceByDateDesc(store.experience);
     return (
       <div className="space-y-3">
-        {store.experience.map((exp) => (
-          <div key={exp.id} className="form-card group">
+        {experienceList.map((exp) => (
+          <div
+            key={exp.id}
+            className={`form-card group ${draggingExperienceId === exp.id ? 'opacity-60' : ''}`}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              setDraggingExperienceId(exp.id);
+            }}
+            onDragEnd={() => setDraggingExperienceId(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (!draggingExperienceId || draggingExperienceId === exp.id) return;
+              store.reorderExperience(draggingExperienceId, exp.id);
+              setDraggingExperienceId(null);
+            }}
+          >
+            <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">Drag to reorder</p>
             <button onClick={() => store.removeExperience(exp.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Company" value={exp.company} onChange={(e) => store.updateExperience(exp.id, { company: e.target.value })} />
             <input className="input-field" placeholder="Position" value={exp.position} onChange={(e) => store.updateExperience(exp.id, { position: e.target.value })} />
@@ -93,10 +117,30 @@ export default function SectionEditor({ type }: { type: SectionType }) {
   }
 
   if (type === 'projects') {
+    const projectList = store.projectsManualOrder
+      ? store.projects
+      : sortProjectsByDateDesc(store.projects);
     return (
       <div className="space-y-3">
-        {store.projects.map((proj) => (
-          <div key={proj.id} className="form-card group">
+        {projectList.map((proj) => (
+          <div
+            key={proj.id}
+            className={`form-card group ${draggingProjectId === proj.id ? 'opacity-60' : ''}`}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              setDraggingProjectId(proj.id);
+            }}
+            onDragEnd={() => setDraggingProjectId(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (!draggingProjectId || draggingProjectId === proj.id) return;
+              store.reorderProjects(draggingProjectId, proj.id);
+              setDraggingProjectId(null);
+            }}
+          >
+            <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">Drag to reorder</p>
             <button onClick={() => store.removeProject(proj.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Project Name" value={proj.name} onChange={(e) => store.updateProject(proj.id, { name: e.target.value })} />
 

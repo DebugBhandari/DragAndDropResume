@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certificate, Award, Volunteer, Reference, Interest, PersonalInfo, ResumeSection, SectionType, LayoutType, StyleConfig, PhotoConfig, ColumnZone } from '@/types/resume';
+import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 
 const SECTION_TEMPLATES: ResumeSection[] = [
   { id: 'section-experience', type: 'experience', title: 'Work Experience', zone: 'main' },
@@ -37,6 +38,17 @@ const hasAnyText = (values: any[] = []) =>
 
 const hasAnyKeys = (value: any) =>
   !!value && typeof value === 'object' && Object.keys(value).length > 0;
+
+const moveItemById = <T extends { id: string }>(items: T[], activeId: string, overId: string): T[] => {
+  const activeIndex = items.findIndex((item) => item.id === activeId);
+  const overIndex = items.findIndex((item) => item.id === overId);
+  if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) return items;
+
+  const next = [...items];
+  const [moved] = next.splice(activeIndex, 1);
+  next.splice(overIndex, 0, moved);
+  return next;
+};
 
 const normalizeExperience = (item: any) => {
   const rawBullets = Array.isArray(item?.descriptionBullets)
@@ -169,9 +181,11 @@ interface ResumeStore extends ResumeData {
   addExperience: () => void;
   updateExperience: (id: string, data: Partial<WorkExperience>) => void;
   removeExperience: (id: string) => void;
+  reorderExperience: (activeId: string, overId: string) => void;
   addProject: () => void;
   updateProject: (id: string, data: Partial<Project>) => void;
   removeProject: (id: string) => void;
+  reorderProjects: (activeId: string, overId: string) => void;
   addLanguage: () => void;
   updateLanguage: (id: string, data: Partial<Language>) => void;
   removeLanguage: (id: string) => void;
@@ -198,6 +212,8 @@ interface ResumeStore extends ResumeData {
   addSectionToResume: (type: SectionType) => void;
   removeSectionFromResume: (sectionId: string) => void;
   removedSections: SectionType[];
+  experienceManualOrder: boolean;
+  projectsManualOrder: boolean;
 }
 
 export const useResumeStore = create<ResumeStore>()(
@@ -208,6 +224,8 @@ export const useResumeStore = create<ResumeStore>()(
       awards: [], volunteer: [], references: [], interests: [],
       sectionOrder: defaultSections,
       removedSections: [],
+      experienceManualOrder: false,
+      projectsManualOrder: false,
       layout: 'classic',
       style: defaultStyle,
       photo: defaultPhoto,
@@ -221,13 +239,33 @@ export const useResumeStore = create<ResumeStore>()(
       updateEducation: (id, data) => set((s) => ({ education: s.education.map((e) => (e.id === id ? { ...e, ...data } : e)) })),
       removeEducation: (id) => set((s) => ({ education: s.education.filter((e) => e.id !== id) })),
 
-      addExperience: () => set((s) => ({ experience: [...s.experience, { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', description: '', descriptionBullets: [''] }] })),
-      updateExperience: (id, data) => set((s) => ({ experience: s.experience.map((e) => (e.id === id ? { ...e, ...data } : e)) })),
+      addExperience: () => set((s) => {
+        const nextExperience = [...s.experience, { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', description: '', descriptionBullets: [''] }];
+        return { experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience) };
+      }),
+      updateExperience: (id, data) => set((s) => {
+        const nextExperience = s.experience.map((e) => (e.id === id ? { ...e, ...data } : e));
+        return { experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience) };
+      }),
       removeExperience: (id) => set((s) => ({ experience: s.experience.filter((e) => e.id !== id) })),
+      reorderExperience: (activeId, overId) => set((s) => ({
+        experience: moveItemById(s.experience, activeId, overId),
+        experienceManualOrder: true,
+      })),
 
-      addProject: () => set((s) => ({ projects: [...s.projects, { id: uuidv4(), name: '', description: '', descriptionBullets: [''], completionDate: '', technologies: '', link: '' }] })),
-      updateProject: (id, data) => set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...data } : p)) })),
+      addProject: () => set((s) => {
+        const nextProjects = [...s.projects, { id: uuidv4(), name: '', description: '', descriptionBullets: [''], completionDate: '', technologies: '', link: '' }];
+        return { projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects) };
+      }),
+      updateProject: (id, data) => set((s) => {
+        const nextProjects = s.projects.map((p) => (p.id === id ? { ...p, ...data } : p));
+        return { projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects) };
+      }),
       removeProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
+      reorderProjects: (activeId, overId) => set((s) => ({
+        projects: moveItemById(s.projects, activeId, overId),
+        projectsManualOrder: true,
+      })),
 
       addLanguage: () => set((s) => ({ languages: [...s.languages, { id: uuidv4(), name: '', proficiency: 'Intermediate' }] })),
       updateLanguage: (id, data) => set((s) => ({ languages: s.languages.map((l) => (l.id === id ? { ...l, ...data } : l)) })),
@@ -303,6 +341,10 @@ export const useResumeStore = create<ResumeStore>()(
         if (!merged.style?.sidebarWidth) merged.style = { ...current.style, ...merged.style, sidebarWidth: merged.style?.sidebarWidth || 30 };
         merged.experience = (merged.experience || []).map(normalizeExperience);
         merged.projects = (merged.projects || []).map(normalizeProject);
+        if (typeof merged.experienceManualOrder !== 'boolean') merged.experienceManualOrder = false;
+        if (typeof merged.projectsManualOrder !== 'boolean') merged.projectsManualOrder = false;
+        if (!merged.experienceManualOrder) merged.experience = sortWorkExperienceByDateDesc(merged.experience);
+        if (!merged.projectsManualOrder) merged.projects = sortProjectsByDateDesc(merged.projects);
         if (!merged.personalInfo?.linkedin) merged.personalInfo = { ...current.personalInfo, ...merged.personalInfo };
         return merged;
       },
