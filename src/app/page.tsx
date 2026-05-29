@@ -1022,6 +1022,7 @@ function SidebarDraggablePanel({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      data-panel-id={`sec-${section.id}`}
       className={`rounded-lg shadow-sm overflow-hidden cursor-grab active:cursor-grabbing transition-all ${
         hasData ? "bg-emerald-50/60 border border-emerald-200" : "bg-white"
       } ${
@@ -1106,6 +1107,7 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
 export default function Home() {
   const resumeRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
@@ -1161,6 +1163,16 @@ export default function Home() {
       if (!stillExists) focusPanel("panel-header");
     }
   }, [activePanelId, sectionOrder, focusPanel]);
+
+  useEffect(() => {
+    if (!isMobileEditorOpen) return;
+    if (!sidebarRef.current) return;
+
+    const target = sidebarRef.current.querySelector(`[data-panel-id="${activePanelId}"]`) as HTMLElement | null;
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isMobileEditorOpen, activePanelId]);
 
   useEffect(() => {
     const persisted = parsePersistedResumeData();
@@ -1518,9 +1530,11 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsMobileEditorOpen(true)}
-              className="lg:hidden bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-50 transition text-sm font-medium"
+              className="lg:hidden bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 transition text-sm font-medium"
+              aria-label="Open editor"
             >
-              Edit
+              <span aria-hidden="true">✏</span>
+              <span className="sr-only">Edit</span>
             </button>
             <button
               onClick={() => handlePrint()}
@@ -1543,6 +1557,7 @@ export default function Home() {
 
           {/* Editor Sidebar */}
           <div
+            ref={sidebarRef}
             className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-[36%] lg:min-w-[430px] lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
           >
             <div className="flex items-center justify-between mb-2 lg:hidden">
@@ -1610,7 +1625,7 @@ export default function Home() {
               {!sectionsCollapsed && (
                 <div className="space-y-3">
                   {/* Non-draggable: Header (Personal Info + Photo) */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
                     <CollapsiblePanel
                       title="👤 Header"
                       persistId="panel-header"
