@@ -1513,14 +1513,14 @@ export default function Home() {
     >
       <div className="min-h-screen bg-gray-100">
         <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">Resume Builder</h1>
+          <h1 className="text-lg font-bold text-gray-800">Drag and Drop Resume</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsMobileEditorOpen(true)}
               className="lg:hidden bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-50 transition text-sm font-medium"
             >
-              Sidebar
+              Edit
             </button>
             <button
               onClick={() => handlePrint()}
@@ -1670,7 +1670,7 @@ export default function Home() {
           </div>
 
           {/* Resume Preview */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
+          <div className="w-full lg:w-[70%] overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
             <div
               ref={resumeRef}
