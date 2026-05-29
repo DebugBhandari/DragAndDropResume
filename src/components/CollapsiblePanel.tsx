@@ -18,15 +18,15 @@ export default function CollapsiblePanel({ title, children, defaultOpen = true, 
     : localOpen;
   const toggle = () => {
     if (persistId) {
-      if (!isOpen) setPanelOpen(persistId, true);
+      setPanelOpen(persistId, !isOpen);
       return;
     }
-    else setLocalOpen(!localOpen);
+    setLocalOpen(!localOpen);
   };
 
   return (
     <div className="w-full">
-      <button onClick={toggle} className="w-full flex items-center justify-between p-4 text-left">
+      <button type="button" onClick={toggle} className="w-full flex items-center justify-between p-4 text-left">
         <h3 className="font-semibold text-lg truncate">{title}</h3>
         <span className={`text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}>▾</span>
       </button>

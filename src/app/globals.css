@@ -130,6 +130,14 @@
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+  [data-page-section][data-section-type="experience"] {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  [data-exp-item] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
   @page {
     size: A4;
     margin: 0;

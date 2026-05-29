@@ -32,7 +32,7 @@ export default function SectionEditor({ type }: { type: SectionType }) {
     return (
       <div className="space-y-3">
         {store.experience.map((exp) => (
-          <div key={exp.id} className="form-card">
+          <div key={exp.id} className="form-card group">
             <button onClick={() => store.removeExperience(exp.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Company" value={exp.company} onChange={(e) => store.updateExperience(exp.id, { company: e.target.value })} />
             <input className="input-field" placeholder="Position" value={exp.position} onChange={(e) => store.updateExperience(exp.id, { position: e.target.value })} />
@@ -40,7 +40,51 @@ export default function SectionEditor({ type }: { type: SectionType }) {
               <input className="input-field" placeholder="Start Date" value={exp.startDate} onChange={(e) => store.updateExperience(exp.id, { startDate: e.target.value })} />
               <input className="input-field" placeholder="End Date" value={exp.endDate} onChange={(e) => store.updateExperience(exp.id, { endDate: e.target.value })} />
             </div>
-            <textarea className="input-field min-h-[80px]" placeholder="Description (use bullet points with •)" value={exp.description} onChange={(e) => store.updateExperience(exp.id, { description: e.target.value })} />
+
+            <div className="pt-1">
+              <div className="overflow-hidden max-h-0 opacity-0 translate-y-1 transition-all duration-200 group-hover:max-h-96 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:max-h-96 group-focus-within:opacity-100 group-focus-within:translate-y-0">
+                <div className="space-y-2 pt-1">
+                  {(exp.descriptionBullets || ['']).map((bullet, index) => (
+                    <div key={`${exp.id}-bullet-${index}`} className="flex items-start gap-2">
+                      <span className="text-slate-400 pt-2">•</span>
+                      <input
+                        className="input-field flex-1"
+                        placeholder={`Bullet ${index + 1}`}
+                        value={bullet}
+                        onChange={(e) => {
+                          const nextBullets = [...(exp.descriptionBullets || [''])];
+                          nextBullets[index] = e.target.value;
+                          store.updateExperience(exp.id, { descriptionBullets: nextBullets, description: nextBullets.filter((item) => item.trim().length > 0).join('\n') });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mt-1 text-xs px-2 py-1 rounded border border-slate-300 text-slate-600 disabled:opacity-40"
+                        disabled={(exp.descriptionBullets || ['']).length <= 1}
+                        onClick={() => {
+                          const currentBullets = exp.descriptionBullets || [''];
+                          if (currentBullets.length <= 1) return;
+                          const nextBullets = currentBullets.filter((_, bulletIndex) => bulletIndex !== index);
+                          store.updateExperience(exp.id, { descriptionBullets: nextBullets, description: nextBullets.filter((item) => item.trim().length > 0).join('\n') });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn-add"
+                    onClick={() => {
+                      const nextBullets = [...(exp.descriptionBullets || ['']), ''];
+                      store.updateExperience(exp.id, { descriptionBullets: nextBullets });
+                    }}
+                  >
+                    + Add Bullet
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ))}
         <button onClick={store.addExperience} className="btn-add">+ Add Experience</button>

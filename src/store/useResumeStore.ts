@@ -38,11 +38,26 @@ const hasAnyText = (values: any[] = []) =>
 const hasAnyKeys = (value: any) =>
   !!value && typeof value === 'object' && Object.keys(value).length > 0;
 
+const normalizeExperience = (item: any) => {
+  const rawBullets = Array.isArray(item?.descriptionBullets)
+    ? item.descriptionBullets
+    : typeof item?.description === 'string' && item.description.trim().length > 0
+      ? [item.description]
+      : [''];
+
+  const bullets = rawBullets.map((bullet: any) => String(bullet ?? ''));
+
+  return {
+    ...item,
+    descriptionBullets: bullets.length > 0 ? bullets : [''],
+  };
+};
+
 const sectionHasData = (type: SectionType, state: any) => {
   switch (type) {
     case 'experience':
       return (state.experience || []).some((item: any) =>
-        hasAnyKeys(item) && hasAnyText([item.company, item.position, item.startDate, item.endDate, item.description])
+        hasAnyKeys(item) && hasAnyText([item.company, item.position, item.startDate, item.endDate, item.description, ...(item.descriptionBullets || [])])
       );
     case 'education':
       return (state.education || []).some((item: any) =>
@@ -151,7 +166,7 @@ export const useResumeStore = create<ResumeStore>()(
       updateEducation: (id, data) => set((s) => ({ education: s.education.map((e) => (e.id === id ? { ...e, ...data } : e)) })),
       removeEducation: (id) => set((s) => ({ education: s.education.filter((e) => e.id !== id) })),
 
-      addExperience: () => set((s) => ({ experience: [...s.experience, { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', description: '' }] })),
+      addExperience: () => set((s) => ({ experience: [...s.experience, { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', description: '', descriptionBullets: [''] }] })),
       updateExperience: (id, data) => set((s) => ({ experience: s.experience.map((e) => (e.id === id ? { ...e, ...data } : e)) })),
       removeExperience: (id) => set((s) => ({ experience: s.experience.filter((e) => e.id !== id) })),
 
@@ -231,6 +246,7 @@ export const useResumeStore = create<ResumeStore>()(
         if (!merged.interests) merged.interests = [];
         if (!merged.skills) merged.skills = [];
         if (!merged.style?.sidebarWidth) merged.style = { ...current.style, ...merged.style, sidebarWidth: merged.style?.sidebarWidth || 30 };
+        merged.experience = (merged.experience || []).map(normalizeExperience);
         if (!merged.personalInfo?.linkedin) merged.personalInfo = { ...current.personalInfo, ...merged.personalInfo };
         return merged;
       },

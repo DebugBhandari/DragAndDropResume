@@ -34,6 +34,7 @@ import {
   LayoutType,
   ColumnZone,
   ResumeData,
+  WorkExperience,
 } from "@/types/resume";
 
 // ─── Contact icons for resume ───
@@ -78,7 +79,13 @@ function getFontFamily(font: StyleConfig["fontFamily"]) {
 }
 
 // ─── Section Content ───
-function SectionContent({ type }: { type: SectionType }) {
+function SectionContent({
+  type,
+  experienceItems,
+}: {
+  type: SectionType;
+  experienceItems?: WorkExperience[];
+}) {
   const {
     education,
     experience,
@@ -134,7 +141,9 @@ function SectionContent({ type }: { type: SectionType }) {
         </>
       );
     case "experience":
-      if (!experience.length)
+      {
+      const experienceList = experienceItems ?? experience;
+      if (!experienceList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No experience added
@@ -142,8 +151,16 @@ function SectionContent({ type }: { type: SectionType }) {
         );
       return (
         <>
-          {experience.map((exp) => (
-            <div key={exp.id} className="mb-2">
+          {experienceList.map((exp) => {
+            const bullets = (exp.descriptionBullets && exp.descriptionBullets.length > 0
+              ? exp.descriptionBullets
+              : exp.description
+                ? [exp.description]
+                : []
+            ).map((item) => item.trim()).filter((item) => item.length > 0);
+
+            return (
+            <div key={exp.id} data-exp-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
               <div className="flex justify-between items-baseline">
                 <strong style={{ fontSize: "1.05em" }}>
                   {exp.position || "Position"}
@@ -159,18 +176,19 @@ function SectionContent({ type }: { type: SectionType }) {
               >
                 {exp.company}
               </div>
-              {exp.description && (
-                <p
-                  className="mt-0.5 text-gray-600 whitespace-pre-line"
-                  style={{ fontSize: "0.9em" }}
-                >
-                  {exp.description}
-                </p>
+
+              {bullets.length > 0 && (
+                <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
+                  {bullets.map((bullet, index) => (
+                    <li key={`${exp.id}-preview-bullet-${index}`}>{bullet}</li>
+                  ))}
+                </ul>
               )}
             </div>
-          ))}
+          )})}
         </>
       );
+      }
     case "projects":
       if (!projects.length)
         return (
@@ -656,7 +674,13 @@ function PersonalHeader({
 }
 
 // ─── Resume Draggable Section (sortable on document) ───
-function ResumeDraggableSection({ section }: { section: ResumeSection }) {
+function ResumeDraggableSection({
+  section,
+  experienceItems,
+}: {
+  section: ResumeSection;
+  experienceItems?: WorkExperience[];
+}) {
   const { style, removeSectionFromResume } = useResumeStore();
   const { focusPanel } = useUIStore();
   const {
@@ -718,7 +742,47 @@ function ResumeDraggableSection({ section }: { section: ResumeSection }) {
         )}
         {section.title}
       </h2>
-      <SectionContent type={section.type} />
+      <SectionContent
+        type={section.type}
+        experienceItems={section.type === "experience" ? experienceItems : undefined}
+      />
+    </div>
+  );
+}
+
+function ResumeStaticSection({
+  section,
+  experienceItems,
+}: {
+  section: ResumeSection;
+  experienceItems?: WorkExperience[];
+}) {
+  const { style } = useResumeStore();
+  const { showBodyIcons, sectionIcons } = useUIStore();
+  const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
+  const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
+
+  return (
+    <div
+      data-page-section
+      data-section-type={section.type}
+      data-section-id={section.id}
+      className={`${getSpacingClass(style.sectionSpacing)} relative rounded p-2`}
+    >
+      <h2
+        className={headingClass}
+        style={{
+          borderBottom: `2px solid ${style.accentColor}`,
+          color: style.accentColor,
+        }}
+      >
+        {iconVisible && <span className="mr-1">{SECTION_ICONS[section.type]}</span>}
+        {section.title}
+      </h2>
+      <SectionContent
+        type={section.type}
+        experienceItems={section.type === "experience" ? experienceItems : undefined}
+      />
     </div>
   );
 }
@@ -1141,6 +1205,8 @@ export default function Home() {
 
   // Track which section index starts page 2+
   const [pageSplitIndex, setPageSplitIndex] = useState<number>(-1);
+  const [experienceSplitSectionIndex, setExperienceSplitSectionIndex] = useState<number | null>(null);
+  const [experienceSplitItemIndex, setExperienceSplitItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -1160,13 +1226,46 @@ export default function Home() {
         }
       }
       setPageSplitIndex(splitIdx);
+      if (splitIdx !== -1) {
+        const overflowSection = sections[splitIdx] as HTMLElement;
+        if (overflowSection?.dataset?.sectionType === "experience") {
+          const experienceItems = overflowSection.querySelectorAll("[data-exp-item]");
+          let itemSplit = -1;
+
+          for (let i = 0; i < experienceItems.length; i++) {
+            const itemRect = experienceItems[i].getBoundingClientRect();
+            const itemBottom = itemRect.top - containerRect.top + itemRect.height;
+            if (itemBottom > USABLE_HEIGHT) {
+              itemSplit = i;
+              break;
+            }
+          }
+
+          if (itemSplit === -1) {
+            itemSplit = experienceItems.length;
+          }
+
+          if (itemSplit < 1 && experienceItems.length > 0) {
+            itemSplit = 1;
+          }
+
+          setExperienceSplitSectionIndex(splitIdx);
+          setExperienceSplitItemIndex(itemSplit);
+        } else {
+          setExperienceSplitSectionIndex(null);
+          setExperienceSplitItemIndex(null);
+        }
+      } else {
+        setExperienceSplitSectionIndex(null);
+        setExperienceSplitItemIndex(null);
+      }
       setPageCount(splitIdx === -1 ? 1 : 2);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(contentRef.current);
     measure();
     return () => observer.disconnect();
-  }, [layout, sectionOrder, USABLE_HEIGHT, s.fontSize, s.headingSize, s.sectionSpacing]);
+  }, [layout, sectionOrder, experience, USABLE_HEIGHT, s.fontSize, s.headingSize, s.sectionSpacing]);
 
   if (!mounted) return null;
 
@@ -1242,6 +1341,82 @@ export default function Home() {
     overflow: "hidden",
   };
 
+  const hasExperienceSplit =
+    experienceSplitSectionIndex !== null &&
+    experienceSplitItemIndex !== null &&
+    pageSplitIndex !== -1;
+
+  const clampedExperienceSplitIndex = hasExperienceSplit
+    ? Math.max(1, Math.min(experienceSplitItemIndex!, experience.length))
+    : null;
+
+  const splitSectionCandidate =
+    hasExperienceSplit &&
+    experienceSplitSectionIndex! >= 0 &&
+    experienceSplitSectionIndex! < sectionOrder.length
+      ? sectionOrder[experienceSplitSectionIndex!]
+      : null;
+
+  const canUseExperienceSplit =
+    !!splitSectionCandidate &&
+    splitSectionCandidate.type === "experience" &&
+    clampedExperienceSplitIndex !== null;
+
+  const renderLinearPageOneSections = () => {
+    if (pageSplitIndex === -1) {
+      return sectionOrder.map((sec) => (
+        <ResumeDraggableSection key={sec.id} section={sec} />
+      ));
+    }
+
+    if (!canUseExperienceSplit) {
+      return sectionOrder.slice(0, pageSplitIndex).map((sec) => (
+        <ResumeDraggableSection key={sec.id} section={sec} />
+      ));
+    }
+
+    const splitSection = splitSectionCandidate;
+    const beforeSplit = sectionOrder.slice(0, experienceSplitSectionIndex!);
+
+    return (
+      <>
+        {beforeSplit.map((sec) => (
+          <ResumeDraggableSection key={sec.id} section={sec} />
+        ))}
+        <ResumeDraggableSection
+          key={splitSection!.id}
+          section={splitSection!}
+          experienceItems={experience.slice(0, clampedExperienceSplitIndex)}
+        />
+      </>
+    );
+  };
+
+  const renderLinearPageTwoSections = () => {
+    if (pageSplitIndex === -1) return null;
+
+    if (!canUseExperienceSplit) {
+      return sectionOrder.slice(pageSplitIndex).map((sec) => (
+        <ResumeDraggableSection key={sec.id} section={sec} />
+      ));
+    }
+
+    const splitSection = splitSectionCandidate;
+    const afterSplit = sectionOrder.slice(experienceSplitSectionIndex! + 1);
+
+    return (
+      <>
+        <ResumeStaticSection
+          section={splitSection!}
+          experienceItems={experience.slice(clampedExperienceSplitIndex)}
+        />
+        {afterSplit.map((sec) => (
+          <ResumeDraggableSection key={sec.id} section={sec} />
+        ))}
+      </>
+    );
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -1267,6 +1442,7 @@ export default function Home() {
             {/* Settings Group */}
             <div className="mb-4">
               <button
+                type="button"
                 onClick={toggleSettings}
                 className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition ${settingsCollapsed ? "bg-white shadow-sm hover:shadow" : "bg-transparent"}`}
               >
@@ -1300,6 +1476,7 @@ export default function Home() {
             {/* Sections Group */}
             <div>
               <button
+                type="button"
                 onClick={toggleSections}
                 className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition ${sectionsCollapsed ? "bg-white shadow-sm hover:shadow" : "bg-transparent"}`}
               >
@@ -1332,44 +1509,10 @@ export default function Home() {
                   {(() => {
                     const activeTypes = sectionOrder.map((s) => s.type);
                     const extraAvailable = ALL_SECTION_TYPES.filter(
-                      (type) =>
-                        !PRIORITY_SECTION_TYPES.includes(type) &&
-                        !activeTypes.includes(type),
+                      (type) => !activeTypes.includes(type),
                     );
                     return (
                       <>
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2">
-                            Priority sections
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {PRIORITY_SECTION_TYPES.map((type) => {
-                              const activeSection = activeSectionByType[type];
-                              const isActive = !!activeSection;
-                              return (
-                                <button
-                                  key={type}
-                                  onClick={() => {
-                                    if (activeSection) {
-                                      removeSectionFromResume(activeSection.id);
-                                      return;
-                                    }
-                                    addSectionToResume(type);
-                                  }}
-                                  className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                                    isActive
-                                      ? "border-blue-400 bg-blue-50 text-blue-700"
-                                      : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
-                                  }`}
-                                >
-                                  {SECTION_ICONS[type]} {SECTION_LABELS[type]}
-                                  {combinedSectionFlags[type] ? " • Has data" : ""}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
                         {!!extraAvailable.length && (
                           <div className="bg-gray-50 rounded-lg p-3">
                             <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2">
@@ -1387,7 +1530,6 @@ export default function Home() {
                               }`}
                             >
                               {SECTION_ICONS[type]} {SECTION_LABELS[type]}
-                                {combinedSectionFlags[type] ? " • Has data" : ""}
                             </button>
                               ))}
                             </div>
@@ -1497,12 +1639,7 @@ export default function Home() {
                       </div>
                     ) : (
                       <div>
-                        {(pageSplitIndex === -1
-                          ? sectionOrder
-                          : sectionOrder.slice(0, pageSplitIndex)
-                        ).map((sec) => (
-                          <ResumeDraggableSection key={sec.id} section={sec} />
-                        ))}
+                        {renderLinearPageOneSections()}
                       </div>
                     )}
                   </div>
@@ -1539,12 +1676,7 @@ export default function Home() {
                         </div>
                       ) : (
                         <div>
-                          {sectionOrder.slice(pageSplitIndex).map((sec) => (
-                            <ResumeDraggableSection
-                              key={sec.id}
-                              section={sec}
-                            />
-                          ))}
+                          {renderLinearPageTwoSections()}
                         </div>
                       )}
                     </div>

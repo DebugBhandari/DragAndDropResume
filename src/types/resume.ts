@@ -25,6 +25,7 @@ export interface WorkExperience {
   startDate: string;
   endDate: string;
   description: string;
+  descriptionBullets: string[];
 }
 
 export interface Project {
