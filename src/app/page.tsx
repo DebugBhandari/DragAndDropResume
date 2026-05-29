@@ -37,6 +37,7 @@ import {
   WorkExperience,
   Project,
 } from "@/types/resume";
+import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/dateSort";
 
 // ─── Contact icons for resume ───
 const CONTACT_ICONS: Record<string, string> = {
@@ -145,7 +146,7 @@ function SectionContent({
       );
     case "experience":
       {
-      const experienceList = experienceItems ?? experience;
+      const experienceList = sortWorkExperienceByDateDesc(experienceItems ?? experience);
       if (!experienceList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
@@ -194,7 +195,7 @@ function SectionContent({
       }
     case "projects":
       {
-      const projectList = projectItems ?? projects;
+      const projectList = sortProjectsByDateDesc(projectItems ?? projects);
       if (!projectList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
@@ -1370,13 +1371,16 @@ export default function Home() {
     overflow: "hidden",
   };
 
+  const sortedExperience = sortWorkExperienceByDateDesc(experience);
+  const sortedProjects = sortProjectsByDateDesc(projects);
+
   const hasDetailSplit =
     detailSplitSectionType !== null &&
     detailSplitSectionIndex !== null &&
     detailSplitItemIndex !== null &&
     pageSplitIndex !== -1;
 
-  const splitItemsLength = detailSplitSectionType === "projects" ? projects.length : experience.length;
+  const splitItemsLength = detailSplitSectionType === "projects" ? sortedProjects.length : sortedExperience.length;
 
   const clampedDetailSplitIndex = hasDetailSplit
     ? Math.max(1, Math.min(detailSplitItemIndex!, splitItemsLength))
@@ -1409,8 +1413,8 @@ export default function Home() {
 
     const splitSection = splitSectionCandidate;
     const beforeSplit = sectionOrder.slice(0, detailSplitSectionIndex!);
-    const splitExperienceItems = detailSplitSectionType === "experience" ? experience.slice(0, clampedDetailSplitIndex!) : undefined;
-    const splitProjectItems = detailSplitSectionType === "projects" ? projects.slice(0, clampedDetailSplitIndex!) : undefined;
+    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(0, clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(0, clampedDetailSplitIndex!) : undefined;
 
     return (
       <>
@@ -1438,8 +1442,8 @@ export default function Home() {
 
     const splitSection = splitSectionCandidate;
     const afterSplit = sectionOrder.slice(detailSplitSectionIndex! + 1);
-    const splitExperienceItems = detailSplitSectionType === "experience" ? experience.slice(clampedDetailSplitIndex!) : undefined;
-    const splitProjectItems = detailSplitSectionType === "projects" ? projects.slice(clampedDetailSplitIndex!) : undefined;
+    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(clampedDetailSplitIndex!) : undefined;
 
     return (
       <>
