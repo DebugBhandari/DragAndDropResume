@@ -221,7 +221,7 @@ function SectionContent({
             ).map((item) => item.trim()).filter((item) => item.length > 0);
 
             return (
-            <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-auto">
+            <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
               <div className="flex items-baseline gap-2">
                 <strong style={{ fontSize: "1.05em" }}>
                   {proj.name || "Project"}

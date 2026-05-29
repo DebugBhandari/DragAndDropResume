@@ -143,8 +143,8 @@
     page-break-inside: avoid !important;
   }
   [data-project-item] {
-    break-inside: auto !important;
-    page-break-inside: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
   @page {
     size: A4;
