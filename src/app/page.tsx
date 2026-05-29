@@ -1492,6 +1492,14 @@ export default function Home() {
     splitSectionCandidate.type === detailSplitSectionType &&
     clampedDetailSplitIndex !== null;
 
+  const detailSplitMainIndex =
+    splitSectionCandidate && splitSectionCandidate.zone === "main"
+      ? mainSections.findIndex((section) => section.id === splitSectionCandidate.id)
+      : -1;
+
+  const canUseMainDetailSplit =
+    canUseDetailSplit && splitSectionCandidate?.zone === "main" && detailSplitMainIndex !== -1;
+
   const renderLinearPageOneSections = () => {
     if (pageSplitIndex === -1) {
       return sectionOrder.map((sec) => (
@@ -1517,6 +1525,20 @@ export default function Home() {
     const beforeSplit = sectionOrder.slice(0, detailSplitSectionIndex!);
     const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(0, clampedDetailSplitIndex!) : undefined;
     const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(0, clampedDetailSplitIndex!) : undefined;
+
+    if (clampedDetailSplitIndex === 0) {
+      return (
+        <>
+          {beforeSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
+        </>
+      );
+    }
 
     return (
       <>
@@ -1560,6 +1582,99 @@ export default function Home() {
       <>
         <ResumeStaticSection
           section={splitSection!}
+          experienceItems={splitExperienceItems}
+          projectItems={splitProjectItems}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+        {afterSplit.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ))}
+      </>
+    );
+  };
+
+  const renderTwoColumnMainPageOneSections = () => {
+    if (mainPageSplitIndex === -1) {
+      return mainSections.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    if (!canUseMainDetailSplit) {
+      return mainSections.slice(0, mainPageSplitIndex).map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    const splitSection = splitSectionCandidate!;
+    const beforeSplit = mainSections.slice(0, detailSplitMainIndex);
+    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(0, clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(0, clampedDetailSplitIndex!) : undefined;
+
+    if (clampedDetailSplitIndex === 0) {
+      return beforeSplit.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    return (
+      <>
+        {beforeSplit.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ))}
+        <ResumeDraggableSection
+          key={splitSection.id}
+          section={splitSection}
+          experienceItems={splitExperienceItems}
+          projectItems={splitProjectItems}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      </>
+    );
+  };
+
+  const renderTwoColumnMainPageTwoSections = () => {
+    if (mainPageSplitIndex === -1) return null;
+
+    if (!canUseMainDetailSplit) {
+      return mainSections.slice(mainPageSplitIndex).map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    const splitSection = splitSectionCandidate!;
+    const afterSplit = mainSections.slice(detailSplitMainIndex + 1);
+    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(clampedDetailSplitIndex!) : undefined;
+
+    return (
+      <>
+        <ResumeStaticSection
+          section={splitSection}
           experienceItems={splitExperienceItems}
           projectItems={splitProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
@@ -1838,20 +1953,8 @@ export default function Home() {
                             </p>
                           )}
                         </DroppableZone>
-                        <DroppableZone
-                          id="zone-main"
-                          className="flex-1 p-8 pt-4"
-                        >
-                          {(pageSplitIndex === -1
-                            ? mainSections
-                            : mainSections.slice(0, mainPageSplitIndex)
-                          ).map((sec) => (
-                            <ResumeDraggableSection
-                              key={sec.id}
-                              section={sec}
-                              onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                            />
-                          ))}
+                        <DroppableZone id="zone-main" className="flex-1 p-8 pt-4">
+                          {renderTwoColumnMainPageOneSections()}
                           {!mainSections.length && (
                             <p className="text-xs text-gray-400 italic text-center mt-8">
                               Drop sections here
@@ -1888,13 +1991,7 @@ export default function Home() {
                             }}
                           />
                           <div className="flex-1 p-8 pt-4">
-                            {mainSections.slice(mainPageSplitIndex).map((sec) => (
-                              <ResumeDraggableSection
-                                key={sec.id}
-                                section={sec}
-                                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                              />
-                            ))}
+                            {renderTwoColumnMainPageTwoSections()}
                           </div>
                         </div>
                       ) : (
