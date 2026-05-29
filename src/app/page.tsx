@@ -1364,10 +1364,6 @@ export default function Home() {
             itemSplit = detailItems.length;
           }
 
-          if (itemSplit < 1 && detailItems.length > 0) {
-            itemSplit = 1;
-          }
-
           setDetailSplitSectionType(overflowType);
           setDetailSplitSectionIndex(splitIdx);
           setDetailSplitItemIndex(itemSplit);
@@ -1481,7 +1477,7 @@ export default function Home() {
   const splitItemsLength = detailSplitSectionType === "projects" ? sortedProjects.length : sortedExperience.length;
 
   const clampedDetailSplitIndex = hasDetailSplit
-    ? Math.max(1, Math.min(detailSplitItemIndex!, splitItemsLength))
+    ? Math.max(0, Math.min(detailSplitItemIndex!, splitItemsLength))
     : null;
 
   const splitSectionCandidate =
