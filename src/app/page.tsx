@@ -1573,8 +1573,7 @@ export default function Home() {
               className="lg:hidden inline-flex items-center justify-center h-10 w-24 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition text-sm font-medium"
               aria-label="Open editor"
             >
-              <span aria-hidden="true">✏</span>
-              <span className="sr-only">Edit</span>
+              Edit
             </button>
             <button
               onClick={() => handlePrint()}
