@@ -1319,6 +1319,7 @@ export default function Home() {
   const PAGE_PAD = layout === "compact" ? 32 : 48;
   const PAGE_PAD_BOTTOM = 24;
   const USABLE_HEIGHT = PAGE_HEIGHT - PAGE_PAD - PAGE_PAD_BOTTOM;
+  const SPLIT_SAFETY_PX = 2;
 
   // Track which section index starts page 2+
   const [pageSplitIndex, setPageSplitIndex] = useState<number>(-1);
@@ -1342,7 +1343,7 @@ export default function Home() {
         const el = sections[i] as HTMLElement;
         const rect = el.getBoundingClientRect();
         const elBottom = rect.top - containerRect.top + rect.height;
-        if (elBottom > USABLE_HEIGHT) {
+        if (elBottom >= USABLE_HEIGHT - SPLIT_SAFETY_PX) {
           if (layout === "two-column") {
             const sectionId = el.dataset?.sectionId;
             splitIdx = sectionId
@@ -1367,7 +1368,7 @@ export default function Home() {
           for (let i = 0; i < detailItems.length; i++) {
             const itemRect = detailItems[i].getBoundingClientRect();
             const itemBottom = itemRect.top - containerRect.top + itemRect.height;
-            if (itemBottom > USABLE_HEIGHT) {
+            if (itemBottom >= USABLE_HEIGHT - SPLIT_SAFETY_PX) {
               itemSplit = i;
               break;
             }
