@@ -708,10 +708,12 @@ function ResumeDraggableSection({
   section,
   experienceItems,
   projectItems,
+  onPreviewInteract,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
   projectItems?: Project[];
+  onPreviewInteract?: (section: ResumeSection) => void;
 }) {
   const { style, removeSectionFromResume } = useResumeStore();
   const { focusPanel } = useUIStore();
@@ -738,6 +740,7 @@ function ResumeDraggableSection({
 
   const expandPanel = () => {
     focusPanel(`sec-${section.id}`);
+    onPreviewInteract?.(section);
   };
 
   return (
@@ -746,7 +749,7 @@ function ResumeDraggableSection({
       style={containerStyle}
       {...attributes}
       {...listeners}
-      onMouseDown={expandPanel}
+      onPointerDown={expandPanel}
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
@@ -787,18 +790,26 @@ function ResumeStaticSection({
   section,
   experienceItems,
   projectItems,
+  onPreviewInteract,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
   projectItems?: Project[];
+  onPreviewInteract?: (section: ResumeSection) => void;
 }) {
   const { style } = useResumeStore();
-  const { showBodyIcons, sectionIcons } = useUIStore();
+  const { showBodyIcons, sectionIcons, focusPanel } = useUIStore();
   const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
   const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
 
+  const expandPanel = () => {
+    focusPanel(`sec-${section.id}`);
+    onPreviewInteract?.(section);
+  };
+
   return (
     <div
+      onPointerDown={expandPanel}
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
@@ -1097,6 +1108,7 @@ export default function Home() {
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
   const [pageCount, setPageCount] = useState(1);
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
@@ -1411,13 +1423,21 @@ export default function Home() {
   const renderLinearPageOneSections = () => {
     if (pageSplitIndex === -1) {
       return sectionOrder.map((sec) => (
-        <ResumeDraggableSection key={sec.id} section={sec} />
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
       ));
     }
 
     if (!canUseDetailSplit) {
       return sectionOrder.slice(0, pageSplitIndex).map((sec) => (
-        <ResumeDraggableSection key={sec.id} section={sec} />
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
       ));
     }
 
@@ -1429,13 +1449,18 @@ export default function Home() {
     return (
       <>
         {beforeSplit.map((sec) => (
-          <ResumeDraggableSection key={sec.id} section={sec} />
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
         ))}
         <ResumeDraggableSection
           key={splitSection!.id}
           section={splitSection!}
           experienceItems={splitExperienceItems}
           projectItems={splitProjectItems}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       </>
     );
@@ -1446,7 +1471,11 @@ export default function Home() {
 
     if (!canUseDetailSplit) {
       return sectionOrder.slice(pageSplitIndex).map((sec) => (
-        <ResumeDraggableSection key={sec.id} section={sec} />
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
       ));
     }
 
@@ -1461,9 +1490,14 @@ export default function Home() {
           section={splitSection!}
           experienceItems={splitExperienceItems}
           projectItems={splitProjectItems}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
         {afterSplit.map((sec) => (
-          <ResumeDraggableSection key={sec.id} section={sec} />
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
         ))}
       </>
     );
@@ -1480,17 +1514,47 @@ export default function Home() {
       <div className="min-h-screen bg-gray-100">
         <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800">Resume Builder</h1>
-          <button
-            onClick={() => handlePrint()}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium"
-          >
-            Export PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsMobileEditorOpen(true)}
+              className="lg:hidden bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-50 transition text-sm font-medium"
+            >
+              Sidebar
+            </button>
+            <button
+              onClick={() => handlePrint()}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium"
+            >
+              Export PDF
+            </button>
+          </div>
         </header>
 
         <main className="flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
+          {isMobileEditorOpen && (
+            <button
+              type="button"
+              onClick={() => setIsMobileEditorOpen(false)}
+              className="fixed inset-0 bg-black/35 z-40 lg:hidden"
+              aria-label="Close sidebar"
+            />
+          )}
+
           {/* Editor Sidebar */}
-          <div className="w-full lg:w-[30%] shrink-0 max-h-[50vh] lg:max-h-[calc(100vh-80px)] overflow-y-auto pr-0 lg:pr-2">
+          <div
+            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-[30%] lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+          >
+            <div className="flex items-center justify-between mb-2 lg:hidden">
+              <p className="text-sm font-semibold text-gray-700">Editor</p>
+              <button
+                type="button"
+                onClick={() => setIsMobileEditorOpen(false)}
+                className="px-2 py-1 rounded border border-gray-300 text-sm text-gray-700"
+              >
+                Close
+              </button>
+            </div>
             {/* Settings Group */}
             <div className="mb-4">
               <button
@@ -1664,6 +1728,7 @@ export default function Home() {
                             <ResumeDraggableSection
                               key={sec.id}
                               section={sec}
+                              onPreviewInteract={() => setIsMobileEditorOpen(true)}
                             />
                           ))}
                           {!sidebarSections.length && (
@@ -1680,6 +1745,7 @@ export default function Home() {
                             <ResumeDraggableSection
                               key={sec.id}
                               section={sec}
+                              onPreviewInteract={() => setIsMobileEditorOpen(true)}
                             />
                           ))}
                           {!mainSections.length && (
@@ -1722,6 +1788,7 @@ export default function Home() {
                               <ResumeDraggableSection
                                 key={sec.id}
                                 section={sec}
+                                onPreviewInteract={() => setIsMobileEditorOpen(true)}
                               />
                             ))}
                           </div>
