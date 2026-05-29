@@ -1793,7 +1793,7 @@ export default function Home() {
                 items={allIds}
               >
                 <DroppableZone
-                  id="zone-main"
+                  id={layout === "two-column" ? "zone-canvas" : "zone-main"}
                   className="flex flex-col items-center gap-8"
                 >
                   {/* Page 1 */}
@@ -1815,7 +1815,8 @@ export default function Home() {
                           margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px`,
                         }}
                       >
-                        <div
+                        <DroppableZone
+                          id="zone-sidebar"
                           className="shrink-0 p-5 pt-4"
                           style={{
                             background: s.accentColor + "10",
@@ -1834,8 +1835,11 @@ export default function Home() {
                               Drop sections here
                             </p>
                           )}
-                        </div>
-                        <div className="flex-1 p-8 pt-4">
+                        </DroppableZone>
+                        <DroppableZone
+                          id="zone-main"
+                          className="flex-1 p-8 pt-4"
+                        >
                           {(pageSplitIndex === -1
                             ? mainSections
                             : mainSections.slice(0, pageSplitIndex)
@@ -1851,7 +1855,7 @@ export default function Home() {
                               Drop sections here
                             </p>
                           )}
-                        </div>
+                        </DroppableZone>
                       </div>
                     ) : (
                       <div>
