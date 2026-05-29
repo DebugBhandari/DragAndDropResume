@@ -1248,6 +1248,24 @@ export default function Home() {
     documentTitle: "Resume",
   });
 
+  const handleExportPdf = useCallback(() => {
+    const isMobileViewport =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+
+    if (isMobileViewport && typeof window !== "undefined") {
+      window.print();
+      return;
+    }
+
+    try {
+      handlePrint?.();
+    } catch {
+      if (typeof window !== "undefined") {
+        window.print();
+      }
+    }
+  }, [handlePrint]);
+
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
     setActiveDragId(
@@ -1576,7 +1594,7 @@ export default function Home() {
               Edit
             </button>
             <button
-              onClick={() => handlePrint()}
+              onClick={handleExportPdf}
               className="inline-flex items-center justify-center h-10 w-24 lg:w-auto bg-blue-600 text-white px-4 rounded hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap"
             >
               Export PDF
