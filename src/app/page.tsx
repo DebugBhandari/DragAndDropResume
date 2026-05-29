@@ -1469,7 +1469,9 @@ export default function Home() {
   const pageStyle: React.CSSProperties = {
     width: `${PAGE_WIDTH}px`,
     height: `${PAGE_HEIGHT}px`,
-    padding: layout === "compact" ? "32px 32px 8px 32px" : "48px 48px 8px 48px",
+    padding: layout === "compact"
+      ? `32px 32px ${PAGE_PAD_BOTTOM}px 32px`
+      : `48px 48px ${PAGE_PAD_BOTTOM}px 48px`,
     fontFamily: getFontFamily(s.fontFamily),
     fontSize: `${s.fontSize === "sm" ? 12 : s.fontSize === "lg" ? 14 : 13}px`,
     background: "white",
