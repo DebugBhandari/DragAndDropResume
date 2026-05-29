@@ -1606,8 +1606,8 @@ export default function Home() {
           </div>
 
           {/* Resume Preview */}
-          <div className="flex-1 overflow-auto max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
-            <div className="origin-top w-[90%] mx-auto lg:w-auto lg:mx-0 scale-[0.6] sm:scale-[0.7] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
+            <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
             <div
               ref={resumeRef}
               className="resume-pages flex flex-col items-center gap-8 py-4 print:block print:p-0"
