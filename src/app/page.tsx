@@ -1543,7 +1543,7 @@ export default function Home() {
 
           {/* Editor Sidebar */}
           <div
-            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-[30%] lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-[36%] lg:min-w-[430px] lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
           >
             <div className="flex items-center justify-between mb-2 lg:hidden">
               <p className="text-sm font-semibold text-gray-700">Editor</p>
@@ -1670,7 +1670,7 @@ export default function Home() {
           </div>
 
           {/* Resume Preview */}
-          <div className="w-full lg:w-[70%] overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
+          <div className="w-full lg:w-[64%] overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
             <div
               ref={resumeRef}
