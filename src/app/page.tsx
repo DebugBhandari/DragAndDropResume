@@ -1108,9 +1108,12 @@ export default function Home() {
   const resumeRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const mainLayoutRef = useRef<HTMLElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
+  const [editorPaneWidth, setEditorPaneWidth] = useState(520);
+  const [isResizingEditor, setIsResizingEditor] = useState(false);
   const [pageCount, setPageCount] = useState(1);
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
@@ -1173,6 +1176,36 @@ export default function Home() {
 
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [isMobileEditorOpen, activePanelId]);
+
+  useEffect(() => {
+    if (!isResizingEditor) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!mainLayoutRef.current) return;
+      const rect = mainLayoutRef.current.getBoundingClientRect();
+
+      const minWidth = 420;
+      const maxWidth = Math.min(860, rect.width - 420);
+      const next = Math.max(minWidth, Math.min(maxWidth, event.clientX - rect.left));
+      setEditorPaneWidth(next);
+    };
+
+    const onPointerUp = () => {
+      setIsResizingEditor(false);
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [isResizingEditor]);
 
   useEffect(() => {
     const persisted = parsePersistedResumeData();
@@ -1545,7 +1578,7 @@ export default function Home() {
           </div>
         </header>
 
-        <main className="flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
+        <main ref={mainLayoutRef} className="flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
           {isMobileEditorOpen && (
             <button
               type="button"
@@ -1558,7 +1591,10 @@ export default function Home() {
           {/* Editor Sidebar */}
           <div
             ref={sidebarRef}
-            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-[36%] lg:min-w-[430px] lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-(--editor-pane-width) lg:max-w-none lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+            style={{
+              ["--editor-pane-width" as string]: `${editorPaneWidth}px`,
+            } as React.CSSProperties}
           >
             <div className="flex items-center justify-between mb-2 lg:hidden">
               <p className="text-sm font-semibold text-gray-700">Editor</p>
@@ -1684,8 +1720,21 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="hidden lg:flex items-stretch">
+            <button
+              type="button"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                setIsResizingEditor(true);
+              }}
+              className="w-2 rounded bg-gray-200/80 hover:bg-blue-300 active:bg-blue-400 cursor-col-resize transition-colors"
+              aria-label="Resize editor pane"
+              title="Drag to resize editor"
+            />
+          </div>
+
           {/* Resume Preview */}
-          <div className="w-full lg:w-[64%] overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
+          <div className="w-full lg:flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
             <div
               ref={resumeRef}
