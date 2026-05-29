@@ -760,6 +760,7 @@ function ResumeDraggableSection({
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
+      data-section-zone={section.zone}
       className={`${getSpacingClass(style.sectionSpacing)} break-inside-avoid relative rounded p-2 transition-all hover:bg-gray-50/50 active:cursor-grabbing group/sec`}
     >
       <button
@@ -820,6 +821,7 @@ function ResumeStaticSection({
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
+      data-section-zone={section.zone}
       className={`${getSpacingClass(style.sectionSpacing)} relative rounded p-2`}
     >
       <h2
@@ -1330,14 +1332,25 @@ export default function Home() {
       if (!contentRef.current) return;
       const container = contentRef.current;
       const containerRect = container.getBoundingClientRect();
-      const sections = container.querySelectorAll("[data-page-section]");
+      const sections = container.querySelectorAll(
+        layout === "two-column"
+          ? '[data-page-section][data-section-zone="main"]'
+          : "[data-page-section]",
+      );
       let splitIdx = -1;
       for (let i = 0; i < sections.length; i++) {
-        const el = sections[i];
+        const el = sections[i] as HTMLElement;
         const rect = el.getBoundingClientRect();
         const elBottom = rect.top - containerRect.top + rect.height;
         if (elBottom > USABLE_HEIGHT) {
-          splitIdx = i;
+          if (layout === "two-column") {
+            const sectionId = el.dataset?.sectionId;
+            splitIdx = sectionId
+              ? sectionOrder.findIndex((section) => section.id === sectionId)
+              : -1;
+          } else {
+            splitIdx = i;
+          }
           break;
         }
       }
@@ -1383,7 +1396,7 @@ export default function Home() {
     observer.observe(contentRef.current);
     measure();
     return () => observer.disconnect();
-  }, [layout, sectionOrder, experience, USABLE_HEIGHT, s.fontSize, s.headingSize, s.sectionSpacing]);
+  }, [layout, sectionOrder, experience, projects, USABLE_HEIGHT, s.fontSize, s.headingSize, s.sectionSpacing, s.sidebarWidth]);
 
   if (!mounted) return null;
 
@@ -1888,7 +1901,7 @@ export default function Home() {
                   visibility: "hidden",
                   left: "-9999px",
                   width: `${PAGE_WIDTH}px`,
-                  padding: `${PAGE_PAD}px ${PAGE_PAD}px 8px ${PAGE_PAD}px`,
+                  padding: `${PAGE_PAD}px ${PAGE_PAD}px ${PAGE_PAD_BOTTOM}px ${PAGE_PAD}px`,
                   fontSize: `${s.fontSize === "sm" ? 12 : s.fontSize === "lg" ? 14 : 13}px`,
                   fontFamily: getFontFamily(s.fontFamily),
                 }}
@@ -1900,9 +1913,30 @@ export default function Home() {
                     photo={photo}
                     onPreviewInteract={() => setIsMobileEditorOpen(true)}
                   />
-                  {sectionOrder.map((sec) => (
-                    <ResumeDraggableSection key={sec.id} section={sec} />
-                  ))}
+                  {layout === "two-column" ? (
+                    <div className="flex gap-0" style={{ minHeight: "850px", margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
+                      <div
+                        className="shrink-0 p-5 pt-4"
+                        style={{
+                          background: s.accentColor + "10",
+                          width: `${s.sidebarWidth}%`,
+                        }}
+                      >
+                        {sidebarSections.map((sec) => (
+                          <ResumeDraggableSection key={sec.id} section={sec} />
+                        ))}
+                      </div>
+                      <div className="flex-1 p-8 pt-4">
+                        {mainSections.map((sec) => (
+                          <ResumeDraggableSection key={sec.id} section={sec} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    sectionOrder.map((sec) => (
+                      <ResumeDraggableSection key={sec.id} section={sec} />
+                    ))
+                  )}
                 </div>
               </div>
 
