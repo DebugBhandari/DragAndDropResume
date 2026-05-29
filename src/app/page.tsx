@@ -756,7 +756,7 @@ function ResumeDraggableSection({
       style={containerStyle}
       {...attributes}
       {...listeners}
-      onPointerDown={expandPanel}
+      onClick={expandPanel}
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
@@ -816,7 +816,7 @@ function ResumeStaticSection({
 
   return (
     <div
-      onPointerDown={expandPanel}
+      onClick={expandPanel}
       data-page-section
       data-section-type={section.type}
       data-section-id={section.id}
