@@ -39,6 +39,21 @@ export default function SectionEditor({ type }: { type: SectionType }) {
           <div key={exp.id} className="form-card group">
             <button
               type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = experienceList.findIndex((item) => item.id === exp.id);
+                if (currentIndex === -1 || experienceList.length <= 1) return;
+                const targetIndex = currentIndex === experienceList.length - 1 ? 0 : currentIndex + 1;
+                const target = experienceList[targetIndex];
+                if (!target) return;
+                store.reorderExperience(exp.id, target.id);
+              }}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
               title="Move up (top goes to bottom)"
               className="absolute top-2 right-9 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
               onClick={() => {
@@ -119,6 +134,21 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {projectList.map((proj) => (
           <div key={proj.id} className="form-card group">
+            <button
+              type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = projectList.findIndex((item) => item.id === proj.id);
+                if (currentIndex === -1 || projectList.length <= 1) return;
+                const targetIndex = currentIndex === projectList.length - 1 ? 0 : currentIndex + 1;
+                const target = projectList[targetIndex];
+                if (!target) return;
+                store.reorderProjects(proj.id, target.id);
+              }}
+            >
+              ↓
+            </button>
             <button
               type="button"
               title="Move up (top goes to bottom)"
