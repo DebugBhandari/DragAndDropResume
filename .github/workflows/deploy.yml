@@ -2,14 +2,13 @@ name: Deploy to VPS
 
 on:
   push:
-    branches:
-      - main
   workflow_dispatch:
 
 env:
   APP_DIR: /var/www/resume-debugbhandari-link
   SERVICE_NAME: resume-debugbhandari
   DOMAIN: resume.debugbhandari.link
+  APP_PORT: 3001
 
 jobs:
   deploy:
@@ -31,6 +30,16 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Package build output
+        run: |
+          set -euo pipefail
+          tar -czf release.tgz \
+            .next \
+            public \
+            package.json \
+            package-lock.json \
+            next.config.ts
+
       - name: Configure SSH
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
@@ -44,19 +53,14 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload application files
+      - name: Upload build artifact
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
-          tar \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude=.next \
-            --exclude=.github \
-            -czf - . | ssh -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "mkdir -p '$APP_DIR' && tar -xzf - -C '$APP_DIR'"
+          scp -P "${VPS_PORT:-22}" release.tgz "$VPS_USER@$VPS_HOST:/tmp/${SERVICE_NAME}-release.tgz"
 
       - name: Deploy on VPS
         env:
@@ -65,7 +69,7 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
-          ssh -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "APP_DIR='$APP_DIR' SERVICE_NAME='$SERVICE_NAME' DOMAIN='$DOMAIN' bash -s" <<'EOF'
+          ssh -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "APP_DIR='$APP_DIR' SERVICE_NAME='$SERVICE_NAME' DOMAIN='$DOMAIN' APP_PORT='$APP_PORT' bash -s" <<'EOF'
           set -euo pipefail
 
           export DEBIAN_FRONTEND=noninteractive
@@ -86,9 +90,13 @@ jobs:
             apt-get install -y nginx
           fi
 
+          mkdir -p "$APP_DIR"
+          rm -rf "$APP_DIR/.next" "$APP_DIR/public"
+          tar -xzf "/tmp/${SERVICE_NAME}-release.tgz" -C "$APP_DIR"
+          rm -f "/tmp/${SERVICE_NAME}-release.tgz"
+
           cd "$APP_DIR"
-          npm ci
-          npm run build
+          npm ci --omit=dev
 
           cat >/etc/systemd/system/${SERVICE_NAME}.service <<UNIT
           [Unit]
@@ -98,7 +106,7 @@ jobs:
           [Service]
           Type=simple
           WorkingDirectory=${APP_DIR}
-          ExecStart=/usr/bin/npm run start:prod
+          ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${APP_PORT}
           Restart=always
           RestartSec=5
           Environment=NODE_ENV=production
@@ -118,7 +126,7 @@ jobs:
             server_name ${DOMAIN};
 
             location / {
-              proxy_pass http://127.0.0.1:3000;
+              proxy_pass http://127.0.0.1:${APP_PORT};
               proxy_http_version 1.1;
               proxy_set_header Upgrade \$http_upgrade;
               proxy_set_header Connection 'upgrade';
