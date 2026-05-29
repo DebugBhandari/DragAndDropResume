@@ -47,11 +47,46 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
+          if [ -z "${VPS_HOST:-}" ]; then
+            echo "VPS_HOST is empty. Set secrets.VPS_HOST (or optional secrets.VPS_HOST_IP)."
+            exit 1
+          fi
+
+          # If host is a DNS name, give resolver a few chances before failing.
+          if [[ ! "$VPS_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            for i in 1 2 3 4 5; do
+              if getent ahosts "$VPS_HOST" >/dev/null 2>&1; then
+                break
+              fi
+
+              if [ "$i" -eq 5 ]; then
+                echo "Could not resolve VPS_HOST=$VPS_HOST from GitHub runner."
+                echo "Set secrets.VPS_HOST to a public DNS name or set secrets.VPS_HOST_IP to server public IP."
+                exit 1
+              fi
+
+              echo "DNS resolution failed for $VPS_HOST (attempt $i/5). Retrying..."
+              sleep 3
+            done
+          fi
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           echo "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          for i in 1 2 3 4 5; do
+            if ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              break
+            fi
+
+            if [ "$i" -eq 5 ]; then
+              echo "ssh-keyscan failed for $VPS_HOST:${VPS_PORT:-22} after 5 attempts."
+              exit 1
+            fi
+
+            echo "ssh-keyscan failed (attempt $i/5). Retrying..."
+            sleep 3
+          done
 
       - name: Upload build artifact
         env:
