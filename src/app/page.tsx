@@ -567,14 +567,21 @@ function PersonalHeader({
   layout,
   style: s,
   photo,
+  onPreviewInteract,
 }: {
   layout: LayoutType;
   style: StyleConfig;
   photo: PhotoConfig;
+  onPreviewInteract?: () => void;
 }) {
   const { personalInfo } = useResumeStore();
   const { focusPanel } = useUIStore();
   const headerRef = useRef<HTMLDivElement>(null);
+
+  const handleHeaderClick = () => {
+    focusPanel('panel-header');
+    onPreviewInteract?.();
+  };
 
   // Compute text alignment offset based on photo position
   const photoOnLeft = photo.url && photo.x < 35;
@@ -592,7 +599,7 @@ function PersonalHeader({
     return (
       <div
         ref={headerRef}
-        onClick={() => focusPanel('panel-header')}
+        onClick={handleHeaderClick}
         className="text-white -mx-12 -mt-12 mb-6 px-8 py-8 relative cursor-pointer"
         style={{
           background: s.accentColor,
@@ -631,7 +638,7 @@ function PersonalHeader({
     return (
       <div
         ref={headerRef}
-        onClick={() => focusPanel('panel-header')}
+        onClick={handleHeaderClick}
         className="mb-3 pb-2 relative cursor-pointer"
         style={{
           borderBottom: `2px solid ${s.accentColor}`,
@@ -675,7 +682,7 @@ function PersonalHeader({
   return (
     <div
       ref={headerRef}
-      onClick={() => focusPanel('panel-header')}
+      onClick={handleHeaderClick}
       className="mb-4 relative cursor-pointer"
       style={{ minHeight: photo.url ? Math.max(80, photo.size + 16) : "auto" }}
     >
@@ -1753,7 +1760,12 @@ export default function Home() {
                 }}
               >
                 <div ref={contentRef}>
-                  <PersonalHeader layout={layout} style={s} photo={photo} />
+                  <PersonalHeader
+                    layout={layout}
+                    style={s}
+                    photo={photo}
+                    onPreviewInteract={() => setIsMobileEditorOpen(true)}
+                  />
                   {sectionOrder.map((sec) => (
                     <ResumeDraggableSection key={sec.id} section={sec} />
                   ))}
@@ -1772,7 +1784,12 @@ export default function Home() {
                     className="resume-page shadow-lg rounded"
                     style={{ ...pageStyle }}
                   >
-                    <PersonalHeader layout={layout} style={s} photo={photo} />
+                    <PersonalHeader
+                      layout={layout}
+                      style={s}
+                      photo={photo}
+                      onPreviewInteract={() => setIsMobileEditorOpen(true)}
+                    />
                     {layout === "two-column" ? (
                       <div
                         className="flex gap-0"
