@@ -228,6 +228,36 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {store.languages.map((lang) => (
           <div key={lang.id} className="form-card flex gap-2 items-center">
+            <button
+              type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.languages.findIndex((item) => item.id === lang.id);
+                if (currentIndex === -1 || store.languages.length <= 1) return;
+                const targetIndex = currentIndex === store.languages.length - 1 ? 0 : currentIndex + 1;
+                const target = store.languages[targetIndex];
+                if (!target) return;
+                store.reorderLanguages(lang.id, target.id);
+              }}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              title="Move up (top goes to bottom)"
+              className="absolute top-2 right-9 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.languages.findIndex((item) => item.id === lang.id);
+                if (currentIndex === -1 || store.languages.length <= 1) return;
+                const targetIndex = currentIndex === 0 ? store.languages.length - 1 : currentIndex - 1;
+                const target = store.languages[targetIndex];
+                if (!target) return;
+                store.reorderLanguages(lang.id, target.id);
+              }}
+            >
+              ↑
+            </button>
             <button onClick={() => store.removeLanguage(lang.id)} className="remove-btn">✕</button>
             <input className="input-field flex-1" placeholder="Language" value={lang.name} onChange={(e) => store.updateLanguage(lang.id, { name: e.target.value })} />
             <select className="input-field w-36" value={lang.proficiency} onChange={(e) => store.updateLanguage(lang.id, { proficiency: e.target.value as Language['proficiency'] })}>
@@ -245,6 +275,36 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {store.skills.map((skill) => (
           <div key={skill.id} className="form-card flex gap-2 items-center">
+            <button
+              type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.skills.findIndex((item) => item.id === skill.id);
+                if (currentIndex === -1 || store.skills.length <= 1) return;
+                const targetIndex = currentIndex === store.skills.length - 1 ? 0 : currentIndex + 1;
+                const target = store.skills[targetIndex];
+                if (!target) return;
+                store.reorderSkills(skill.id, target.id);
+              }}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              title="Move up (top goes to bottom)"
+              className="absolute top-2 right-9 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.skills.findIndex((item) => item.id === skill.id);
+                if (currentIndex === -1 || store.skills.length <= 1) return;
+                const targetIndex = currentIndex === 0 ? store.skills.length - 1 : currentIndex - 1;
+                const target = store.skills[targetIndex];
+                if (!target) return;
+                store.reorderSkills(skill.id, target.id);
+              }}
+            >
+              ↑
+            </button>
             <button onClick={() => store.removeSkill(skill.id)} className="remove-btn">✕</button>
             <input className="input-field flex-1" placeholder="Skill" value={skill.name} onChange={(e) => store.updateSkill(skill.id, { name: e.target.value })} />
             <select className="input-field w-36" value={skill.level} onChange={(e) => store.updateSkill(skill.id, { level: e.target.value as Skill['level'] })}>
@@ -262,6 +322,36 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {store.certificates.map((cert) => (
           <div key={cert.id} className="form-card">
+            <button
+              type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.certificates.findIndex((item) => item.id === cert.id);
+                if (currentIndex === -1 || store.certificates.length <= 1) return;
+                const targetIndex = currentIndex === store.certificates.length - 1 ? 0 : currentIndex + 1;
+                const target = store.certificates[targetIndex];
+                if (!target) return;
+                store.reorderCertificates(cert.id, target.id);
+              }}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              title="Move up (top goes to bottom)"
+              className="absolute top-2 right-9 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.certificates.findIndex((item) => item.id === cert.id);
+                if (currentIndex === -1 || store.certificates.length <= 1) return;
+                const targetIndex = currentIndex === 0 ? store.certificates.length - 1 : currentIndex - 1;
+                const target = store.certificates[targetIndex];
+                if (!target) return;
+                store.reorderCertificates(cert.id, target.id);
+              }}
+            >
+              ↑
+            </button>
             <button onClick={() => store.removeCertificate(cert.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Certificate Name" value={cert.name} onChange={(e) => store.updateCertificate(cert.id, { name: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">
@@ -320,6 +410,36 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {store.references.map((ref) => (
           <div key={ref.id} className="form-card">
+            <button
+              type="button"
+              title="Move down (bottom goes to top)"
+              className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.references.findIndex((item) => item.id === ref.id);
+                if (currentIndex === -1 || store.references.length <= 1) return;
+                const targetIndex = currentIndex === store.references.length - 1 ? 0 : currentIndex + 1;
+                const target = store.references[targetIndex];
+                if (!target) return;
+                store.reorderReferences(ref.id, target.id);
+              }}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              title="Move up (top goes to bottom)"
+              className="absolute top-2 right-9 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
+              onClick={() => {
+                const currentIndex = store.references.findIndex((item) => item.id === ref.id);
+                if (currentIndex === -1 || store.references.length <= 1) return;
+                const targetIndex = currentIndex === 0 ? store.references.length - 1 : currentIndex - 1;
+                const target = store.references[targetIndex];
+                if (!target) return;
+                store.reorderReferences(ref.id, target.id);
+              }}
+            >
+              ↑
+            </button>
             <button onClick={() => store.removeReference(ref.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Name" value={ref.name} onChange={(e) => store.updateReference(ref.id, { name: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">

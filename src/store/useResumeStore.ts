@@ -189,12 +189,15 @@ interface ResumeStore extends ResumeData {
   addLanguage: () => void;
   updateLanguage: (id: string, data: Partial<Language>) => void;
   removeLanguage: (id: string) => void;
+  reorderLanguages: (activeId: string, overId: string) => void;
   addSkill: () => void;
   updateSkill: (id: string, data: Partial<Skill>) => void;
   removeSkill: (id: string) => void;
+  reorderSkills: (activeId: string, overId: string) => void;
   addCertificate: () => void;
   updateCertificate: (id: string, data: Partial<Certificate>) => void;
   removeCertificate: (id: string) => void;
+  reorderCertificates: (activeId: string, overId: string) => void;
   addAward: () => void;
   updateAward: (id: string, data: Partial<Award>) => void;
   removeAward: (id: string) => void;
@@ -204,6 +207,7 @@ interface ResumeStore extends ResumeData {
   addReference: () => void;
   updateReference: (id: string, data: Partial<Reference>) => void;
   removeReference: (id: string) => void;
+  reorderReferences: (activeId: string, overId: string) => void;
   addInterest: () => void;
   updateInterest: (id: string, data: Partial<Interest>) => void;
   removeInterest: (id: string) => void;
@@ -270,14 +274,23 @@ export const useResumeStore = create<ResumeStore>()(
       addLanguage: () => set((s) => ({ languages: [...s.languages, { id: uuidv4(), name: '', proficiency: 'Intermediate' }] })),
       updateLanguage: (id, data) => set((s) => ({ languages: s.languages.map((l) => (l.id === id ? { ...l, ...data } : l)) })),
       removeLanguage: (id) => set((s) => ({ languages: s.languages.filter((l) => l.id !== id) })),
+      reorderLanguages: (activeId, overId) => set((s) => ({
+        languages: moveItemById(s.languages, activeId, overId),
+      })),
 
       addSkill: () => set((s) => ({ skills: [...s.skills, { id: uuidv4(), name: '', level: 'Intermediate' }] })),
       updateSkill: (id, data) => set((s) => ({ skills: s.skills.map((sk) => (sk.id === id ? { ...sk, ...data } : sk)) })),
       removeSkill: (id) => set((s) => ({ skills: s.skills.filter((sk) => sk.id !== id) })),
+      reorderSkills: (activeId, overId) => set((s) => ({
+        skills: moveItemById(s.skills, activeId, overId),
+      })),
 
       addCertificate: () => set((s) => ({ certificates: [...s.certificates, { id: uuidv4(), name: '', issuer: '', date: '', link: '' }] })),
       updateCertificate: (id, data) => set((s) => ({ certificates: s.certificates.map((c) => (c.id === id ? { ...c, ...data } : c)) })),
       removeCertificate: (id) => set((s) => ({ certificates: s.certificates.filter((c) => c.id !== id) })),
+      reorderCertificates: (activeId, overId) => set((s) => ({
+        certificates: moveItemById(s.certificates, activeId, overId),
+      })),
 
       addAward: () => set((s) => ({ awards: [...s.awards, { id: uuidv4(), title: '', issuer: '', date: '', description: '' }] })),
       updateAward: (id, data) => set((s) => ({ awards: s.awards.map((a) => (a.id === id ? { ...a, ...data } : a)) })),
@@ -290,6 +303,9 @@ export const useResumeStore = create<ResumeStore>()(
       addReference: () => set((s) => ({ references: [...s.references, { id: uuidv4(), name: '', position: '', company: '', contact: '' }] })),
       updateReference: (id, data) => set((s) => ({ references: s.references.map((r) => (r.id === id ? { ...r, ...data } : r)) })),
       removeReference: (id) => set((s) => ({ references: s.references.filter((r) => r.id !== id) })),
+      reorderReferences: (activeId, overId) => set((s) => ({
+        references: moveItemById(s.references, activeId, overId),
+      })),
 
       addInterest: () => set((s) => ({ interests: [...s.interests, { id: uuidv4(), name: '' }] })),
       updateInterest: (id, data) => set((s) => ({ interests: s.interests.map((i) => (i.id === id ? { ...i, ...data } : i)) })),
