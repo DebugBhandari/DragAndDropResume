@@ -1558,12 +1558,12 @@ export default function Home() {
     >
       <div className="min-h-screen bg-gray-100">
         <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">Drag and Drop Resume</h1>
+          <h1 className="text-lg font-bold text-gray-800">Easy Resume</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsMobileEditorOpen(true)}
-              className="lg:hidden bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 transition text-sm font-medium"
+              className="lg:hidden inline-flex items-center justify-center h-10 w-24 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition text-sm font-medium"
               aria-label="Open editor"
             >
               <span aria-hidden="true">✏</span>
@@ -1571,7 +1571,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => handlePrint()}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium"
+              className="inline-flex items-center justify-center h-10 w-24 lg:w-auto bg-blue-600 text-white px-4 rounded hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap"
             >
               Export PDF
             </button>
