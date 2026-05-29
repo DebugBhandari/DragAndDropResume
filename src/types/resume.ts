@@ -32,6 +32,8 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  descriptionBullets: string[];
+  completionDate: string;
   technologies: string;
   link: string;
 }

@@ -96,12 +96,59 @@ export default function SectionEditor({ type }: { type: SectionType }) {
     return (
       <div className="space-y-3">
         {store.projects.map((proj) => (
-          <div key={proj.id} className="form-card">
+          <div key={proj.id} className="form-card group">
             <button onClick={() => store.removeProject(proj.id)} className="remove-btn">✕</button>
             <input className="input-field" placeholder="Project Name" value={proj.name} onChange={(e) => store.updateProject(proj.id, { name: e.target.value })} />
-            <textarea className="input-field" placeholder="Description" value={proj.description} onChange={(e) => store.updateProject(proj.id, { description: e.target.value })} />
-            <input className="input-field" placeholder="Technologies" value={proj.technologies} onChange={(e) => store.updateProject(proj.id, { technologies: e.target.value })} />
-            <input className="input-field" placeholder="Link" value={proj.link} onChange={(e) => store.updateProject(proj.id, { link: e.target.value })} />
+
+            <div className="pt-1">
+              <div className="overflow-hidden max-h-0 opacity-0 translate-y-1 transition-all duration-200 group-hover:max-h-96 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:max-h-96 group-focus-within:opacity-100 group-focus-within:translate-y-0">
+                <div className="space-y-2 pt-1">
+                  <input className="input-field" placeholder="Completion Date" value={proj.completionDate || ''} onChange={(e) => store.updateProject(proj.id, { completionDate: e.target.value })} />
+                  <input className="input-field" placeholder="Technologies" value={proj.technologies} onChange={(e) => store.updateProject(proj.id, { technologies: e.target.value })} />
+                  <input className="input-field" placeholder="Link" value={proj.link} onChange={(e) => store.updateProject(proj.id, { link: e.target.value })} />
+
+                  {(proj.descriptionBullets || ['']).map((bullet, index) => (
+                    <div key={`${proj.id}-bullet-${index}`} className="flex items-start gap-2">
+                      <span className="text-slate-400 pt-2">•</span>
+                      <input
+                        className="input-field flex-1"
+                        placeholder={`Project detail ${index + 1}`}
+                        value={bullet}
+                        onChange={(e) => {
+                          const nextBullets = [...(proj.descriptionBullets || [''])];
+                          nextBullets[index] = e.target.value;
+                          store.updateProject(proj.id, { descriptionBullets: nextBullets, description: nextBullets.filter((item) => item.trim().length > 0).join('\n') });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mt-1 text-xs px-2 py-1 rounded border border-slate-300 text-slate-600 disabled:opacity-40"
+                        disabled={(proj.descriptionBullets || ['']).length <= 1}
+                        onClick={() => {
+                          const currentBullets = proj.descriptionBullets || [''];
+                          if (currentBullets.length <= 1) return;
+                          const nextBullets = currentBullets.filter((_, bulletIndex) => bulletIndex !== index);
+                          store.updateProject(proj.id, { descriptionBullets: nextBullets, description: nextBullets.filter((item) => item.trim().length > 0).join('\n') });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn-add"
+                    onClick={() => {
+                      const nextBullets = [...(proj.descriptionBullets || ['']), ''];
+                      store.updateProject(proj.id, { descriptionBullets: nextBullets });
+                    }}
+                  >
+                    + Add Bullet
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ))}
         <button onClick={store.addProject} className="btn-add">+ Add Project</button>

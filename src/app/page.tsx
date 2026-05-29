@@ -35,6 +35,7 @@ import {
   ColumnZone,
   ResumeData,
   WorkExperience,
+  Project,
 } from "@/types/resume";
 
 // ─── Contact icons for resume ───
@@ -82,9 +83,11 @@ function getFontFamily(font: StyleConfig["fontFamily"]) {
 function SectionContent({
   type,
   experienceItems,
+  projectItems,
 }: {
   type: SectionType;
   experienceItems?: WorkExperience[];
+  projectItems?: Project[];
 }) {
   const {
     education,
@@ -190,7 +193,9 @@ function SectionContent({
       );
       }
     case "projects":
-      if (!projects.length)
+      {
+      const projectList = projectItems ?? projects;
+      if (!projectList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No projects added
@@ -198,12 +203,28 @@ function SectionContent({
         );
       return (
         <>
-          {projects.map((proj) => (
-            <div key={proj.id} className="mb-2">
+          {projectList.map((proj) => {
+            const bullets = (proj.descriptionBullets && proj.descriptionBullets.length > 0
+              ? proj.descriptionBullets
+              : proj.description
+                ? [proj.description]
+                : []
+            ).map((item) => item.trim()).filter((item) => item.length > 0);
+
+            return (
+            <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-auto">
               <div className="flex items-baseline gap-2">
                 <strong style={{ fontSize: "1.05em" }}>
                   {proj.name || "Project"}
                 </strong>
+                {proj.completionDate && (
+                  <span
+                    className="text-gray-500"
+                    style={{ fontSize: "0.85em" }}
+                  >
+                    • {proj.completionDate}
+                  </span>
+                )}
                 {proj.technologies && (
                   <span
                     className="text-gray-500"
@@ -213,29 +234,29 @@ function SectionContent({
                   </span>
                 )}
               </div>
-              {proj.description && (
-                <p
-                  className="mt-0.5 text-gray-600"
-                  style={{ fontSize: "0.9em" }}
-                >
-                  {proj.description}
-                </p>
+              {bullets.length > 0 && (
+                <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
+                  {bullets.map((bullet, index) => (
+                    <li key={`${proj.id}-preview-bullet-${index}`}>{bullet}</li>
+                  ))}
+                </ul>
               )}
               {proj.link && (
                 <a
                   href={proj.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline"
+                  className="mt-1 inline-block"
                   style={{ color: style.accentColor, fontSize: "0.85em" }}
                 >
                   {proj.link}
                 </a>
               )}
             </div>
-          ))}
+          )})}
         </>
       );
+      }
     case "languages":
       if (!languages.length)
         return (
@@ -677,9 +698,11 @@ function PersonalHeader({
 function ResumeDraggableSection({
   section,
   experienceItems,
+  projectItems,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
+  projectItems?: Project[];
 }) {
   const { style, removeSectionFromResume } = useResumeStore();
   const { focusPanel } = useUIStore();
@@ -745,6 +768,7 @@ function ResumeDraggableSection({
       <SectionContent
         type={section.type}
         experienceItems={section.type === "experience" ? experienceItems : undefined}
+        projectItems={section.type === "projects" ? projectItems : undefined}
       />
     </div>
   );
@@ -753,9 +777,11 @@ function ResumeDraggableSection({
 function ResumeStaticSection({
   section,
   experienceItems,
+  projectItems,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
+  projectItems?: Project[];
 }) {
   const { style } = useResumeStore();
   const { showBodyIcons, sectionIcons } = useUIStore();
@@ -782,6 +808,7 @@ function ResumeStaticSection({
       <SectionContent
         type={section.type}
         experienceItems={section.type === "experience" ? experienceItems : undefined}
+        projectItems={section.type === "projects" ? projectItems : undefined}
       />
     </div>
   );
@@ -913,7 +940,7 @@ function sectionHasData(type: SectionType, store: SectionDataSnapshot) {
     case "projects":
       return store.projects.some((item) =>
         hasAnyKeys(item) &&
-        hasAnyText([item.name, item.description, item.technologies, item.link]),
+        hasAnyText([item.name, item.description, ...(item.descriptionBullets || []), item.completionDate, item.technologies, item.link]),
       );
     case "languages":
       return store.languages.some((item) => hasAnyKeys(item) && hasAnyText([item.name]));
@@ -988,11 +1015,6 @@ function SidebarDraggablePanel({
           persistId={`sec-${section.id}`}
           defaultOpen={false}
         >
-          {hasData && (
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-emerald-700">
-              Contains data
-            </p>
-          )}
           <div className="mb-2 flex items-center gap-2">
             <label
               className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer"
@@ -1205,8 +1227,9 @@ export default function Home() {
 
   // Track which section index starts page 2+
   const [pageSplitIndex, setPageSplitIndex] = useState<number>(-1);
-  const [experienceSplitSectionIndex, setExperienceSplitSectionIndex] = useState<number | null>(null);
-  const [experienceSplitItemIndex, setExperienceSplitItemIndex] = useState<number | null>(null);
+  const [detailSplitSectionType, setDetailSplitSectionType] = useState<"experience" | "projects" | null>(null);
+  const [detailSplitSectionIndex, setDetailSplitSectionIndex] = useState<number | null>(null);
+  const [detailSplitItemIndex, setDetailSplitItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -1228,12 +1251,15 @@ export default function Home() {
       setPageSplitIndex(splitIdx);
       if (splitIdx !== -1) {
         const overflowSection = sections[splitIdx] as HTMLElement;
-        if (overflowSection?.dataset?.sectionType === "experience") {
-          const experienceItems = overflowSection.querySelectorAll("[data-exp-item]");
+        const overflowType = overflowSection?.dataset?.sectionType;
+        const isSplitType = overflowType === "experience" || overflowType === "projects";
+        if (isSplitType) {
+          const itemSelector = overflowType === "experience" ? "[data-exp-item]" : "[data-project-item]";
+          const detailItems = overflowSection.querySelectorAll(itemSelector);
           let itemSplit = -1;
 
-          for (let i = 0; i < experienceItems.length; i++) {
-            const itemRect = experienceItems[i].getBoundingClientRect();
+          for (let i = 0; i < detailItems.length; i++) {
+            const itemRect = detailItems[i].getBoundingClientRect();
             const itemBottom = itemRect.top - containerRect.top + itemRect.height;
             if (itemBottom > USABLE_HEIGHT) {
               itemSplit = i;
@@ -1242,22 +1268,25 @@ export default function Home() {
           }
 
           if (itemSplit === -1) {
-            itemSplit = experienceItems.length;
+            itemSplit = detailItems.length;
           }
 
-          if (itemSplit < 1 && experienceItems.length > 0) {
+          if (itemSplit < 1 && detailItems.length > 0) {
             itemSplit = 1;
           }
 
-          setExperienceSplitSectionIndex(splitIdx);
-          setExperienceSplitItemIndex(itemSplit);
+          setDetailSplitSectionType(overflowType);
+          setDetailSplitSectionIndex(splitIdx);
+          setDetailSplitItemIndex(itemSplit);
         } else {
-          setExperienceSplitSectionIndex(null);
-          setExperienceSplitItemIndex(null);
+          setDetailSplitSectionType(null);
+          setDetailSplitSectionIndex(null);
+          setDetailSplitItemIndex(null);
         }
       } else {
-        setExperienceSplitSectionIndex(null);
-        setExperienceSplitItemIndex(null);
+        setDetailSplitSectionType(null);
+        setDetailSplitSectionIndex(null);
+        setDetailSplitItemIndex(null);
       }
       setPageCount(splitIdx === -1 ? 1 : 2);
     };
@@ -1341,26 +1370,29 @@ export default function Home() {
     overflow: "hidden",
   };
 
-  const hasExperienceSplit =
-    experienceSplitSectionIndex !== null &&
-    experienceSplitItemIndex !== null &&
+  const hasDetailSplit =
+    detailSplitSectionType !== null &&
+    detailSplitSectionIndex !== null &&
+    detailSplitItemIndex !== null &&
     pageSplitIndex !== -1;
 
-  const clampedExperienceSplitIndex = hasExperienceSplit
-    ? Math.max(1, Math.min(experienceSplitItemIndex!, experience.length))
+  const splitItemsLength = detailSplitSectionType === "projects" ? projects.length : experience.length;
+
+  const clampedDetailSplitIndex = hasDetailSplit
+    ? Math.max(1, Math.min(detailSplitItemIndex!, splitItemsLength))
     : null;
 
   const splitSectionCandidate =
-    hasExperienceSplit &&
-    experienceSplitSectionIndex! >= 0 &&
-    experienceSplitSectionIndex! < sectionOrder.length
-      ? sectionOrder[experienceSplitSectionIndex!]
+    hasDetailSplit &&
+    detailSplitSectionIndex! >= 0 &&
+    detailSplitSectionIndex! < sectionOrder.length
+      ? sectionOrder[detailSplitSectionIndex!]
       : null;
 
-  const canUseExperienceSplit =
+  const canUseDetailSplit =
     !!splitSectionCandidate &&
-    splitSectionCandidate.type === "experience" &&
-    clampedExperienceSplitIndex !== null;
+    splitSectionCandidate.type === detailSplitSectionType &&
+    clampedDetailSplitIndex !== null;
 
   const renderLinearPageOneSections = () => {
     if (pageSplitIndex === -1) {
@@ -1369,14 +1401,16 @@ export default function Home() {
       ));
     }
 
-    if (!canUseExperienceSplit) {
+    if (!canUseDetailSplit) {
       return sectionOrder.slice(0, pageSplitIndex).map((sec) => (
         <ResumeDraggableSection key={sec.id} section={sec} />
       ));
     }
 
     const splitSection = splitSectionCandidate;
-    const beforeSplit = sectionOrder.slice(0, experienceSplitSectionIndex!);
+    const beforeSplit = sectionOrder.slice(0, detailSplitSectionIndex!);
+    const splitExperienceItems = detailSplitSectionType === "experience" ? experience.slice(0, clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? projects.slice(0, clampedDetailSplitIndex!) : undefined;
 
     return (
       <>
@@ -1386,7 +1420,8 @@ export default function Home() {
         <ResumeDraggableSection
           key={splitSection!.id}
           section={splitSection!}
-          experienceItems={experience.slice(0, clampedExperienceSplitIndex)}
+          experienceItems={splitExperienceItems}
+          projectItems={splitProjectItems}
         />
       </>
     );
@@ -1395,20 +1430,23 @@ export default function Home() {
   const renderLinearPageTwoSections = () => {
     if (pageSplitIndex === -1) return null;
 
-    if (!canUseExperienceSplit) {
+    if (!canUseDetailSplit) {
       return sectionOrder.slice(pageSplitIndex).map((sec) => (
         <ResumeDraggableSection key={sec.id} section={sec} />
       ));
     }
 
     const splitSection = splitSectionCandidate;
-    const afterSplit = sectionOrder.slice(experienceSplitSectionIndex! + 1);
+    const afterSplit = sectionOrder.slice(detailSplitSectionIndex! + 1);
+    const splitExperienceItems = detailSplitSectionType === "experience" ? experience.slice(clampedDetailSplitIndex!) : undefined;
+    const splitProjectItems = detailSplitSectionType === "projects" ? projects.slice(clampedDetailSplitIndex!) : undefined;
 
     return (
       <>
         <ResumeStaticSection
           section={splitSection!}
-          experienceItems={experience.slice(clampedExperienceSplitIndex)}
+          experienceItems={splitExperienceItems}
+          projectItems={splitProjectItems}
         />
         {afterSplit.map((sec) => (
           <ResumeDraggableSection key={sec.id} section={sec} />

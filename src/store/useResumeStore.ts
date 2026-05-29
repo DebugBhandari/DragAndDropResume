@@ -53,6 +53,22 @@ const normalizeExperience = (item: any) => {
   };
 };
 
+const normalizeProject = (item: any) => {
+  const rawBullets = Array.isArray(item?.descriptionBullets)
+    ? item.descriptionBullets
+    : typeof item?.description === 'string' && item.description.trim().length > 0
+      ? [item.description]
+      : [''];
+
+  const bullets = rawBullets.map((bullet: any) => String(bullet ?? ''));
+
+  return {
+    ...item,
+    descriptionBullets: bullets.length > 0 ? bullets : [''],
+    completionDate: String(item?.completionDate ?? ''),
+  };
+};
+
 const sectionHasData = (type: SectionType, state: any) => {
   switch (type) {
     case 'experience':
@@ -65,7 +81,7 @@ const sectionHasData = (type: SectionType, state: any) => {
       );
     case 'projects':
       return (state.projects || []).some((item: any) =>
-        hasAnyKeys(item) && hasAnyText([item.name, item.description, item.technologies, item.link])
+        hasAnyKeys(item) && hasAnyText([item.name, item.description, ...(item.descriptionBullets || []), item.completionDate, item.technologies, item.link])
       );
     case 'skills':
       return (state.skills || []).some((item: any) =>
@@ -102,6 +118,45 @@ const sectionHasData = (type: SectionType, state: any) => {
 
 const defaultStyle: StyleConfig = { accentColor: '#2563eb', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'center', sidebarWidth: 30 };
 const defaultPhoto: PhotoConfig = { url: '', x: 50, y: 50, size: 80, borderRadius: 50 };
+const seededPersonalInfo: PersonalInfo = {
+  fullName: 'Your Name',
+  email: 'you@example.com',
+  phone: '+1 (555) 123-4567',
+  location: 'City, Country',
+  summary: 'Product-minded engineer focused on building reliable web apps with strong UX and measurable outcomes.',
+  linkedin: 'https://linkedin.com/in/your-profile',
+  website: 'https://your-portfolio.dev',
+};
+
+const seededExperience: WorkExperience[] = [
+  {
+    id: 'seed-exp-1',
+    company: 'Acme Labs',
+    position: 'Software Engineer',
+    startDate: 'Jan 2023',
+    endDate: 'Present',
+    description: 'Built and shipped resume builder features with measurable UX improvements.',
+    descriptionBullets: [
+      'Built drag-and-drop section management with persistent layout state.',
+      'Improved print/export fidelity and reduced formatting issues across browsers.',
+    ],
+  },
+];
+
+const seededProjects: Project[] = [
+  {
+    id: 'seed-proj-1',
+    name: 'Resume Builder',
+    description: 'Interactive resume builder with live preview and export support.',
+    descriptionBullets: [
+      'Implemented section-level customization and style controls.',
+      'Added robust deployment pipeline to VPS with domain routing.',
+    ],
+    completionDate: 'May 2026',
+    technologies: 'Next.js, TypeScript, Zustand',
+    link: 'https://resume.debugbhandari.link',
+  },
+];
 
 interface ResumeStore extends ResumeData {
   setLayout: (layout: LayoutType) => void;
@@ -148,8 +203,8 @@ interface ResumeStore extends ResumeData {
 export const useResumeStore = create<ResumeStore>()(
   persist(
     (set) => ({
-      personalInfo: { fullName: '', email: '', phone: '', location: '', summary: '', linkedin: '', website: '' },
-      education: [], experience: [], projects: [], languages: [], skills: [], certificates: [],
+      personalInfo: seededPersonalInfo,
+      education: [], experience: seededExperience, projects: seededProjects, languages: [], skills: [], certificates: [],
       awards: [], volunteer: [], references: [], interests: [],
       sectionOrder: defaultSections,
       removedSections: [],
@@ -170,7 +225,7 @@ export const useResumeStore = create<ResumeStore>()(
       updateExperience: (id, data) => set((s) => ({ experience: s.experience.map((e) => (e.id === id ? { ...e, ...data } : e)) })),
       removeExperience: (id) => set((s) => ({ experience: s.experience.filter((e) => e.id !== id) })),
 
-      addProject: () => set((s) => ({ projects: [...s.projects, { id: uuidv4(), name: '', description: '', technologies: '', link: '' }] })),
+      addProject: () => set((s) => ({ projects: [...s.projects, { id: uuidv4(), name: '', description: '', descriptionBullets: [''], completionDate: '', technologies: '', link: '' }] })),
       updateProject: (id, data) => set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...data } : p)) })),
       removeProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
 
@@ -247,6 +302,7 @@ export const useResumeStore = create<ResumeStore>()(
         if (!merged.skills) merged.skills = [];
         if (!merged.style?.sidebarWidth) merged.style = { ...current.style, ...merged.style, sidebarWidth: merged.style?.sidebarWidth || 30 };
         merged.experience = (merged.experience || []).map(normalizeExperience);
+        merged.projects = (merged.projects || []).map(normalizeProject);
         if (!merged.personalInfo?.linkedin) merged.personalInfo = { ...current.personalInfo, ...merged.personalInfo };
         return merged;
       },

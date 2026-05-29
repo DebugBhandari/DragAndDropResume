@@ -134,9 +134,17 @@
     break-inside: auto !important;
     page-break-inside: auto !important;
   }
+  [data-page-section][data-section-type="projects"] {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
   [data-exp-item] {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  [data-project-item] {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
   @page {
     size: A4;
