@@ -1315,7 +1315,7 @@ export default function Home() {
   const PAGE_WIDTH = 794;
   const PAGE_HEIGHT = 1123;
   const PAGE_PAD = layout === "compact" ? 32 : 48;
-  const PAGE_PAD_BOTTOM = 8;
+  const PAGE_PAD_BOTTOM = 24;
   const USABLE_HEIGHT = PAGE_HEIGHT - PAGE_PAD - PAGE_PAD_BOTTOM;
 
   // Track which section index starts page 2+
