@@ -1243,6 +1243,7 @@ export default function Home() {
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
   const {
+    personalInfo,
     sectionOrder,
     reorderSections,
     moveSectionToZone,
@@ -1366,7 +1367,22 @@ export default function Home() {
       method,
       layout,
     });
-  }, [layout]);
+
+    // Keep a server-side app-wide counter for successful PDF exports.
+    void fetch("/api/analytics/export-pdf", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        method,
+        layout,
+        email: personalInfo.email,
+      }),
+    }).catch(() => {
+      // Avoid blocking the export flow if analytics logging fails.
+    });
+  }, [layout, personalInfo.email]);
 
   const handleWindowPrint = useCallback(() => {
     if (typeof window === "undefined") return;
