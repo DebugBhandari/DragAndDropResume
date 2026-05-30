@@ -1731,8 +1731,10 @@ export default function Home() {
                 pageContentHeight - trailingChromeHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
               );
               const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
+              const trailingType =
+                trailingSplitSection.type === "experience" ? "experience" : "projects";
 
-              setSidebarTrailingDetailSplitSectionType(trailingSplitSection.type);
+              setSidebarTrailingDetailSplitSectionType(trailingType);
               setSidebarTrailingDetailSplitSectionId(trailingSplitSection.id);
               setSidebarTrailingDetailContinuationChunks(trailingChunks);
               setSidebarTrailingDetailTransitionItemEnd(transitionItemEnd);
@@ -1917,8 +1919,10 @@ export default function Home() {
                 pageContentHeight - trailingChromeHeight - CONTINUATION_DETAIL_SPLIT_BUFFER_PX
               );
               const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
+              const trailingType =
+                trailingSplitSection.type === "experience" ? "experience" : "projects";
 
-              setTrailingDetailSplitSectionType(trailingSplitSection.type);
+              setTrailingDetailSplitSectionType(trailingType);
               setTrailingDetailSplitSectionId(trailingSplitSection.id);
               setTrailingDetailContinuationChunks(trailingChunks);
               setTrailingDetailTransitionItemEnd(transitionItemEnd);
