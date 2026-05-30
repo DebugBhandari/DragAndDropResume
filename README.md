@@ -130,6 +130,29 @@ GitHub Actions deploy:
 
 - Add `NEXT_PUBLIC_GA_ID` under Repository Settings -> Secrets and variables -> Actions.
 
+## Export Analytics (PostgreSQL)
+
+The export reports page (`/deepak`) reads from `GET /api/analytics/export-pdf`.
+Successful PDF exports append an event row into a dedicated PostgreSQL table:
+
+- `resume_export_pdf_events`
+
+Required environment variable:
+
+- `EXPORT_ANALYTICS_DATABASE_URL`
+
+Example:
+
+```bash
+EXPORT_ANALYTICS_DATABASE_URL=postgresql://username:password@127.0.0.1:5432/nepaltrex
+```
+
+For GitHub Actions deploy:
+
+- Add `EXPORT_ANALYTICS_DATABASE_URL` under Repository Settings -> Secrets and variables -> Actions.
+
+The table is created automatically (with `CREATE TABLE IF NOT EXISTS`) and existing tables/data are not modified.
+
 ### Reuse your existing Chrome profile (optional)
 
 If you want to load from your machine's current Chrome profile while capturing state:

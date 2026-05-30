@@ -1,10 +1,12 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { Pool } from "pg";
 
 export const runtime = "nodejs";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
-const STATS_FILE = path.join(DATA_DIR, "export-stats.json");
+const DATABASE_URL = process.env.EXPORT_ANALYTICS_DATABASE_URL;
+
+const pool = DATABASE_URL
+  ? new Pool({ connectionString: DATABASE_URL })
+  : null;
 
 type ExportStats = {
   totalExports: number;
@@ -13,43 +15,6 @@ type ExportStats = {
   exportsByEmail: Record<string, number>;
 };
 
-const INITIAL_STATS: ExportStats = {
-  totalExports: 0,
-  lastExportAt: null,
-  lastExportedEmail: null,
-  exportsByEmail: {},
-};
-
-async function loadStats(): Promise<ExportStats> {
-  try {
-    const raw = await readFile(STATS_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<ExportStats>;
-
-    return {
-      totalExports: Number.isFinite(parsed.totalExports)
-        ? Number(parsed.totalExports)
-        : 0,
-      lastExportAt:
-        typeof parsed.lastExportAt === "string" ? parsed.lastExportAt : null,
-      lastExportedEmail:
-        typeof parsed.lastExportedEmail === "string"
-          ? parsed.lastExportedEmail
-          : null,
-      exportsByEmail:
-        parsed.exportsByEmail && typeof parsed.exportsByEmail === "object"
-          ? parsed.exportsByEmail
-          : {},
-    };
-  } catch {
-    return INITIAL_STATS;
-  }
-}
-
-async function saveStats(stats: ExportStats) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(STATS_FILE, JSON.stringify(stats, null, 2), "utf8");
-}
-
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
@@ -57,13 +22,98 @@ function normalizeEmail(value: unknown): string | null {
   return email.length > 320 ? email.slice(0, 320) : email;
 }
 
+async function ensureTable() {
+  if (!pool) {
+    throw new Error(
+      "Missing EXPORT_ANALYTICS_DATABASE_URL environment variable."
+    );
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS resume_export_pdf_events (
+      id BIGSERIAL PRIMARY KEY,
+      email TEXT NULL,
+      method TEXT NULL,
+      layout TEXT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_resume_export_pdf_events_created_at
+    ON resume_export_pdf_events (created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_resume_export_pdf_events_email
+    ON resume_export_pdf_events (email)
+  `);
+}
+
+async function readStats(): Promise<ExportStats> {
+  if (!pool) {
+    throw new Error(
+      "Missing EXPORT_ANALYTICS_DATABASE_URL environment variable."
+    );
+  }
+
+  const totalResult = await pool.query<{
+    total_exports: string;
+    last_export_at: string | null;
+    last_exported_email: string | null;
+  }>(`
+    SELECT
+      COUNT(*)::text AS total_exports,
+      MAX(created_at)::text AS last_export_at,
+      (
+        SELECT email
+        FROM resume_export_pdf_events
+        WHERE email IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) AS last_exported_email
+    FROM resume_export_pdf_events
+  `);
+
+  const byEmailResult = await pool.query<{ email: string; count: string }>(`
+    SELECT email, COUNT(*)::text AS count
+    FROM resume_export_pdf_events
+    WHERE email IS NOT NULL
+    GROUP BY email
+    ORDER BY COUNT(*) DESC, email ASC
+  `);
+
+  const totals = totalResult.rows[0];
+  const exportsByEmail: Record<string, number> = {};
+
+  for (const row of byEmailResult.rows) {
+    exportsByEmail[row.email] = Number(row.count) || 0;
+  }
+
+  return {
+    totalExports: Number(totals?.total_exports || "0") || 0,
+    lastExportAt: totals?.last_export_at ?? null,
+    lastExportedEmail: totals?.last_exported_email ?? null,
+    exportsByEmail,
+  };
+}
+
 export async function GET() {
-  const stats = await loadStats();
-  return Response.json({ ok: true, stats });
+  try {
+    await ensureTable();
+    const stats = await readStats();
+    return Response.json({ ok: true, stats });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to read export stats.";
+    return Response.json({ ok: false, error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
   try {
+    await ensureTable();
+
     const body = (await request.json()) as {
       email?: unknown;
       method?: unknown;
@@ -71,22 +121,26 @@ export async function POST(request: Request) {
     };
 
     const email = normalizeEmail(body.email);
-    const stats = await loadStats();
-    const updated: ExportStats = {
-      ...stats,
-      totalExports: stats.totalExports + 1,
-      lastExportAt: new Date().toISOString(),
-      lastExportedEmail: email,
-      exportsByEmail: { ...stats.exportsByEmail },
-    };
+    const method = typeof body.method === "string" ? body.method : null;
+    const layout = typeof body.layout === "string" ? body.layout : null;
 
-    if (email) {
-      updated.exportsByEmail[email] = (updated.exportsByEmail[email] || 0) + 1;
+    if (!pool) {
+      throw new Error(
+        "Missing EXPORT_ANALYTICS_DATABASE_URL environment variable."
+      );
     }
 
-    await saveStats(updated);
+    await pool.query(
+      `
+        INSERT INTO resume_export_pdf_events (email, method, layout)
+        VALUES ($1, $2, $3)
+      `,
+      [email, method, layout]
+    );
 
-    return Response.json({ ok: true, stats: updated });
+    const stats = await readStats();
+
+    return Response.json({ ok: true, stats });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to record export event.";
