@@ -24,6 +24,7 @@
 .DS_Store
 ._*
 *.pem
+playwright/.auth/
 
 # debug
 npm-debug.log*

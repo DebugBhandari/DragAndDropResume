@@ -24,6 +24,7 @@ import { useDraggable } from "@dnd-kit/core";
 import SectionEditor from "@/components/SectionEditor";
 import StyleEditor from "@/components/StyleEditor";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useUIStore } from "@/store/useUIStore";
 import {
@@ -36,6 +37,9 @@ import {
   ResumeData,
   WorkExperience,
   Project,
+  Language,
+  Skill,
+  Interest,
 } from "@/types/resume";
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/dateSort";
 
@@ -85,10 +89,16 @@ function SectionContent({
   type,
   experienceItems,
   projectItems,
+  languageItems,
+  skillItems,
+  interestItems,
 }: {
   type: SectionType;
   experienceItems?: WorkExperience[];
   projectItems?: Project[];
+  languageItems?: Language[];
+  skillItems?: Skill[];
+  interestItems?: Interest[];
 }) {
   const {
     education,
@@ -146,8 +156,7 @@ function SectionContent({
           ))}
         </>
       );
-    case "experience":
-      {
+    case "experience": {
       const baseExperience = experienceItems ?? experience;
       const experienceList = experienceManualOrder && !experienceItems
         ? baseExperience
@@ -169,37 +178,34 @@ function SectionContent({
             ).map((item) => item.trim()).filter((item) => item.length > 0);
 
             return (
-            <div key={exp.id} data-exp-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
-              <div className="flex justify-between items-baseline">
-                <strong style={{ fontSize: "1.05em" }}>
-                  {exp.position || "Position"}
-                </strong>
-                <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                  {exp.startDate}
-                  {exp.endDate && ` – ${exp.endDate}`}
-                </span>
-              </div>
-              <div
-                className="italic text-gray-700"
-                style={{ fontSize: "0.9em" }}
-              >
-                {exp.company}
-              </div>
+              <div key={exp.id} data-exp-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
+                <div className="flex justify-between items-baseline">
+                  <strong style={{ fontSize: "1.05em" }}>
+                    {exp.position || "Position"}
+                  </strong>
+                  <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
+                    {exp.startDate}
+                    {exp.endDate && ` – ${exp.endDate}`}
+                  </span>
+                </div>
+                <div className="italic text-gray-700" style={{ fontSize: "0.9em" }}>
+                  {exp.company}
+                </div>
 
-              {bullets.length > 0 && (
-                <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
-                  {bullets.map((bullet, index) => (
-                    <li key={`${exp.id}-preview-bullet-${index}`}>{bullet}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )})}
+                {bullets.length > 0 && (
+                  <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
+                    {bullets.map((bullet, index) => (
+                      <li key={`${exp.id}-preview-bullet-${index}`}>{bullet}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </>
       );
-      }
-    case "projects":
-      {
+    }
+    case "projects": {
       const baseProjects = projectItems ?? projects;
       const projectList = projectsManualOrder && !projectItems
         ? baseProjects
@@ -221,83 +227,84 @@ function SectionContent({
             ).map((item) => item.trim()).filter((item) => item.length > 0);
 
             return (
-            <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
-              <div className="flex items-baseline gap-2">
-                <strong style={{ fontSize: "1.05em" }}>
-                  {proj.name || "Project"}
-                </strong>
-                {proj.completionDate && (
-                  <span
-                    className="text-gray-500"
-                    style={{ fontSize: "0.85em" }}
-                  >
-                    • {proj.completionDate}
-                  </span>
+              <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
+                <div className="flex items-baseline gap-2">
+                  <strong style={{ fontSize: "1.05em" }}>
+                    {proj.name || "Project"}
+                  </strong>
+                  {proj.completionDate && (
+                    <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
+                      • {proj.completionDate}
+                    </span>
+                  )}
+                  {proj.technologies && (
+                    <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
+                      ({proj.technologies})
+                    </span>
+                  )}
+                </div>
+                {bullets.length > 0 && (
+                  <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
+                    {bullets.map((bullet, index) => (
+                      <li key={`${proj.id}-preview-bullet-${index}`}>{bullet}</li>
+                    ))}
+                  </ul>
                 )}
-                {proj.technologies && (
-                  <span
-                    className="text-gray-500"
-                    style={{ fontSize: "0.85em" }}
+                {proj.link && (
+                  <a
+                    href={proj.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block"
+                    style={{ color: style.accentColor, fontSize: "0.85em" }}
                   >
-                    ({proj.technologies})
-                  </span>
+                    {proj.link}
+                  </a>
                 )}
               </div>
-              {bullets.length > 0 && (
-                <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
-                  {bullets.map((bullet, index) => (
-                    <li key={`${proj.id}-preview-bullet-${index}`}>{bullet}</li>
-                  ))}
-                </ul>
-              )}
-              {proj.link && (
-                <a
-                  href={proj.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-block"
-                  style={{ color: style.accentColor, fontSize: "0.85em" }}
-                >
-                  {proj.link}
-                </a>
-              )}
-            </div>
-          )})}
+            );
+          })}
         </>
       );
-      }
+    }
     case "languages":
-      if (!languages.length)
+      {
+      const languageList = languageItems ?? languages;
+      if (!languageList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No languages added
           </p>
         );
       return (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {languages.map((lang) => (
-            <span key={lang.id}>
-              {lang.name}{" "}
+        <div className="space-y-1">
+          {languageList.map((lang) => (
+            <div key={lang.id} data-lang-item>
+              <span>{lang.name}{" "}</span>
               <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
                 ({lang.proficiency})
               </span>
-            </span>
+            </div>
           ))}
         </div>
       );
+      }
     case "skills":
-      if (!skills.length)
+      {
+      const skillList = skillItems ?? skills;
+      if (!skillList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No skills added
           </p>
         );
       return (
-        <div className="flex flex-wrap gap-1.5">
-          {skills.map((sk) => (
-            <span
+        <div className="space-y-1">
+          {skillList.map((sk) => (
+            <div
               key={sk.id}
-              className="px-2 py-0.5 rounded"
+              data-skill-item
+              className="inline-block px-2 py-0.5 rounded"
               style={{
                 background: style.accentColor + "20",
                 color: style.accentColor,
@@ -305,10 +312,11 @@ function SectionContent({
               }}
             >
               {sk.name}
-            </span>
+            </div>
           ))}
         </div>
       );
+      }
     case "certificates":
       if (!certificates.length)
         return (
@@ -444,25 +452,29 @@ function SectionContent({
         </>
       );
     case "interests":
-      if (!interests.length)
+      {
+      const interestList = interestItems ?? interests;
+      if (!interestList.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No interests added
           </p>
         );
       return (
-        <div className="flex flex-wrap gap-1.5">
-          {interests.map((i) => (
-            <span
+        <div className="space-y-1">
+          {interestList.map((i) => (
+            <div
               key={i.id}
+              data-interest-item
               className="px-2 py-0.5 rounded bg-gray-100 text-gray-700"
-              style={{ fontSize: "0.85em" }}
+              style={{ fontSize: "0.85em", display: "inline-block" }}
             >
               {i.name}
-            </span>
+            </div>
           ))}
         </div>
       );
+      }
   }
 }
 
@@ -715,11 +727,17 @@ function ResumeDraggableSection({
   section,
   experienceItems,
   projectItems,
+  languageItems,
+  skillItems,
+  interestItems,
   onPreviewInteract,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
   projectItems?: Project[];
+  languageItems?: Language[];
+  skillItems?: Skill[];
+  interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
   const { style, removeSectionFromResume } = useResumeStore();
@@ -789,6 +807,9 @@ function ResumeDraggableSection({
         type={section.type}
         experienceItems={section.type === "experience" ? experienceItems : undefined}
         projectItems={section.type === "projects" ? projectItems : undefined}
+        languageItems={section.type === "languages" ? languageItems : undefined}
+        skillItems={section.type === "skills" ? skillItems : undefined}
+        interestItems={section.type === "interests" ? interestItems : undefined}
       />
     </div>
   );
@@ -798,11 +819,17 @@ function ResumeStaticSection({
   section,
   experienceItems,
   projectItems,
+  languageItems,
+  skillItems,
+  interestItems,
   onPreviewInteract,
 }: {
   section: ResumeSection;
   experienceItems?: WorkExperience[];
   projectItems?: Project[];
+  languageItems?: Language[];
+  skillItems?: Skill[];
+  interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
   const { style } = useResumeStore();
@@ -838,6 +865,96 @@ function ResumeStaticSection({
         type={section.type}
         experienceItems={section.type === "experience" ? experienceItems : undefined}
         projectItems={section.type === "projects" ? projectItems : undefined}
+        languageItems={section.type === "languages" ? languageItems : undefined}
+        skillItems={section.type === "skills" ? skillItems : undefined}
+        interestItems={section.type === "interests" ? interestItems : undefined}
+      />
+    </div>
+  );
+}
+
+function ResumeProxyDraggableSection({
+  section,
+  proxyId,
+  experienceItems,
+  projectItems,
+  languageItems,
+  skillItems,
+  interestItems,
+  onPreviewInteract,
+}: {
+  section: ResumeSection;
+  proxyId: string;
+  experienceItems?: WorkExperience[];
+  projectItems?: Project[];
+  languageItems?: Language[];
+  skillItems?: Skill[];
+  interestItems?: Interest[];
+  onPreviewInteract?: (section: ResumeSection) => void;
+}) {
+  const { style } = useResumeStore();
+  const { showBodyIcons, sectionIcons, focusPanel } = useUIStore();
+  const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
+  const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useDraggable({
+    id: proxyId,
+    data: {
+      origin: "resume-proxy",
+      sectionId: section.id,
+      zone: section.zone,
+      type: section.type,
+    },
+  });
+
+  const containerStyle: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    cursor: "grab",
+  };
+
+  const expandPanel = () => {
+    focusPanel(`sec-${section.id}`);
+    onPreviewInteract?.(section);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={containerStyle}
+      {...attributes}
+      {...listeners}
+      onClick={expandPanel}
+      data-page-section
+      data-section-type={section.type}
+      data-section-id={section.id}
+      data-section-zone={section.zone}
+      className={`${getSpacingClass(style.sectionSpacing)} relative rounded p-2 active:cursor-grabbing`}
+    >
+      <h2
+        className={headingClass}
+        style={{
+          borderBottom: `2px solid ${style.accentColor}`,
+          color: style.accentColor,
+        }}
+      >
+        {iconVisible && <span className="mr-1">{SECTION_ICONS[section.type]}</span>}
+        {section.title}
+      </h2>
+      <SectionContent
+        type={section.type}
+        experienceItems={section.type === "experience" ? experienceItems : undefined}
+        projectItems={section.type === "projects" ? projectItems : undefined}
+        languageItems={section.type === "languages" ? languageItems : undefined}
+        skillItems={section.type === "skills" ? skillItems : undefined}
+        interestItems={section.type === "interests" ? interestItems : undefined}
       />
     </div>
   );
@@ -1270,17 +1387,14 @@ export default function Home() {
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
-    setActiveDragId(
-      data?.origin === "sidebar" ? data.sectionId : (event.active.id as string),
-    );
+    setActiveDragId(data?.sectionId ?? (event.active.id as string));
   }
 
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
     const data = active.data.current;
-    const sectionId =
-      data?.origin === "sidebar" ? data.sectionId : (active.id as string);
+    const sectionId = data?.sectionId ?? (active.id as string);
     const overId = over.id as string;
     const activeSection = sectionOrder.find((sec) => sec.id === sectionId);
     if (!activeSection) return;
@@ -1301,8 +1415,7 @@ export default function Home() {
     const { active, over } = event;
     if (!over) return;
     const data = active.data.current;
-    const sectionId =
-      data?.origin === "sidebar" ? data.sectionId : (active.id as string);
+    const sectionId = data?.sectionId ?? (active.id as string);
     const overId = over.id as string;
     if (overId === "zone-main" || overId === "zone-sidebar") return;
     const overSection = sectionOrder.find((sec) => sec.id === overId);
@@ -1319,13 +1432,36 @@ export default function Home() {
   const PAGE_PAD = layout === "compact" ? 32 : 48;
   const PAGE_PAD_BOTTOM = 24;
   const USABLE_HEIGHT = PAGE_HEIGHT - PAGE_PAD - PAGE_PAD_BOTTOM;
+  const MEASURE_USABLE_HEIGHT = layout === "two-column" ? USABLE_HEIGHT - 28 : USABLE_HEIGHT;
   const SPLIT_SAFETY_PX = 2;
+  const FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 12 : 12;
+  const CONTINUATION_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 48 : 120;
+  const SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 24 : FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX;
+  const SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 72 : CONTINUATION_DETAIL_SPLIT_BUFFER_PX;
+  const TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT = 930;
 
   // Track which section index starts page 2+
   const [pageSplitIndex, setPageSplitIndex] = useState<number>(-1);
   const [detailSplitSectionType, setDetailSplitSectionType] = useState<"experience" | "projects" | null>(null);
   const [detailSplitSectionIndex, setDetailSplitSectionIndex] = useState<number | null>(null);
   const [detailSplitItemIndex, setDetailSplitItemIndex] = useState<number | null>(null);
+  const [sidebarContinuationChunks, setSidebarContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [mainSectionContinuationChunks, setMainSectionContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [sidebarDetailSplitSectionType, setSidebarDetailSplitSectionType] = useState<"skills" | "languages" | "interests" | "experience" | "projects" | null>(null);
+  const [sidebarDetailSplitSectionId, setSidebarDetailSplitSectionId] = useState<string | null>(null);
+  const [sidebarDetailSplitItemIndex, setSidebarDetailSplitItemIndex] = useState<number | null>(null);
+  const [sidebarDetailContinuationChunks, setSidebarDetailContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [sidebarCarrySectionId, setSidebarCarrySectionId] = useState<string | null>(null);
+  const [sidebarCarryItemCount, setSidebarCarryItemCount] = useState<number>(0);
+  const [sidebarTrailingDetailSplitSectionType, setSidebarTrailingDetailSplitSectionType] = useState<"experience" | "projects" | null>(null);
+  const [sidebarTrailingDetailSplitSectionId, setSidebarTrailingDetailSplitSectionId] = useState<string | null>(null);
+  const [sidebarTrailingDetailContinuationChunks, setSidebarTrailingDetailContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [sidebarTrailingDetailTransitionItemEnd, setSidebarTrailingDetailTransitionItemEnd] = useState<number>(0);
+  const [detailContinuationChunks, setDetailContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [trailingDetailSplitSectionType, setTrailingDetailSplitSectionType] = useState<"experience" | "projects" | null>(null);
+  const [trailingDetailSplitSectionId, setTrailingDetailSplitSectionId] = useState<string | null>(null);
+  const [trailingDetailContinuationChunks, setTrailingDetailContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [trailingDetailTransitionItemEnd, setTrailingDetailTransitionItemEnd] = useState<number>(0);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -1333,17 +1469,314 @@ export default function Home() {
       if (!contentRef.current) return;
       const container = contentRef.current;
       const containerRect = container.getBoundingClientRect();
+      const buildChunks = (itemHeights: number[], startIndex: number, capacity: number) => {
+        const chunks: Array<{ start: number; end: number }> = [];
+        let start = Math.max(0, startIndex);
+
+        while (start < itemHeights.length) {
+          let end = start;
+          let used = 0;
+
+          while (end < itemHeights.length) {
+            const nextHeight = itemHeights[end];
+            if (end > start && used + nextHeight > capacity) break;
+            used += nextHeight;
+            end += 1;
+          }
+
+          chunks.push({ start, end });
+          start = end;
+        }
+
+        return chunks;
+      };
       const sections = container.querySelectorAll(
         layout === "two-column"
           ? '[data-page-section][data-section-zone="main"]'
           : "[data-page-section]",
       );
+      const twoColumnContainer = layout === "two-column"
+        ? (container.querySelector("[data-measure-two-column]") as HTMLElement | null)
+        : null;
+      const twoColumnTopOffset = twoColumnContainer
+        ? twoColumnContainer.getBoundingClientRect().top - containerRect.top
+        : 0;
+      const pageContentHeight = layout === "two-column"
+        ? TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT
+        : MEASURE_USABLE_HEIGHT;
+      const pageSplitThreshold = layout === "two-column"
+        ? twoColumnTopOffset + pageContentHeight
+        : pageContentHeight;
+      if (layout === "two-column") {
+        const sidebarMeasuredSections = Array.from(
+          container.querySelectorAll('[data-page-section][data-section-zone="sidebar"]')
+        ) as HTMLElement[];
+        const sidebarHeights = sidebarMeasuredSections.map((section) => {
+          const rect = section.getBoundingClientRect();
+          const styles = window.getComputedStyle(section as Element);
+          const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+          const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+          return rect.height + marginTop + marginBottom;
+        });
+        const sidebarCapacity = Math.max(
+          120,
+          pageContentHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+        );
+        const chunks = buildChunks(sidebarHeights, 0, sidebarCapacity);
+        setSidebarContinuationChunks(chunks);
+
+        const firstChunk = chunks[0] ?? { start: 0, end: sidebarMeasuredSections.length };
+        const carryCandidate = firstChunk.end < sidebarMeasuredSections.length
+          ? sidebarMeasuredSections[firstChunk.end]
+          : null;
+
+        if (carryCandidate) {
+          const carryType = carryCandidate.dataset?.sectionType;
+          const carryCanSplit =
+            carryType === "experience" ||
+            carryType === "projects" ||
+            carryType === "languages" ||
+            carryType === "skills" ||
+            carryType === "interests";
+
+          if (carryCanSplit) {
+            const carrySelector =
+              carryType === "experience"
+                ? "[data-exp-item]"
+                : carryType === "projects"
+                  ? "[data-project-item]"
+                  : carryType === "languages"
+                    ? "[data-lang-item]"
+                    : carryType === "skills"
+                      ? "[data-skill-item]"
+                      : "[data-interest-item]";
+            const carryItems = carryCandidate.querySelectorAll(carrySelector);
+            const carryItemHeights = Array.from(carryItems).map((item) => {
+              const rect = item.getBoundingClientRect();
+              const styles = window.getComputedStyle(item as Element);
+              const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+              const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+              return rect.height + marginTop + marginBottom;
+            });
+            const carryItemsTotalHeight = carryItemHeights.reduce((acc, height) => acc + height, 0);
+            const carryRect = carryCandidate.getBoundingClientRect();
+            const carryChromeHeight = Math.max(0, carryRect.height - carryItemsTotalHeight);
+            const usedByPrecedingSections = sidebarHeights
+              .slice(firstChunk.start, firstChunk.end)
+              .reduce((acc, height) => acc + height, 0);
+            const availableForCarryItems = Math.max(
+              0,
+              pageContentHeight - usedByPrecedingSections - carryChromeHeight - SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX
+            );
+
+            let carryCount = 0;
+            let carryUsed = 0;
+            for (let i = 0; i < carryItemHeights.length; i++) {
+              const next = carryItemHeights[i];
+              if (i > 0 && carryUsed + next > availableForCarryItems) break;
+              carryUsed += next;
+              carryCount += 1;
+              if (i === 0 && carryUsed > availableForCarryItems) {
+                carryCount = 1;
+                break;
+              }
+            }
+
+            setSidebarCarrySectionId(carryCandidate.dataset?.sectionId ?? null);
+            setSidebarCarryItemCount(carryCount);
+          } else {
+            setSidebarCarrySectionId(null);
+            setSidebarCarryItemCount(0);
+          }
+        } else {
+          setSidebarCarrySectionId(null);
+          setSidebarCarryItemCount(0);
+        }
+
+        const sidebarOverflowSection = sidebarMeasuredSections.find((section) => {
+          const rect = section.getBoundingClientRect();
+          const sectionBottom = rect.top - containerRect.top + rect.height;
+          return sectionBottom >= pageSplitThreshold - SPLIT_SAFETY_PX;
+        });
+
+        const sidebarOverflowType = sidebarOverflowSection?.dataset?.sectionType;
+        const sidebarCanSplit =
+          sidebarOverflowType === "experience" ||
+          sidebarOverflowType === "projects" ||
+          sidebarOverflowType === "skills" ||
+          sidebarOverflowType === "languages" ||
+          sidebarOverflowType === "interests";
+
+        if (sidebarOverflowSection && sidebarCanSplit) {
+          const itemSelector =
+            sidebarOverflowType === "experience"
+              ? "[data-exp-item]"
+              : sidebarOverflowType === "projects"
+                ? "[data-project-item]"
+                : sidebarOverflowType === "languages"
+              ? "[data-lang-item]"
+              : sidebarOverflowType === "skills"
+                ? "[data-skill-item]"
+                : "[data-interest-item]";
+          const detailItems = sidebarOverflowSection.querySelectorAll(itemSelector);
+          let itemSplit = -1;
+
+          for (let i = 0; i < detailItems.length; i++) {
+            const itemRect = detailItems[i].getBoundingClientRect();
+            const itemBottom = itemRect.top - containerRect.top + itemRect.height;
+            if (itemBottom >= pageSplitThreshold - SPLIT_SAFETY_PX - SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX) {
+              itemSplit = i;
+              break;
+            }
+          }
+
+          if (itemSplit === -1) itemSplit = detailItems.length;
+          if (itemSplit === 0 && detailItems.length > 0) itemSplit = 1;
+
+          const itemHeights = Array.from(detailItems).map((item) => {
+            const rect = item.getBoundingClientRect();
+            const styles = window.getComputedStyle(item as Element);
+            const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+            const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+            return rect.height + marginTop + marginBottom;
+          });
+
+          const itemsTotalHeight = itemHeights.reduce((acc, height) => acc + height, 0);
+          const sectionRect = sidebarOverflowSection.getBoundingClientRect();
+          const sectionChromeHeight = Math.max(0, sectionRect.height - itemsTotalHeight);
+          const perPageItemsCapacityRaw = Math.max(120, pageContentHeight - sectionChromeHeight);
+          const perPageItemsCapacity = Math.max(
+            120,
+            perPageItemsCapacityRaw - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+          );
+          const chunks = buildChunks(itemHeights, itemSplit, perPageItemsCapacity);
+
+          const lastPrimaryChunk = chunks[chunks.length - 1];
+          const usedLastPrimaryChunk = lastPrimaryChunk
+            ? itemHeights
+                .slice(lastPrimaryChunk.start, lastPrimaryChunk.end)
+                .reduce((acc, height) => acc + height, 0)
+            : 0;
+          const leftoverOnLastPrimaryPage = Math.max(0, perPageItemsCapacityRaw - usedLastPrimaryChunk);
+
+          const sidebarOrder = sectionOrder.filter((section) => section.zone === "sidebar");
+          const splitSectionId = sidebarOverflowSection.dataset?.sectionId;
+          const splitSidebarIndex = splitSectionId
+            ? sidebarOrder.findIndex((section) => section.id === splitSectionId)
+            : -1;
+          const trailingSequence = splitSidebarIndex === -1 ? [] : sidebarOrder.slice(splitSidebarIndex + 1);
+
+          const trailingSplitSection = trailingSequence.find(
+            (section) => section.type === "experience" || section.type === "projects"
+          );
+
+          if (trailingSplitSection) {
+            const trailingElement = sidebarMeasuredSections.find(
+              (section) => section.dataset?.sectionId === trailingSplitSection.id
+            );
+
+            if (trailingElement) {
+              const trailingSelector =
+                trailingSplitSection.type === "experience" ? "[data-exp-item]" : "[data-project-item]";
+              const trailingItems = trailingElement.querySelectorAll(trailingSelector);
+              const trailingItemHeights = Array.from(trailingItems).map((item) => {
+                const rect = item.getBoundingClientRect();
+                const styles = window.getComputedStyle(item as Element);
+                const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+                const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+                return rect.height + marginTop + marginBottom;
+              });
+              const trailingItemsTotalHeight = trailingItemHeights.reduce((acc, height) => acc + height, 0);
+              const trailingRect = trailingElement.getBoundingClientRect();
+              const trailingChromeHeight = Math.max(0, trailingRect.height - trailingItemsTotalHeight);
+              const availableOnPrimaryLastPageForTrailingItems = Math.max(
+                0,
+                leftoverOnLastPrimaryPage - trailingChromeHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+              );
+
+              let transitionItemEnd = 0;
+              let transitionUsed = 0;
+              while (transitionItemEnd < trailingItemHeights.length) {
+                const nextHeight = trailingItemHeights[transitionItemEnd];
+                if (
+                  transitionItemEnd > 0 &&
+                  transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems
+                ) {
+                  break;
+                }
+                transitionUsed += nextHeight;
+                transitionItemEnd += 1;
+              }
+
+              const trailingCapacity = Math.max(
+                120,
+                pageContentHeight - trailingChromeHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+              );
+              const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
+
+              setSidebarTrailingDetailSplitSectionType(trailingSplitSection.type);
+              setSidebarTrailingDetailSplitSectionId(trailingSplitSection.id);
+              setSidebarTrailingDetailContinuationChunks(trailingChunks);
+              setSidebarTrailingDetailTransitionItemEnd(transitionItemEnd);
+            } else {
+              setSidebarTrailingDetailSplitSectionType(null);
+              setSidebarTrailingDetailSplitSectionId(null);
+              setSidebarTrailingDetailContinuationChunks([]);
+              setSidebarTrailingDetailTransitionItemEnd(0);
+            }
+          } else {
+            setSidebarTrailingDetailSplitSectionType(null);
+            setSidebarTrailingDetailSplitSectionId(null);
+            setSidebarTrailingDetailContinuationChunks([]);
+            setSidebarTrailingDetailTransitionItemEnd(0);
+          }
+
+          setSidebarDetailSplitSectionType(sidebarOverflowType);
+          setSidebarDetailSplitSectionId(sidebarOverflowSection.dataset?.sectionId ?? null);
+          setSidebarDetailSplitItemIndex(itemSplit);
+          setSidebarDetailContinuationChunks(chunks);
+        } else {
+          setSidebarDetailSplitSectionType(null);
+          setSidebarDetailSplitSectionId(null);
+          setSidebarDetailSplitItemIndex(null);
+          setSidebarDetailContinuationChunks([]);
+          setSidebarTrailingDetailSplitSectionType(null);
+          setSidebarTrailingDetailSplitSectionId(null);
+          setSidebarTrailingDetailContinuationChunks([]);
+          setSidebarTrailingDetailTransitionItemEnd(0);
+        }
+
+        const mainHeights = Array.from(sections).map((section) => {
+          const rect = (section as HTMLElement).getBoundingClientRect();
+          const styles = window.getComputedStyle(section as Element);
+          const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+          const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+          return rect.height + marginTop + marginBottom;
+        });
+        const mainCapacity = Math.max(120, pageContentHeight - 8);
+        setMainSectionContinuationChunks(buildChunks(mainHeights, 0, mainCapacity));
+      } else {
+        setSidebarContinuationChunks([]);
+        setMainSectionContinuationChunks([]);
+        setSidebarDetailSplitSectionType(null);
+        setSidebarDetailSplitSectionId(null);
+        setSidebarDetailSplitItemIndex(null);
+        setSidebarDetailContinuationChunks([]);
+        setSidebarCarrySectionId(null);
+        setSidebarCarryItemCount(0);
+        setSidebarTrailingDetailSplitSectionType(null);
+        setSidebarTrailingDetailSplitSectionId(null);
+        setSidebarTrailingDetailContinuationChunks([]);
+        setSidebarTrailingDetailTransitionItemEnd(0);
+      }
       let splitIdx = -1;
+      let overflowMeasuredSection: HTMLElement | null = null;
       for (let i = 0; i < sections.length; i++) {
         const el = sections[i] as HTMLElement;
         const rect = el.getBoundingClientRect();
         const elBottom = rect.top - containerRect.top + rect.height;
-        if (elBottom >= USABLE_HEIGHT - SPLIT_SAFETY_PX) {
+        if (elBottom >= pageSplitThreshold - SPLIT_SAFETY_PX) {
+          overflowMeasuredSection = el;
           if (layout === "two-column") {
             const sectionId = el.dataset?.sectionId;
             splitIdx = sectionId
@@ -1356,8 +1789,8 @@ export default function Home() {
         }
       }
       setPageSplitIndex(splitIdx);
-      if (splitIdx !== -1) {
-        const overflowSection = sections[splitIdx] as HTMLElement;
+      if (splitIdx !== -1 && overflowMeasuredSection) {
+        const overflowSection = overflowMeasuredSection;
         const overflowType = overflowSection?.dataset?.sectionType;
         const isSplitType = overflowType === "experience" || overflowType === "projects";
         if (isSplitType) {
@@ -1368,7 +1801,7 @@ export default function Home() {
           for (let i = 0; i < detailItems.length; i++) {
             const itemRect = detailItems[i].getBoundingClientRect();
             const itemBottom = itemRect.top - containerRect.top + itemRect.height;
-            if (itemBottom >= USABLE_HEIGHT - SPLIT_SAFETY_PX) {
+            if (itemBottom >= pageSplitThreshold - SPLIT_SAFETY_PX - FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX) {
               itemSplit = i;
               break;
             }
@@ -1377,19 +1810,136 @@ export default function Home() {
           if (itemSplit === -1) {
             itemSplit = detailItems.length;
           }
+          if (itemSplit === 0 && detailItems.length > 0) {
+            // Avoid rendering an empty page 1 block when there is at least one splittable item.
+            itemSplit = 1;
+          }
+
+          const itemHeights = Array.from(detailItems).map((item) => {
+            const rect = item.getBoundingClientRect();
+            const styles = window.getComputedStyle(item as Element);
+            const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+            const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+            return rect.height + marginTop + marginBottom;
+          });
+
+          const itemsTotalHeight = itemHeights.reduce((acc, height) => acc + height, 0);
+          const sectionRect = overflowSection.getBoundingClientRect();
+          const sectionChromeHeight = Math.max(0, sectionRect.height - itemsTotalHeight);
+          const perPageItemsCapacityRaw = Math.max(120, pageContentHeight - sectionChromeHeight);
+          const perPageItemsCapacity = Math.max(
+            120,
+            perPageItemsCapacityRaw - FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX
+          );
+
+          const chunks = buildChunks(itemHeights, itemSplit, perPageItemsCapacity);
+          const lastPrimaryChunk = chunks[chunks.length - 1];
+          const usedLastPrimaryChunk = lastPrimaryChunk
+            ? itemHeights
+                .slice(lastPrimaryChunk.start, lastPrimaryChunk.end)
+                .reduce((acc, height) => acc + height, 0)
+            : 0;
+          const leftoverOnLastPrimaryPage = Math.max(0, perPageItemsCapacityRaw - usedLastPrimaryChunk);
+
+          const trailingSequence = (() => {
+            if (layout === "two-column") {
+              const splitSectionId = overflowSection?.dataset?.sectionId;
+              const mainOrder = sectionOrder.filter((section) => section.zone === "main");
+              const splitMainIndex = splitSectionId
+                ? mainOrder.findIndex((section) => section.id === splitSectionId)
+                : -1;
+              return splitMainIndex === -1 ? [] : mainOrder.slice(splitMainIndex + 1);
+            }
+
+            return sectionOrder.slice(splitIdx + 1);
+          })();
+
+          const trailingSplitSection = trailingSequence.find(
+            (section) => section.type === "experience" || section.type === "projects"
+          );
+
+          if (trailingSplitSection) {
+            const trailingElement = Array.from(sections).find(
+              (section) => (section as HTMLElement).dataset?.sectionId === trailingSplitSection.id
+            ) as HTMLElement | undefined;
+
+            if (trailingElement) {
+              const trailingSelector =
+                trailingSplitSection.type === "experience" ? "[data-exp-item]" : "[data-project-item]";
+              const trailingItems = trailingElement.querySelectorAll(trailingSelector);
+              const trailingItemHeights = Array.from(trailingItems).map((item) => {
+                const rect = item.getBoundingClientRect();
+                const styles = window.getComputedStyle(item as Element);
+                const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+                const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+                return rect.height + marginTop + marginBottom;
+              });
+              const trailingItemsTotalHeight = trailingItemHeights.reduce((acc, height) => acc + height, 0);
+              const trailingRect = trailingElement.getBoundingClientRect();
+              const trailingChromeHeight = Math.max(0, trailingRect.height - trailingItemsTotalHeight);
+              const availableOnPrimaryLastPageForTrailingItems = Math.max(
+                0,
+                leftoverOnLastPrimaryPage - trailingChromeHeight - CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+              );
+              let transitionItemEnd = 0;
+              let transitionUsed = 0;
+              while (transitionItemEnd < trailingItemHeights.length) {
+                const nextHeight = trailingItemHeights[transitionItemEnd];
+                if (
+                  transitionItemEnd > 0 &&
+                  transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems
+                ) {
+                  break;
+                }
+                transitionUsed += nextHeight;
+                transitionItemEnd += 1;
+              }
+              const trailingCapacity = Math.max(
+                120,
+                pageContentHeight - trailingChromeHeight - CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+              );
+              const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
+
+              setTrailingDetailSplitSectionType(trailingSplitSection.type);
+              setTrailingDetailSplitSectionId(trailingSplitSection.id);
+              setTrailingDetailContinuationChunks(trailingChunks);
+              setTrailingDetailTransitionItemEnd(transitionItemEnd);
+            } else {
+              setTrailingDetailSplitSectionType(null);
+              setTrailingDetailSplitSectionId(null);
+              setTrailingDetailContinuationChunks([]);
+              setTrailingDetailTransitionItemEnd(0);
+            }
+          } else {
+            setTrailingDetailSplitSectionType(null);
+            setTrailingDetailSplitSectionId(null);
+            setTrailingDetailContinuationChunks([]);
+            setTrailingDetailTransitionItemEnd(0);
+          }
 
           setDetailSplitSectionType(overflowType);
           setDetailSplitSectionIndex(splitIdx);
           setDetailSplitItemIndex(itemSplit);
+          setDetailContinuationChunks(chunks);
         } else {
           setDetailSplitSectionType(null);
           setDetailSplitSectionIndex(null);
           setDetailSplitItemIndex(null);
+          setDetailContinuationChunks([]);
+          setTrailingDetailSplitSectionType(null);
+          setTrailingDetailSplitSectionId(null);
+          setTrailingDetailContinuationChunks([]);
+          setTrailingDetailTransitionItemEnd(0);
         }
       } else {
         setDetailSplitSectionType(null);
         setDetailSplitSectionIndex(null);
         setDetailSplitItemIndex(null);
+        setDetailContinuationChunks([]);
+        setTrailingDetailSplitSectionType(null);
+        setTrailingDetailSplitSectionId(null);
+        setTrailingDetailContinuationChunks([]);
+        setTrailingDetailTransitionItemEnd(0);
       }
       setPageCount(splitIdx === -1 ? 1 : 2);
     };
@@ -1516,6 +2066,551 @@ export default function Home() {
   const canUseMainDetailSplit =
     canUseDetailSplit && splitSectionCandidate?.zone === "main" && detailSplitMainIndex !== -1;
 
+  const effectiveContinuationChunks =
+    canUseDetailSplit
+      ? (
+          detailContinuationChunks.length > 0
+            ? detailContinuationChunks
+            : clampedDetailSplitIndex! < splitItemsLength
+              ? [{ start: clampedDetailSplitIndex!, end: splitItemsLength }]
+              : []
+        )
+      : [];
+
+  const linearTrailingSections =
+    detailSplitSectionIndex !== null ? sectionOrder.slice(detailSplitSectionIndex + 1) : [];
+  const twoColumnTrailingSections =
+    detailSplitMainIndex !== -1 ? mainSections.slice(detailSplitMainIndex + 1) : [];
+
+  const sequenceAfterPrimarySplit =
+    splitSectionCandidate?.zone === "main"
+      ? twoColumnTrailingSections
+      : linearTrailingSections;
+
+  const trailingSplitIndex = trailingDetailSplitSectionId
+    ? sequenceAfterPrimarySplit.findIndex((section) => section.id === trailingDetailSplitSectionId)
+    : -1;
+
+  const hasTrailingDetailSplit =
+    trailingSplitIndex !== -1 &&
+    trailingDetailSplitSectionType !== null;
+
+  const trailingSplitSection =
+    hasTrailingDetailSplit && trailingSplitIndex !== -1
+      ? sequenceAfterPrimarySplit[trailingSplitIndex]
+      : null;
+
+  const trailingAfterSections =
+    trailingSplitIndex !== -1
+      ? sequenceAfterPrimarySplit.slice(trailingSplitIndex + 1)
+      : sequenceAfterPrimarySplit;
+
+  const trailingSplitItemsLength =
+    trailingDetailSplitSectionType === "projects" ? sortedProjects.length : sortedExperience.length;
+
+  const clampedTrailingTransitionItemEnd = hasTrailingDetailSplit
+    ? Math.max(0, Math.min(trailingDetailTransitionItemEnd, trailingSplitItemsLength))
+    : 0;
+
+  const effectiveTrailingContinuationChunks =
+    hasTrailingDetailSplit
+      ? (
+          trailingDetailContinuationChunks.length > 0
+            ? trailingDetailContinuationChunks
+            : clampedTrailingTransitionItemEnd < trailingSplitItemsLength
+              ? [{ start: clampedTrailingTransitionItemEnd, end: trailingSplitItemsLength }]
+              : []
+        )
+      : [];
+
+  const primaryContinuationPageCount =
+    pageSplitIndex === -1
+      ? 0
+      : canUseDetailSplit
+        ? (
+            hasTrailingDetailSplit
+              ? effectiveContinuationChunks.length
+              : Math.max(effectiveContinuationChunks.length, sequenceAfterPrimarySplit.length > 0 ? 1 : 0)
+          )
+        : 1;
+
+  const trailingContinuationPageCount =
+    pageSplitIndex === -1 || !hasTrailingDetailSplit
+      ? 0
+      : Math.max(
+          effectiveTrailingContinuationChunks.length,
+          trailingAfterSections.length > 0 ? 1 : 0
+        );
+
+  const effectiveSidebarChunks =
+    layout === "two-column"
+      ? (sidebarContinuationChunks.length > 0
+          ? sidebarContinuationChunks
+          : [{ start: 0, end: sidebarSections.length }])
+      : [];
+
+  const sidebarSplitSectionIndex =
+    sidebarDetailSplitSectionId
+      ? sidebarSections.findIndex((section) => section.id === sidebarDetailSplitSectionId)
+      : -1;
+
+  const hasSidebarDetailSplit =
+    layout === "two-column" &&
+    sidebarSplitSectionIndex !== -1 &&
+    sidebarDetailSplitSectionType !== null &&
+    sidebarDetailSplitItemIndex !== null;
+
+  const firstSidebarChunk = effectiveSidebarChunks[0] ?? { start: 0, end: sidebarSections.length };
+  const carriedSidebarSection =
+    !hasSidebarDetailSplit &&
+    layout === "two-column" &&
+    sidebarCarryItemCount > 0 &&
+    firstSidebarChunk.end < sidebarSections.length
+      ? sidebarSections.find((section) => section.id === sidebarCarrySectionId) ?? null
+      : null;
+  const canCarrySidebarSection =
+    !!carriedSidebarSection &&
+    (
+      carriedSidebarSection.type === "experience" ||
+      carriedSidebarSection.type === "projects" ||
+      carriedSidebarSection.type === "languages" ||
+      carriedSidebarSection.type === "skills" ||
+      carriedSidebarSection.type === "interests"
+    );
+
+  const carriedSidebarTotalItems =
+    canCarrySidebarSection && carriedSidebarSection
+      ? carriedSidebarSection.type === "experience"
+        ? sortedExperience.length
+        : carriedSidebarSection.type === "projects"
+          ? sortedProjects.length
+          : carriedSidebarSection.type === "languages"
+            ? languages.length
+            : carriedSidebarSection.type === "skills"
+              ? skills.length
+              : carriedSidebarSection.type === "interests"
+                ? interests.length
+                : 0
+      : 0;
+
+  const hasRemainingCarriedSidebarItems =
+    canCarrySidebarSection && sidebarCarryItemCount < carriedSidebarTotalItems;
+
+  const firstSidebarContinuationChunk = effectiveSidebarChunks[1];
+  const firstSidebarContinuationWithoutCarryCount =
+    canCarrySidebarSection && carriedSidebarSection && firstSidebarContinuationChunk
+      ? sidebarSections
+          .slice(firstSidebarContinuationChunk.start, firstSidebarContinuationChunk.end)
+          .filter((section) => section.id !== carriedSidebarSection.id).length
+      : 0;
+
+  const skipFirstSidebarContinuationChunk =
+    !hasSidebarDetailSplit &&
+    canCarrySidebarSection &&
+    !!firstSidebarContinuationChunk &&
+    !hasRemainingCarriedSidebarItems &&
+    firstSidebarContinuationWithoutCarryCount === 0;
+
+  const sidebarContinuationChunkOffset = skipFirstSidebarContinuationChunk ? 1 : 0;
+
+  const sidebarSplitItemsLength =
+    sidebarDetailSplitSectionType === "experience"
+      ? sortedExperience.length
+      : sidebarDetailSplitSectionType === "projects"
+        ? sortedProjects.length
+        : sidebarDetailSplitSectionType === "skills"
+      ? skills.length
+      : sidebarDetailSplitSectionType === "languages"
+        ? languages.length
+        : sidebarDetailSplitSectionType === "interests"
+          ? interests.length
+        : 0;
+
+  const clampedSidebarSplitItemIndex = hasSidebarDetailSplit
+    ? Math.max(0, Math.min(sidebarDetailSplitItemIndex!, sidebarSplitItemsLength))
+    : 0;
+
+  const effectiveSidebarDetailChunks = hasSidebarDetailSplit
+    ? (
+        sidebarDetailContinuationChunks.length > 0
+          ? sidebarDetailContinuationChunks
+          : clampedSidebarSplitItemIndex < sidebarSplitItemsLength
+            ? [{ start: clampedSidebarSplitItemIndex, end: sidebarSplitItemsLength }]
+            : []
+      )
+    : [];
+
+  const sidebarAfterSplitSections = hasSidebarDetailSplit
+    ? sidebarSections.slice(sidebarSplitSectionIndex + 1)
+    : [];
+
+  const sidebarTrailingSplitIndex = sidebarTrailingDetailSplitSectionId
+    ? sidebarAfterSplitSections.findIndex((section) => section.id === sidebarTrailingDetailSplitSectionId)
+    : -1;
+
+  const hasSidebarTrailingDetailSplit =
+    sidebarTrailingSplitIndex !== -1 &&
+    sidebarTrailingDetailSplitSectionType !== null;
+
+  const sidebarTrailingSplitSection =
+    hasSidebarTrailingDetailSplit && sidebarTrailingSplitIndex !== -1
+      ? sidebarAfterSplitSections[sidebarTrailingSplitIndex]
+      : null;
+
+  const sidebarTrailingAfterSections =
+    sidebarTrailingSplitIndex !== -1
+      ? sidebarAfterSplitSections.slice(sidebarTrailingSplitIndex + 1)
+      : sidebarAfterSplitSections;
+
+  const sidebarBeforeTrailingSplitSections =
+    sidebarTrailingSplitIndex !== -1
+      ? sidebarAfterSplitSections.slice(0, sidebarTrailingSplitIndex)
+      : [];
+
+  const sidebarTrailingSplitItemsLength =
+    sidebarTrailingDetailSplitSectionType === "projects"
+      ? sortedProjects.length
+      : sidebarTrailingDetailSplitSectionType === "experience"
+        ? sortedExperience.length
+        : 0;
+
+  const clampedSidebarTrailingTransitionItemEnd = hasSidebarTrailingDetailSplit
+    ? Math.max(0, Math.min(sidebarTrailingDetailTransitionItemEnd, sidebarTrailingSplitItemsLength))
+    : 0;
+
+  const effectiveSidebarTrailingContinuationChunks =
+    hasSidebarTrailingDetailSplit
+      ? (
+          sidebarTrailingDetailContinuationChunks.length > 0
+            ? sidebarTrailingDetailContinuationChunks
+            : clampedSidebarTrailingTransitionItemEnd < sidebarTrailingSplitItemsLength
+              ? [{ start: clampedSidebarTrailingTransitionItemEnd, end: sidebarTrailingSplitItemsLength }]
+              : []
+        )
+      : [];
+
+  const sidebarPrimaryContinuationPageCount = hasSidebarDetailSplit
+    ? (
+        hasSidebarTrailingDetailSplit
+          ? effectiveSidebarDetailChunks.length
+          : Math.max(effectiveSidebarDetailChunks.length, sidebarAfterSplitSections.length > 0 ? 1 : 0)
+      )
+    : 0;
+
+  const sidebarTrailingContinuationPageCount = hasSidebarDetailSplit && hasSidebarTrailingDetailSplit
+    ? Math.max(
+        effectiveSidebarTrailingContinuationChunks.length,
+        sidebarTrailingAfterSections.length > 0 ? 1 : 0
+      )
+    : 0;
+
+  const effectiveMainSectionChunks =
+    layout === "two-column"
+      ? (mainSectionContinuationChunks.length > 0
+          ? mainSectionContinuationChunks
+          : [{ start: 0, end: mainSections.length }])
+      : [];
+
+  const sidebarContinuationPageCount =
+    layout === "two-column"
+      ? (hasSidebarDetailSplit
+          ? sidebarPrimaryContinuationPageCount + sidebarTrailingContinuationPageCount
+          : Math.max(0, effectiveSidebarChunks.length - 1 - sidebarContinuationChunkOffset))
+      : 0;
+
+  const mainSectionContinuationPageCount =
+    layout === "two-column" && !canUseMainDetailSplit
+      ? Math.max(0, effectiveMainSectionChunks.length - 1)
+      : 0;
+
+  const continuationPageCount =
+    Math.max(
+      primaryContinuationPageCount + trailingContinuationPageCount,
+      sidebarContinuationPageCount,
+      mainSectionContinuationPageCount
+    );
+
+  const renderTwoColumnSidebarPageOneSections = () => {
+    if (hasSidebarDetailSplit) {
+      const splitSection = sidebarSections[sidebarSplitSectionIndex];
+      const beforeSplit = sidebarSections.slice(0, sidebarSplitSectionIndex);
+      const splitLanguageItems = sidebarDetailSplitSectionType === "languages"
+        ? languages.slice(0, clampedSidebarSplitItemIndex)
+        : undefined;
+      const splitSkillItems = sidebarDetailSplitSectionType === "skills"
+        ? skills.slice(0, clampedSidebarSplitItemIndex)
+        : undefined;
+      const splitInterestItems = sidebarDetailSplitSectionType === "interests"
+        ? interests.slice(0, clampedSidebarSplitItemIndex)
+        : undefined;
+      const splitExperienceItems = sidebarDetailSplitSectionType === "experience"
+        ? sortedExperience.slice(0, clampedSidebarSplitItemIndex)
+        : undefined;
+      const splitProjectItems = sidebarDetailSplitSectionType === "projects"
+        ? sortedProjects.slice(0, clampedSidebarSplitItemIndex)
+        : undefined;
+
+      if (clampedSidebarSplitItemIndex === 0) {
+        const firstLanguageItems = sidebarDetailSplitSectionType === "languages"
+          ? languages.slice(0, 1)
+          : undefined;
+        const firstSkillItems = sidebarDetailSplitSectionType === "skills"
+          ? skills.slice(0, 1)
+          : undefined;
+        const firstInterestItems = sidebarDetailSplitSectionType === "interests"
+          ? interests.slice(0, 1)
+          : undefined;
+        const firstExperienceItems = sidebarDetailSplitSectionType === "experience"
+          ? sortedExperience.slice(0, 1)
+          : undefined;
+        const firstProjectItems = sidebarDetailSplitSectionType === "projects"
+          ? sortedProjects.slice(0, 1)
+          : undefined;
+
+        return (
+          <>
+            {beforeSplit.map((sec) => (
+              <ResumeDraggableSection
+                key={sec.id}
+                section={sec}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            ))}
+            <ResumeDraggableSection
+              key={splitSection.id}
+              section={splitSection}
+              experienceItems={firstExperienceItems}
+              projectItems={firstProjectItems}
+              languageItems={firstLanguageItems}
+              skillItems={firstSkillItems}
+              interestItems={firstInterestItems}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          </>
+        );
+      }
+
+      return (
+        <>
+          {beforeSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
+          <ResumeDraggableSection
+            key={splitSection.id}
+            section={splitSection}
+            experienceItems={splitExperienceItems}
+            projectItems={splitProjectItems}
+            languageItems={splitLanguageItems}
+            skillItems={splitSkillItems}
+            interestItems={splitInterestItems}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        {sidebarSections.slice(firstSidebarChunk.start, firstSidebarChunk.end).map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ))}
+        {canCarrySidebarSection && (
+          <ResumeDraggableSection
+            key={`${carriedSidebarSection!.id}-carry-page-1`}
+            section={carriedSidebarSection!}
+            experienceItems={carriedSidebarSection!.type === "experience" ? sortedExperience.slice(0, sidebarCarryItemCount) : undefined}
+            projectItems={carriedSidebarSection!.type === "projects" ? sortedProjects.slice(0, sidebarCarryItemCount) : undefined}
+            languageItems={carriedSidebarSection!.type === "languages" ? languages.slice(0, sidebarCarryItemCount) : undefined}
+            skillItems={carriedSidebarSection!.type === "skills" ? skills.slice(0, sidebarCarryItemCount) : undefined}
+            interestItems={carriedSidebarSection!.type === "interests" ? interests.slice(0, sidebarCarryItemCount) : undefined}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        )}
+      </>
+    );
+  };
+
+  const renderTwoColumnSidebarPageTwoSections = (chunkIndex = 0) => {
+    if (hasSidebarDetailSplit) {
+      const splitSection = sidebarSections[sidebarSplitSectionIndex];
+      const isPrimaryChunkPage = chunkIndex < sidebarPrimaryContinuationPageCount;
+
+      if (isPrimaryChunkPage) {
+        const chunk = effectiveSidebarDetailChunks[chunkIndex];
+        if (!chunk) {
+          if (chunkIndex > 0) return null;
+          return sidebarAfterSplitSections.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ));
+        }
+
+        const splitLanguageItems = sidebarDetailSplitSectionType === "languages"
+          ? languages.slice(chunk.start, chunk.end)
+          : undefined;
+        const splitSkillItems = sidebarDetailSplitSectionType === "skills"
+          ? skills.slice(chunk.start, chunk.end)
+          : undefined;
+        const splitInterestItems = sidebarDetailSplitSectionType === "interests"
+          ? interests.slice(chunk.start, chunk.end)
+          : undefined;
+        const splitExperienceItems = sidebarDetailSplitSectionType === "experience"
+          ? sortedExperience.slice(chunk.start, chunk.end)
+          : undefined;
+        const splitProjectItems = sidebarDetailSplitSectionType === "projects"
+          ? sortedProjects.slice(chunk.start, chunk.end)
+          : undefined;
+
+        const transitionExperienceItems =
+          hasSidebarTrailingDetailSplit && sidebarTrailingDetailSplitSectionType === "experience" && clampedSidebarTrailingTransitionItemEnd > 0
+            ? sortedExperience.slice(0, clampedSidebarTrailingTransitionItemEnd)
+            : undefined;
+        const transitionProjectItems =
+          hasSidebarTrailingDetailSplit && sidebarTrailingDetailSplitSectionType === "projects" && clampedSidebarTrailingTransitionItemEnd > 0
+            ? sortedProjects.slice(0, clampedSidebarTrailingTransitionItemEnd)
+            : undefined;
+
+        return (
+          <>
+            <ResumeProxyDraggableSection
+              section={splitSection}
+              proxyId={`${splitSection.id}-sidebar-${chunkIndex}`}
+              experienceItems={splitExperienceItems}
+              projectItems={splitProjectItems}
+              languageItems={splitLanguageItems}
+              skillItems={splitSkillItems}
+              interestItems={splitInterestItems}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+            {hasSidebarTrailingDetailSplit &&
+              chunkIndex === effectiveSidebarDetailChunks.length - 1 &&
+              sidebarBeforeTrailingSplitSections.map((sec) => (
+                <ResumeDraggableSection
+                  key={sec.id}
+                  section={sec}
+                  onPreviewInteract={() => setIsMobileEditorOpen(true)}
+                />
+              ))}
+            {hasSidebarTrailingDetailSplit &&
+              sidebarTrailingSplitSection &&
+              chunkIndex === effectiveSidebarDetailChunks.length - 1 &&
+              clampedSidebarTrailingTransitionItemEnd > 0 && (
+                <ResumeProxyDraggableSection
+                  section={sidebarTrailingSplitSection}
+                  proxyId={`${sidebarTrailingSplitSection.id}-sidebar-transition-${chunkIndex}`}
+                  experienceItems={transitionExperienceItems}
+                  projectItems={transitionProjectItems}
+                  onPreviewInteract={() => setIsMobileEditorOpen(true)}
+                />
+              )}
+            {!hasSidebarTrailingDetailSplit && chunkIndex === effectiveSidebarDetailChunks.length - 1 && sidebarAfterSplitSections.map((sec) => (
+              <ResumeDraggableSection
+                key={sec.id}
+                section={sec}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            ))}
+          </>
+        );
+      }
+
+      if (!hasSidebarTrailingDetailSplit || !sidebarTrailingSplitSection) return null;
+
+      const trailingChunkIndex = chunkIndex - sidebarPrimaryContinuationPageCount;
+      const trailingChunk = effectiveSidebarTrailingContinuationChunks[trailingChunkIndex];
+      if (!trailingChunk) {
+        if (trailingChunkIndex > 0) return null;
+        return sidebarTrailingAfterSections.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ));
+      }
+
+      const trailingExperienceItems =
+        sidebarTrailingDetailSplitSectionType === "experience"
+          ? sortedExperience.slice(trailingChunk.start, trailingChunk.end)
+          : undefined;
+      const trailingProjectItems =
+        sidebarTrailingDetailSplitSectionType === "projects"
+          ? sortedProjects.slice(trailingChunk.start, trailingChunk.end)
+          : undefined;
+
+      return (
+        <>
+          <ResumeProxyDraggableSection
+            section={sidebarTrailingSplitSection}
+            proxyId={`${sidebarTrailingSplitSection.id}-sidebar-trailing-${trailingChunkIndex}`}
+            experienceItems={trailingExperienceItems}
+            projectItems={trailingProjectItems}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+          {trailingChunkIndex === effectiveSidebarTrailingContinuationChunks.length - 1 && sidebarTrailingAfterSections.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
+        </>
+      );
+    }
+
+    const nextChunk = effectiveSidebarChunks[chunkIndex + 1 + sidebarContinuationChunkOffset];
+    if (!nextChunk) return null;
+
+    if (canCarrySidebarSection && chunkIndex === 0 && sidebarContinuationChunkOffset === 0) {
+      const remainingSections = sidebarSections.slice(nextChunk.start, nextChunk.end);
+
+      return (
+        <>
+          {hasRemainingCarriedSidebarItems && (
+            <ResumeProxyDraggableSection
+              section={carriedSidebarSection!}
+              proxyId={`${carriedSidebarSection!.id}-carry-page-2`}
+              experienceItems={carriedSidebarSection!.type === "experience" ? sortedExperience.slice(sidebarCarryItemCount) : undefined}
+              projectItems={carriedSidebarSection!.type === "projects" ? sortedProjects.slice(sidebarCarryItemCount) : undefined}
+              languageItems={carriedSidebarSection!.type === "languages" ? languages.slice(sidebarCarryItemCount) : undefined}
+              skillItems={carriedSidebarSection!.type === "skills" ? skills.slice(sidebarCarryItemCount) : undefined}
+              interestItems={carriedSidebarSection!.type === "interests" ? interests.slice(sidebarCarryItemCount) : undefined}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          )}
+          {remainingSections
+            .filter((section) => section.id !== carriedSidebarSection!.id)
+            .map((sec) => (
+              <ResumeDraggableSection
+                key={sec.id}
+                section={sec}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            ))}
+        </>
+      );
+    }
+
+    return sidebarSections.slice(nextChunk.start, nextChunk.end).map((sec) => (
+      <ResumeDraggableSection
+        key={sec.id}
+        section={sec}
+        onPreviewInteract={() => setIsMobileEditorOpen(true)}
+      />
+    ));
+  };
+
   const renderLinearPageOneSections = () => {
     if (pageSplitIndex === -1) {
       return sectionOrder.map((sec) => (
@@ -1576,10 +2671,11 @@ export default function Home() {
     );
   };
 
-  const renderLinearPageTwoSections = () => {
+  const renderLinearPageTwoSections = (chunkIndex = 0) => {
     if (pageSplitIndex === -1) return null;
 
     if (!canUseDetailSplit) {
+      if (chunkIndex > 0) return null;
       return sectionOrder.slice(pageSplitIndex).map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
@@ -1591,18 +2687,97 @@ export default function Home() {
 
     const splitSection = splitSectionCandidate;
     const afterSplit = sectionOrder.slice(detailSplitSectionIndex! + 1);
-    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(clampedDetailSplitIndex!) : undefined;
-    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(clampedDetailSplitIndex!) : undefined;
+    const isPrimaryChunkPage = chunkIndex < primaryContinuationPageCount;
+
+    if (isPrimaryChunkPage) {
+      const chunk = effectiveContinuationChunks[chunkIndex];
+      if (!chunk) {
+        if (chunkIndex > 0) return null;
+        return afterSplit.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ));
+      }
+      const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
+      const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
+
+      const transitionExperienceItems =
+        hasTrailingDetailSplit && trailingDetailSplitSectionType === "experience" && clampedTrailingTransitionItemEnd > 0
+          ? sortedExperience.slice(0, clampedTrailingTransitionItemEnd)
+          : undefined;
+      const transitionProjectItems =
+        hasTrailingDetailSplit && trailingDetailSplitSectionType === "projects" && clampedTrailingTransitionItemEnd > 0
+          ? sortedProjects.slice(0, clampedTrailingTransitionItemEnd)
+          : undefined;
+
+      return (
+        <>
+          <ResumeProxyDraggableSection
+            section={splitSection!}
+            proxyId={`${splitSection!.id}-linear-primary-${chunkIndex}`}
+            experienceItems={splitExperienceItems}
+            projectItems={splitProjectItems}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+          {hasTrailingDetailSplit &&
+            trailingSplitSection &&
+            chunkIndex === effectiveContinuationChunks.length - 1 &&
+            clampedTrailingTransitionItemEnd > 0 && (
+              <ResumeProxyDraggableSection
+                section={trailingSplitSection}
+                proxyId={`${trailingSplitSection.id}-linear-transition-${chunkIndex}`}
+                experienceItems={transitionExperienceItems}
+                projectItems={transitionProjectItems}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            )}
+          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
+        </>
+      );
+    }
+
+    if (!hasTrailingDetailSplit || !trailingSplitSection) return null;
+
+    const trailingChunkIndex = chunkIndex - primaryContinuationPageCount;
+    const trailingChunk = effectiveTrailingContinuationChunks[trailingChunkIndex];
+    if (!trailingChunk) {
+      if (trailingChunkIndex > 0) return null;
+      return trailingAfterSections.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+    const trailingExperienceItems =
+      trailingDetailSplitSectionType === "experience"
+        ? sortedExperience.slice(trailingChunk.start, trailingChunk.end)
+        : undefined;
+    const trailingProjectItems =
+      trailingDetailSplitSectionType === "projects"
+        ? sortedProjects.slice(trailingChunk.start, trailingChunk.end)
+        : undefined;
 
     return (
       <>
-        <ResumeStaticSection
-          section={splitSection!}
-          experienceItems={splitExperienceItems}
-          projectItems={splitProjectItems}
+        <ResumeProxyDraggableSection
+          section={trailingSplitSection}
+          proxyId={`${trailingSplitSection.id}-linear-trailing-${trailingChunkIndex}`}
+          experienceItems={trailingExperienceItems}
+          projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
-        {afterSplit.map((sec) => (
+        {trailingChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
@@ -1625,7 +2800,8 @@ export default function Home() {
     }
 
     if (!canUseMainDetailSplit) {
-      return mainSections.slice(0, mainPageSplitIndex).map((sec) => (
+      const firstChunk = effectiveMainSectionChunks[0] ?? { start: 0, end: mainSections.length };
+      return mainSections.slice(firstChunk.start, firstChunk.end).map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
@@ -1640,6 +2816,19 @@ export default function Home() {
     const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(0, clampedDetailSplitIndex!) : undefined;
 
     if (clampedDetailSplitIndex === 0) {
+      if (beforeSplit.length === 0) {
+        const firstExperienceItem = detailSplitSectionType === "experience" ? sortedExperience.slice(0, 1) : undefined;
+        const firstProjectItem = detailSplitSectionType === "projects" ? sortedProjects.slice(0, 1) : undefined;
+        return (
+          <ResumeDraggableSection
+            key={splitSection.id}
+            section={splitSection}
+            experienceItems={firstExperienceItem}
+            projectItems={firstProjectItem}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        );
+      }
       return beforeSplit.map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
@@ -1669,11 +2858,13 @@ export default function Home() {
     );
   };
 
-  const renderTwoColumnMainPageTwoSections = () => {
+  const renderTwoColumnMainPageTwoSections = (chunkIndex = 0) => {
     if (mainPageSplitIndex === -1) return null;
 
     if (!canUseMainDetailSplit) {
-      return mainSections.slice(mainPageSplitIndex).map((sec) => (
+      const nextChunk = effectiveMainSectionChunks[chunkIndex + 1];
+      if (!nextChunk) return null;
+      return mainSections.slice(nextChunk.start, nextChunk.end).map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
@@ -1684,18 +2875,97 @@ export default function Home() {
 
     const splitSection = splitSectionCandidate!;
     const afterSplit = mainSections.slice(detailSplitMainIndex + 1);
-    const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(clampedDetailSplitIndex!) : undefined;
-    const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(clampedDetailSplitIndex!) : undefined;
+    const isPrimaryChunkPage = chunkIndex < primaryContinuationPageCount;
+
+    if (isPrimaryChunkPage) {
+      const chunk = effectiveContinuationChunks[chunkIndex];
+      if (!chunk) {
+        if (chunkIndex > 0) return null;
+        return afterSplit.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ));
+      }
+      const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
+      const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
+
+      const transitionExperienceItems =
+        hasTrailingDetailSplit && trailingDetailSplitSectionType === "experience" && clampedTrailingTransitionItemEnd > 0
+          ? sortedExperience.slice(0, clampedTrailingTransitionItemEnd)
+          : undefined;
+      const transitionProjectItems =
+        hasTrailingDetailSplit && trailingDetailSplitSectionType === "projects" && clampedTrailingTransitionItemEnd > 0
+          ? sortedProjects.slice(0, clampedTrailingTransitionItemEnd)
+          : undefined;
+
+      return (
+        <>
+          <ResumeProxyDraggableSection
+            section={splitSection}
+            proxyId={`${splitSection.id}-main-primary-${chunkIndex}`}
+            experienceItems={splitExperienceItems}
+            projectItems={splitProjectItems}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+          {hasTrailingDetailSplit &&
+            trailingSplitSection &&
+            chunkIndex === effectiveContinuationChunks.length - 1 &&
+            clampedTrailingTransitionItemEnd > 0 && (
+              <ResumeProxyDraggableSection
+                section={trailingSplitSection}
+                proxyId={`${trailingSplitSection.id}-main-transition-${chunkIndex}`}
+                experienceItems={transitionExperienceItems}
+                projectItems={transitionProjectItems}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            )}
+          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
+        </>
+      );
+    }
+
+    if (!hasTrailingDetailSplit || !trailingSplitSection) return null;
+
+    const trailingChunkIndex = chunkIndex - primaryContinuationPageCount;
+    const trailingChunk = effectiveTrailingContinuationChunks[trailingChunkIndex];
+    if (!trailingChunk) {
+      if (trailingChunkIndex > 0) return null;
+      return trailingAfterSections.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+    const trailingExperienceItems =
+      trailingDetailSplitSectionType === "experience"
+        ? sortedExperience.slice(trailingChunk.start, trailingChunk.end)
+        : undefined;
+    const trailingProjectItems =
+      trailingDetailSplitSectionType === "projects"
+        ? sortedProjects.slice(trailingChunk.start, trailingChunk.end)
+        : undefined;
 
     return (
       <>
-        <ResumeStaticSection
-          section={splitSection}
-          experienceItems={splitExperienceItems}
-          projectItems={splitProjectItems}
+        <ResumeProxyDraggableSection
+          section={trailingSplitSection}
+          proxyId={`${trailingSplitSection.id}-main-trailing-${trailingChunkIndex}`}
+          experienceItems={trailingExperienceItems}
+          projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
-        {afterSplit.map((sec) => (
+        {trailingChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
@@ -1917,7 +3187,7 @@ export default function Home() {
                     onPreviewInteract={() => setIsMobileEditorOpen(true)}
                   />
                   {layout === "two-column" ? (
-                    <div className="flex gap-0" style={{ minHeight: "850px", margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
+                    <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
                       <div
                         className="shrink-0 p-5 pt-4"
                         style={{
@@ -1926,18 +3196,18 @@ export default function Home() {
                         }}
                       >
                         {sidebarSections.map((sec) => (
-                          <ResumeDraggableSection key={sec.id} section={sec} />
+                          <ResumeStaticSection key={sec.id} section={sec} />
                         ))}
                       </div>
                       <div className="flex-1 p-8 pt-4">
                         {mainSections.map((sec) => (
-                          <ResumeDraggableSection key={sec.id} section={sec} />
+                          <ResumeStaticSection key={sec.id} section={sec} />
                         ))}
                       </div>
                     </div>
                   ) : (
                     sectionOrder.map((sec) => (
-                      <ResumeDraggableSection key={sec.id} section={sec} />
+                      <ResumeStaticSection key={sec.id} section={sec} />
                     ))
                   )}
                 </div>
@@ -1965,7 +3235,7 @@ export default function Home() {
                       <div
                         className="flex gap-0"
                         style={{
-                          minHeight: "850px",
+                          minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`,
                           margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px`,
                         }}
                       >
@@ -1977,13 +3247,7 @@ export default function Home() {
                             width: `${s.sidebarWidth}%`,
                           }}
                         >
-                          {sidebarSections.map((sec) => (
-                            <ResumeDraggableSection
-                              key={sec.id}
-                              section={sec}
-                              onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                            />
-                          ))}
+                          {renderTwoColumnSidebarPageOneSections()}
                           {!sidebarSections.length && (
                             <p className="text-xs text-gray-400 italic text-center mt-8">
                               Drop sections here
@@ -2006,9 +3270,10 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* Page 2 */}
-                  {pageSplitIndex !== -1 && (
+                  {/* Page 2+ */}
+                  {Array.from({ length: continuationPageCount }).map((_, continuationPageIndex) => (
                     <div
+                      key={`resume-page-continuation-${continuationPageIndex}`}
                       className="resume-page shadow-lg rounded"
                       style={{ ...pageStyle }}
                     >
@@ -2026,18 +3291,20 @@ export default function Home() {
                               background: s.accentColor + "10",
                               width: `${s.sidebarWidth}%`,
                             }}
-                          />
+                          >
+                            {renderTwoColumnSidebarPageTwoSections(continuationPageIndex)}
+                          </div>
                           <div className="flex-1 p-8 pt-4">
-                            {renderTwoColumnMainPageTwoSections()}
+                            {renderTwoColumnMainPageTwoSections(continuationPageIndex)}
                           </div>
                         </div>
                       ) : (
                         <div>
-                          {renderLinearPageTwoSections()}
+                          {renderLinearPageTwoSections(continuationPageIndex)}
                         </div>
                       )}
                     </div>
-                  )}
+                  ))}
 
                 </DroppableZone>
               </SortableContext>
@@ -2050,6 +3317,7 @@ export default function Home() {
       <DragOverlay>
         <DragOverlayContent sectionId={activeDragId} />
       </DragOverlay>
+      <FeedbackWidget />
     </DndContext>
   );
 }
