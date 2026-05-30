@@ -98,6 +98,22 @@ For production deploy with GitHub Actions, add the same keys in:
 
 - Repository Settings -> Secrets and variables -> Actions -> New repository secret
 
+### SMTP Health Check Endpoint
+
+Use this to verify SMTP login/connectivity without sending an email:
+
+- `GET /api/health/smtp`
+
+Optional protection:
+
+- Set `HEALTHCHECK_TOKEN` and send header `x-healthcheck-token: <token>`
+
+Example curl:
+
+```bash
+curl -H "x-healthcheck-token: your-token" https://your-domain/api/health/smtp
+```
+
 ## Google Analytics Setup
 
 Set this variable to enable Google Analytics:
