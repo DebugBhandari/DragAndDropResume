@@ -13,6 +13,11 @@ type ExportStats = {
   lastExportAt: string | null;
   lastExportedEmail: string | null;
   exportsByEmail: Record<string, number>;
+  exportsByEmailDetails: Array<{
+    email: string;
+    count: number;
+    lastExportAt: string | null;
+  }>;
 };
 
 function normalizeEmail(value: unknown): string | null {
@@ -47,19 +52,30 @@ async function readStats(): Promise<ExportStats> {
     FROM resume_export_pdf_events
   `);
 
-  const byEmailResult = await pool.query<{ email: string; count: string }>(`
-    SELECT email, COUNT(*)::text AS count
+  const byEmailResult = await pool.query<{
+    email: string;
+    count: string;
+    last_export_at: string | null;
+  }>(`
+    SELECT email, COUNT(*)::text AS count, MAX(created_at)::text AS last_export_at
     FROM resume_export_pdf_events
     WHERE email IS NOT NULL
     GROUP BY email
-    ORDER BY COUNT(*) DESC, email ASC
+    ORDER BY COUNT(*) DESC, MAX(created_at) DESC, email ASC
   `);
 
   const totals = totalResult.rows[0];
   const exportsByEmail: Record<string, number> = {};
+  const exportsByEmailDetails: ExportStats["exportsByEmailDetails"] = [];
 
   for (const row of byEmailResult.rows) {
-    exportsByEmail[row.email] = Number(row.count) || 0;
+    const count = Number(row.count) || 0;
+    exportsByEmail[row.email] = count;
+    exportsByEmailDetails.push({
+      email: row.email,
+      count,
+      lastExportAt: row.last_export_at ?? null,
+    });
   }
 
   return {
@@ -67,6 +83,7 @@ async function readStats(): Promise<ExportStats> {
     lastExportAt: totals?.last_export_at ?? null,
     lastExportedEmail: totals?.last_exported_email ?? null,
     exportsByEmail,
+    exportsByEmailDetails,
   };
 }
 

@@ -7,6 +7,11 @@ type ExportStats = {
   lastExportAt: string | null;
   lastExportedEmail: string | null;
   exportsByEmail: Record<string, number>;
+  exportsByEmailDetails?: Array<{
+    email: string;
+    count: number;
+    lastExportAt: string | null;
+  }>;
 };
 
 type ExportStatsResponse = {
@@ -74,9 +79,18 @@ export default function DeepakReportsPage() {
   const emailRows = useMemo(() => {
     if (!stats) return [];
 
+    if (stats.exportsByEmailDetails && stats.exportsByEmailDetails.length > 0) {
+      return [...stats.exportsByEmailDetails].sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        const aTime = a.lastExportAt ? new Date(a.lastExportAt).getTime() : 0;
+        const bTime = b.lastExportAt ? new Date(b.lastExportAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+
     return Object.entries(stats.exportsByEmail)
       .sort((a, b) => b[1] - a[1])
-      .map(([email, count]) => ({ email, count }));
+      .map(([email, count]) => ({ email, count, lastExportAt: null }));
   }, [stats]);
 
   return (
@@ -145,6 +159,7 @@ export default function DeepakReportsPage() {
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-2 py-2">Email</th>
                     <th className="px-2 py-2">Count</th>
+                    <th className="px-2 py-2">Last Export Time</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,6 +167,7 @@ export default function DeepakReportsPage() {
                     <tr key={row.email} className="border-b border-slate-100 text-sm text-slate-800">
                       <td className="px-2 py-2 break-all">{row.email}</td>
                       <td className="px-2 py-2">{row.count}</td>
+                      <td className="px-2 py-2">{formatTimestamp(row.lastExportAt)}</td>
                     </tr>
                   ))}
                 </tbody>
