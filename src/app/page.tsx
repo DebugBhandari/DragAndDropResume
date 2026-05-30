@@ -901,7 +901,6 @@ function ResumeProxyDraggableSection({
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useDraggable({
     id: proxyId,
@@ -915,7 +914,6 @@ function ResumeProxyDraggableSection({
 
   const containerStyle: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    transition,
     opacity: isDragging ? 0.4 : 1,
     cursor: "grab",
   };
