@@ -22,34 +22,6 @@ function normalizeEmail(value: unknown): string | null {
   return email.length > 320 ? email.slice(0, 320) : email;
 }
 
-async function ensureTable() {
-  if (!pool) {
-    throw new Error(
-      "Missing EXPORT_ANALYTICS_DATABASE_URL environment variable."
-    );
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS resume_export_pdf_events (
-      id BIGSERIAL PRIMARY KEY,
-      email TEXT NULL,
-      method TEXT NULL,
-      layout TEXT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_resume_export_pdf_events_created_at
-    ON resume_export_pdf_events (created_at DESC)
-  `);
-
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_resume_export_pdf_events_email
-    ON resume_export_pdf_events (email)
-  `);
-}
-
 async function readStats(): Promise<ExportStats> {
   if (!pool) {
     throw new Error(
@@ -100,7 +72,6 @@ async function readStats(): Promise<ExportStats> {
 
 export async function GET() {
   try {
-    await ensureTable();
     const stats = await readStats();
     return Response.json({ ok: true, stats });
   } catch (error) {
@@ -112,8 +83,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await ensureTable();
-
     const body = (await request.json()) as {
       email?: unknown;
       method?: unknown;
