@@ -129,7 +129,13 @@ const sectionHasData = (type: SectionType, state: any) => {
 };
 
 const defaultStyle: StyleConfig = { accentColor: '#2563eb', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'center', sidebarWidth: 30 };
-const defaultPhoto: PhotoConfig = { url: '', x: 50, y: 50, size: 80, borderRadius: 50 };
+const defaultPhoto: PhotoConfig = {
+  url: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg',
+  x: 88,
+  y: 50,
+  size: 82,
+  borderRadius: 50,
+};
 const seededPersonalInfo: PersonalInfo = {
   fullName: 'Your Name',
   email: 'you@example.com',
@@ -144,13 +150,49 @@ const seededExperience: WorkExperience[] = [
   {
     id: 'seed-exp-1',
     company: 'Acme Labs',
-    position: 'Software Engineer',
+    position: 'Senior Software Engineer',
     startDate: 'Jan 2023',
     endDate: 'Present',
     description: 'Built and shipped resume builder features with measurable UX improvements.',
     descriptionBullets: [
       'Built drag-and-drop section management with persistent layout state.',
       'Improved print/export fidelity and reduced formatting issues across browsers.',
+    ],
+  },
+  {
+    id: 'seed-exp-2',
+    company: 'Northwind Commerce',
+    position: 'Frontend Engineer',
+    startDate: 'Apr 2021',
+    endDate: 'Dec 2022',
+    description: 'Delivered customer-facing features for checkout and account lifecycle flows.',
+    descriptionBullets: [
+      'Improved checkout completion by 11% through form and validation UX redesign.',
+      'Built reusable UI primitives that reduced feature delivery time across squads.',
+    ],
+  },
+  {
+    id: 'seed-exp-3',
+    company: 'Atlas Health',
+    position: 'Software Developer',
+    startDate: 'Jun 2019',
+    endDate: 'Mar 2021',
+    description: 'Contributed to clinician tooling and analytics dashboards for care teams.',
+    descriptionBullets: [
+      'Implemented secure report generation pipelines for patient activity summaries.',
+      'Added telemetry-backed performance fixes that cut dashboard load time by 35%.',
+    ],
+  },
+  {
+    id: 'seed-exp-4',
+    company: 'Pixel Foundry',
+    position: 'Junior Web Developer',
+    startDate: 'Jan 2018',
+    endDate: 'May 2019',
+    description: 'Built responsive marketing websites and CMS-driven landing pages.',
+    descriptionBullets: [
+      'Delivered 20+ campaign pages with cross-device QA and accessibility fixes.',
+      'Collaborated with design to establish a lightweight component style guide.',
     ],
   },
 ];
@@ -167,6 +209,42 @@ const seededProjects: Project[] = [
     completionDate: 'May 2026',
     technologies: 'Next.js, TypeScript, Zustand',
     link: 'https://resume.debugbhandari.link',
+  },
+  {
+    id: 'seed-proj-2',
+    name: 'Hiring Pipeline Dashboard',
+    description: 'Internal dashboard for applicant tracking and interview performance metrics.',
+    descriptionBullets: [
+      'Designed role-based views for recruiters, interviewers, and hiring managers.',
+      'Automated weekly pipeline summaries with CSV export and trend visualizations.',
+    ],
+    completionDate: 'Jan 2025',
+    technologies: 'React, Node.js, PostgreSQL',
+    link: 'https://github.com/DebugBhandari/hiring-pipeline-dashboard',
+  },
+  {
+    id: 'seed-proj-3',
+    name: 'Realtime Incident Board',
+    description: 'Live incident timeline and alert routing tool for engineering teams.',
+    descriptionBullets: [
+      'Implemented websocket updates for near realtime status synchronization.',
+      'Added incident ownership and SLA reminders to improve on-call response.',
+    ],
+    completionDate: 'Aug 2024',
+    technologies: 'Next.js, Redis, Socket.IO',
+    link: 'https://github.com/DebugBhandari/realtime-incident-board',
+  },
+  {
+    id: 'seed-proj-4',
+    name: 'Portfolio CMS Starter',
+    description: 'Starter template for portfolio websites with markdown and image optimization.',
+    descriptionBullets: [
+      'Built authoring flow with markdown parsing and semantic SEO defaults.',
+      'Created deployment-ready CI workflow with preview and production channels.',
+    ],
+    completionDate: 'Nov 2023',
+    technologies: 'Next.js, MDX, Tailwind CSS',
+    link: 'https://github.com/DebugBhandari/portfolio-cms-starter',
   },
 ];
 

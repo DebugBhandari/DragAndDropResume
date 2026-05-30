@@ -42,6 +42,7 @@ import {
   Interest,
 } from "@/types/resume";
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/dateSort";
+import { trackAnalyticsEvent } from "@/utils/analytics";
 
 // ─── Contact icons for resume ───
 const CONTACT_ICONS: Record<string, string> = {
@@ -1360,28 +1361,47 @@ export default function Home() {
     });
   }, []);
 
+  const trackExportSuccess = useCallback((method: "react_to_print" | "window_print") => {
+    trackAnalyticsEvent("pdf_export_success", {
+      method,
+      layout,
+    });
+  }, [layout]);
+
+  const handleWindowPrint = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const handleAfterPrint = () => {
+      trackExportSuccess("window_print");
+    };
+
+    window.addEventListener("afterprint", handleAfterPrint, { once: true });
+    window.print();
+  }, [trackExportSuccess]);
+
   const handlePrint = useReactToPrint({
     contentRef: resumeRef,
     documentTitle: "Resume",
+    onAfterPrint: () => {
+      trackExportSuccess("react_to_print");
+    },
   });
 
   const handleExportPdf = useCallback(() => {
     const isMobileViewport =
       typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
 
-    if (isMobileViewport && typeof window !== "undefined") {
-      window.print();
+    if (isMobileViewport) {
+      handleWindowPrint();
       return;
     }
 
     try {
       handlePrint?.();
     } catch {
-      if (typeof window !== "undefined") {
-        window.print();
-      }
+      handleWindowPrint();
     }
-  }, [handlePrint]);
+  }, [handlePrint, handleWindowPrint]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
