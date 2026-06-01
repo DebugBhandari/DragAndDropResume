@@ -3334,6 +3334,12 @@ export default function Home() {
             </div>
           </div>
         </main>
+
+        <footer className="px-4 pb-5 pt-1">
+          <div className="mx-auto max-w-[1800px] text-center text-xs text-gray-500">
+            Tip: drag sections to reorder them, and drag the photo in the header to position it.
+          </div>
+        </footer>
       </div>
 
       <DragOverlay>
