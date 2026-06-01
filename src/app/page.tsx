@@ -1691,8 +1691,6 @@ export default function Home() {
           }
 
           if (itemSplit === -1) itemSplit = detailItems.length;
-          if (itemSplit === 0 && detailItems.length > 0) itemSplit = 1;
-
           const itemHeights = Array.from(detailItems).map((item) => {
             const rect = item.getBoundingClientRect();
             const styles = window.getComputedStyle(item as Element);
@@ -1872,11 +1870,6 @@ export default function Home() {
           if (itemSplit === -1) {
             itemSplit = detailItems.length;
           }
-          if (itemSplit === 0 && detailItems.length > 0) {
-            // Avoid rendering an empty page 1 block when there is at least one splittable item.
-            itemSplit = 1;
-          }
-
           const itemHeights = Array.from(detailItems).map((item) => {
             const rect = item.getBoundingClientRect();
             const styles = window.getComputedStyle(item as Element);
@@ -2415,22 +2408,6 @@ export default function Home() {
         : undefined;
 
       if (clampedSidebarSplitItemIndex === 0) {
-        const firstLanguageItems = sidebarDetailSplitSectionType === "languages"
-          ? languages.slice(0, 1)
-          : undefined;
-        const firstSkillItems = sidebarDetailSplitSectionType === "skills"
-          ? skills.slice(0, 1)
-          : undefined;
-        const firstInterestItems = sidebarDetailSplitSectionType === "interests"
-          ? interests.slice(0, 1)
-          : undefined;
-        const firstExperienceItems = sidebarDetailSplitSectionType === "experience"
-          ? sortedExperience.slice(0, 1)
-          : undefined;
-        const firstProjectItems = sidebarDetailSplitSectionType === "projects"
-          ? sortedProjects.slice(0, 1)
-          : undefined;
-
         return (
           <>
             {beforeSplit.map((sec) => (
@@ -2440,16 +2417,6 @@ export default function Home() {
                 onPreviewInteract={() => setIsMobileEditorOpen(true)}
               />
             ))}
-            <ResumeDraggableSection
-              key={splitSection.id}
-              section={splitSection}
-              experienceItems={firstExperienceItems}
-              projectItems={firstProjectItems}
-              languageItems={firstLanguageItems}
-              skillItems={firstSkillItems}
-              interestItems={firstInterestItems}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
-            />
           </>
         );
       }
@@ -2880,19 +2847,6 @@ export default function Home() {
     const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(0, clampedDetailSplitIndex!) : undefined;
 
     if (clampedDetailSplitIndex === 0) {
-      if (beforeSplit.length === 0) {
-        const firstExperienceItem = detailSplitSectionType === "experience" ? sortedExperience.slice(0, 1) : undefined;
-        const firstProjectItem = detailSplitSectionType === "projects" ? sortedProjects.slice(0, 1) : undefined;
-        return (
-          <ResumeDraggableSection
-            key={splitSection.id}
-            section={splitSection}
-            experienceItems={firstExperienceItem}
-            projectItems={firstProjectItem}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
-          />
-        );
-      }
       return beforeSplit.map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
