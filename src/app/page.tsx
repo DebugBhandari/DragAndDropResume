@@ -3490,11 +3490,18 @@ function PhotoContent() {
   }
   return (
     <div className="space-y-2">
+      <label
+        htmlFor="display-image-upload"
+        className="inline-flex items-center justify-center rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-blue-700 cursor-pointer"
+      >
+        {photo.url ? "Replace display image" : "Add a display image"}
+      </label>
       <input
+        id="display-image-upload"
         type="file"
         accept="image/*"
         onChange={handlePhotoUpload}
-        className="text-xs"
+        className="sr-only"
       />
       {photo.url && (
         <>
