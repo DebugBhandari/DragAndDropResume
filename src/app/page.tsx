@@ -534,13 +534,24 @@ function DraggablePhoto({
     const handleMove = (e: MouseEvent) => {
       if (!headerRef.current) return;
       const rect = headerRef.current.getBoundingClientRect();
+      const pageRect = headerRef.current
+        .closest(".resume-page")
+        ?.getBoundingClientRect();
+      const pageTopMarginPx = 12;
+
       const x = Math.max(
         0,
         Math.min(100, ((e.clientX - rect.left) / rect.width) * 100),
       );
+
+      const minCenterYInViewport = pageRect
+        ? pageRect.top + pageTopMarginPx + photo.size / 2
+        : rect.top + photo.size / 2;
+      const minYPercent = ((minCenterYInViewport - rect.top) / rect.height) * 100;
+
       const y = Math.max(
-        0,
-        Math.min(100, ((e.clientY - rect.top) / rect.height) * 100),
+        minYPercent,
+        Math.min(130, ((e.clientY - rect.top) / rect.height) * 100),
       );
       setPhoto({ x: Math.round(x), y: Math.round(y) });
     };
@@ -600,6 +611,22 @@ function PersonalHeader({
   const photoOnLeft = photo.url && photo.x < 35;
   const photoOnRight = photo.url && photo.x > 65;
   const textPadding = photo.url ? `${photo.size + 16}px` : "0";
+  const baseHeaderMinHeight =
+    layout === "modern"
+      ? (photo.url ? Math.max(100, photo.size + 32) : 80)
+      : layout === "compact"
+        ? (photo.url ? Math.max(60, photo.size * 0.7 + 16) : 0)
+        : (photo.url ? Math.max(80, photo.size + 16) : 0);
+  // If the photo is dragged above the header top edge, descend the header
+  // content block below the photo's bottom edge so it never covers the name.
+  const topPhotoOffsetPx = (() => {
+    if (!photo.url) return 0;
+    const photoCenterFromHeaderTopPx = (photo.y / 100) * Math.max(baseHeaderMinHeight, 1);
+    const photoTopFromHeaderTopPx = photoCenterFromHeaderTopPx - photo.size / 2;
+    if (photoTopFromHeaderTopPx >= 0) return 0;
+    const photoBottomFromHeaderTopPx = photoCenterFromHeaderTopPx + photo.size / 2;
+    return Math.ceil(Math.max(0, photoBottomFromHeaderTopPx) + 12);
+  })();
 
   if (layout === "modern") {
     const align = s.headerAlignment || "left";
@@ -616,7 +643,7 @@ function PersonalHeader({
         className="text-white -mx-12 -mt-12 mb-6 px-8 py-8 relative cursor-pointer"
         style={{
           background: s.accentColor,
-          minHeight: photo.url ? Math.max(100, photo.size + 32) : 80,
+          minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : 80,
         }}
       >
         <DraggablePhoto photo={photo} headerRef={headerRef} />
@@ -625,6 +652,7 @@ function PersonalHeader({
           style={{
             paddingLeft: photoOnLeft ? textPadding : 0,
             paddingRight: photoOnRight ? textPadding : 0,
+            paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
           }}
         >
           {personalInfo.fullName && (
@@ -655,7 +683,7 @@ function PersonalHeader({
         className="mb-3 pb-2 relative cursor-pointer"
         style={{
           borderBottom: `2px solid ${s.accentColor}`,
-          minHeight: photo.url ? Math.max(60, photo.size * 0.7 + 16) : "auto",
+          minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : "auto",
         }}
       >
         <DraggablePhoto photo={photo} headerRef={headerRef} />
@@ -663,6 +691,7 @@ function PersonalHeader({
           style={{
             paddingLeft: photoOnLeft ? textPadding : 0,
             paddingRight: photoOnRight ? textPadding : 0,
+            paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
           }}
         >
           <div className="flex items-baseline justify-between">
@@ -697,7 +726,7 @@ function PersonalHeader({
       ref={headerRef}
       onClick={handleHeaderClick}
       className="mb-4 relative cursor-pointer"
-      style={{ minHeight: photo.url ? Math.max(80, photo.size + 16) : "auto" }}
+      style={{ minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : "auto" }}
     >
       <DraggablePhoto photo={photo} headerRef={headerRef} />
       <div
@@ -705,6 +734,7 @@ function PersonalHeader({
         style={{
           paddingLeft: photoOnLeft ? textPadding : 0,
           paddingRight: photoOnRight ? textPadding : 0,
+          paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
         }}
       >
         {personalInfo.fullName && (
@@ -1398,20 +1428,16 @@ export default function Home() {
   const handlePrint = useReactToPrint({
     contentRef: resumeRef,
     documentTitle: "Resume",
+    // Override the global print CSS that uses position:absolute (needed for window.print()
+    // visibility trick) — in useReactToPrint's isolated iframe the content is already the
+    // only thing on the page, so static positioning is correct and prevents blank output.
+    pageStyle: "@media print { body * { visibility: visible !important; } .resume-pages { position: static !important; } }",
     onAfterPrint: () => {
       trackExportSuccess("react_to_print");
     },
   });
 
   const handleExportPdf = useCallback(() => {
-    const isMobileViewport =
-      typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
-
-    if (isMobileViewport) {
-      handleWindowPrint();
-      return;
-    }
-
     try {
       handlePrint?.();
     } catch {
@@ -3198,6 +3224,56 @@ export default function Home() {
             />
           </div>
 
+          {/* Hidden measurer - kept outside the scale wrapper so getBoundingClientRect()
+              returns natural (1:1) dimensions regardless of preview zoom level.
+              Must stay outside resumeRef so it is not cloned by useReactToPrint. */}
+          <div
+            style={{
+              position: "absolute",
+              visibility: "hidden",
+              pointerEvents: "none",
+              left: "-9999px",
+              top: 0,
+              width: `${PAGE_WIDTH}px`,
+              padding: `${PAGE_PAD}px ${PAGE_PAD}px ${PAGE_PAD_BOTTOM}px ${PAGE_PAD}px`,
+              fontSize: `${s.fontSize === "sm" ? 12 : s.fontSize === "lg" ? 14 : 13}px`,
+              fontFamily: getFontFamily(s.fontFamily),
+            }}
+          >
+            <div ref={contentRef}>
+              <PersonalHeader
+                layout={layout}
+                style={s}
+                photo={photo}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+              {layout === "two-column" ? (
+                <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
+                  <div
+                    className="shrink-0 p-5 pt-4"
+                    style={{
+                      background: s.accentColor + "10",
+                      width: `${s.sidebarWidth}%`,
+                    }}
+                  >
+                    {sidebarSections.map((sec) => (
+                      <ResumeStaticSection key={sec.id} section={sec} />
+                    ))}
+                  </div>
+                  <div className="flex-1 p-8 pt-4">
+                    {mainSections.map((sec) => (
+                      <ResumeStaticSection key={sec.id} section={sec} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                sectionOrder.map((sec) => (
+                  <ResumeStaticSection key={sec.id} section={sec} />
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Resume Preview */}
           <div className="w-full lg:flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
@@ -3205,52 +3281,6 @@ export default function Home() {
               ref={resumeRef}
               className="resume-pages flex flex-col items-center gap-8 py-4 print:block print:p-0"
             >
-              {/* Hidden measurer - measures all sections to find page split */}
-              <div
-                style={{
-                  position: "absolute",
-                  visibility: "hidden",
-                  left: "-9999px",
-                  width: `${PAGE_WIDTH}px`,
-                  padding: `${PAGE_PAD}px ${PAGE_PAD}px ${PAGE_PAD_BOTTOM}px ${PAGE_PAD}px`,
-                  fontSize: `${s.fontSize === "sm" ? 12 : s.fontSize === "lg" ? 14 : 13}px`,
-                  fontFamily: getFontFamily(s.fontFamily),
-                }}
-              >
-                <div ref={contentRef}>
-                  <PersonalHeader
-                    layout={layout}
-                    style={s}
-                    photo={photo}
-                    onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                  />
-                  {layout === "two-column" ? (
-                    <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
-                      <div
-                        className="shrink-0 p-5 pt-4"
-                        style={{
-                          background: s.accentColor + "10",
-                          width: `${s.sidebarWidth}%`,
-                        }}
-                      >
-                        {sidebarSections.map((sec) => (
-                          <ResumeStaticSection key={sec.id} section={sec} />
-                        ))}
-                      </div>
-                      <div className="flex-1 p-8 pt-4">
-                        {mainSections.map((sec) => (
-                          <ResumeStaticSection key={sec.id} section={sec} />
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    sectionOrder.map((sec) => (
-                      <ResumeStaticSection key={sec.id} section={sec} />
-                    ))
-                  )}
-                </div>
-              </div>
-
               <SortableContext
                 items={allIds}
               >

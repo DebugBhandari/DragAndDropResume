@@ -88,7 +88,7 @@ export default function FeedbackWidget() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-90 rounded-full border border-sky-300/50 bg-linear-to-r from-sky-600 to-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-900/25 transition hover:-translate-y-0.5 hover:from-sky-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2"
+        className="fixed bottom-4 right-4 z-90 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
         aria-label="Open feedback form"
       >
         Feedback
@@ -170,7 +170,7 @@ export default function FeedbackWidget() {
                   <button
                     type="submit"
                     disabled={!isValid || isSubmitting}
-                    className="rounded-lg bg-linear-to-r from-sky-600 to-cyan-600 px-3 py-2 text-sm font-semibold text-white transition hover:from-sky-500 hover:to-cyan-500 disabled:cursor-not-allowed disabled:from-sky-300 disabled:to-cyan-300"
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                   >
                     {isSubmitting ? "Sending..." : "Send"}
                   </button>
