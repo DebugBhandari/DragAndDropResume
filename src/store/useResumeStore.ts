@@ -142,7 +142,7 @@ const sectionHasData = (type: SectionType, state: any) => {
   }
 };
 
-const defaultStyle: StyleConfig = { accentColor: '#059669', sidebarColor: '#dbeafe', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'center', sidebarWidth: 30 };
+const defaultStyle: StyleConfig = { accentColor: '#059669', sidebarColor: '#dbeafe', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'left', sidebarWidth: 30 };
 const defaultPhoto: PhotoConfig = {
   url: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg',
   verticalPosition: 'center',
