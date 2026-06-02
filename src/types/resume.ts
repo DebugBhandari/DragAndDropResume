@@ -20,6 +20,7 @@ export interface Education {
 
 export interface WorkExperience {
   id: string;
+  visible: boolean;
   company: string;
   position: string;
   startDate: string;
@@ -30,6 +31,7 @@ export interface WorkExperience {
 
 export interface Project {
   id: string;
+  visible: boolean;
   name: string;
   description: string;
   descriptionBullets: string[];
@@ -103,9 +105,12 @@ export interface ResumeSection {
 export type LayoutType = 'classic' | 'modern' | 'compact' | 'two-column';
 
 export type HeaderAlignment = 'left' | 'center' | 'right';
+export type PhotoVerticalPosition = 'top' | 'center' | 'bottom';
+export type PhotoHorizontalPosition = 'left' | 'center' | 'right';
 
 export interface StyleConfig {
   accentColor: string;
+  sidebarColor: string;
   headingSize: 'sm' | 'md' | 'lg';
   sectionSpacing: 'tight' | 'normal' | 'relaxed';
   fontFamily: 'serif' | 'sans-serif' | 'mono';
@@ -116,10 +121,14 @@ export interface StyleConfig {
 
 export interface PhotoConfig {
   url: string;
-  x: number;
-  y: number;
+  verticalPosition: PhotoVerticalPosition;
+  horizontalPosition: PhotoHorizontalPosition;
+  headerHeight: number;
+  marginTop: number;
+  marginBottom: number;
   size: number;
   borderRadius: number;
+  contentGap: number;
 }
 
 export interface ResumeData {

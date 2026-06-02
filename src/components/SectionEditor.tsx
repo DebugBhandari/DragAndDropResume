@@ -39,6 +39,14 @@ export default function SectionEditor({ type }: { type: SectionType }) {
           <div key={exp.id} className="form-card group">
             <button
               type="button"
+              title={exp.visible !== false ? 'Hide in preview' : 'Show in preview'}
+              className={`absolute top-2 right-23 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center ${exp.visible !== false ? 'text-white bg-emerald-500 hover:bg-emerald-600' : 'text-white bg-red-500 hover:bg-red-600'}`}
+              onClick={() => store.updateExperience(exp.id, { visible: exp.visible === false })}
+            >
+              <span aria-hidden="true">👁</span>
+            </button>
+            <button
+              type="button"
               title="Move down (bottom goes to top)"
               className="absolute top-2 right-16 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center text-slate-700 bg-slate-200 hover:bg-slate-300"
               onClick={() => {
@@ -134,6 +142,14 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       <div className="space-y-3">
         {projectList.map((proj) => (
           <div key={proj.id} className="form-card group">
+            <button
+              type="button"
+              title={proj.visible !== false ? 'Hide in preview' : 'Show in preview'}
+              className={`absolute top-2 right-23 w-6 h-6 rounded-full text-xs transition-all duration-150 flex items-center justify-center ${proj.visible !== false ? 'text-white bg-emerald-500 hover:bg-emerald-600' : 'text-white bg-red-500 hover:bg-red-600'}`}
+              onClick={() => store.updateProject(proj.id, { visible: proj.visible === false })}
+            >
+              <span aria-hidden="true">👁</span>
+            </button>
             <button
               type="button"
               title="Move down (bottom goes to top)"

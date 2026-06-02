@@ -73,6 +73,7 @@ const normalizeExperience = (item: any) => {
 
   return {
     ...item,
+    visible: item?.visible !== false,
     descriptionBullets: bullets.length > 0 ? bullets : [''],
   };
 };
@@ -88,6 +89,7 @@ const normalizeProject = (item: any) => {
 
   return {
     ...item,
+    visible: item?.visible !== false,
     descriptionBullets: bullets.length > 0 ? bullets : [''],
     completionDate: String(item?.completionDate ?? ''),
   };
@@ -140,13 +142,17 @@ const sectionHasData = (type: SectionType, state: any) => {
   }
 };
 
-const defaultStyle: StyleConfig = { accentColor: '#2563eb', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'center', sidebarWidth: 30 };
+const defaultStyle: StyleConfig = { accentColor: '#2563eb', sidebarColor: '#dbeafe', headingSize: 'md', sectionSpacing: 'normal', fontFamily: 'sans-serif', fontSize: 'md', headerAlignment: 'center', sidebarWidth: 30 };
 const defaultPhoto: PhotoConfig = {
   url: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg',
-  x: 88,
-  y: 50,
+  verticalPosition: 'center',
+  horizontalPosition: 'right',
+  headerHeight: 180,
+  marginTop: 0,
+  marginBottom: 0,
   size: 82,
   borderRadius: 50,
+  contentGap: 14,
 };
 const seededPersonalInfo: PersonalInfo = {
   fullName: 'Easy Resume',
@@ -161,6 +167,7 @@ const seededPersonalInfo: PersonalInfo = {
 const seededExperience: WorkExperience[] = [
   {
     id: 'seed-exp-1',
+    visible: true,
     company: 'Acme Labs',
     position: 'Senior Software Engineer',
     startDate: 'Jan 2023',
@@ -173,6 +180,7 @@ const seededExperience: WorkExperience[] = [
   },
   {
     id: 'seed-exp-2',
+    visible: true,
     company: 'Northwind Commerce',
     position: 'Frontend Engineer',
     startDate: 'Apr 2021',
@@ -185,6 +193,7 @@ const seededExperience: WorkExperience[] = [
   },
   {
     id: 'seed-exp-3',
+    visible: true,
     company: 'Atlas Health',
     position: 'Software Developer',
     startDate: 'Jun 2019',
@@ -197,6 +206,7 @@ const seededExperience: WorkExperience[] = [
   },
   {
     id: 'seed-exp-4',
+    visible: true,
     company: 'Pixel Foundry',
     position: 'Junior Web Developer',
     startDate: 'Jan 2018',
@@ -212,6 +222,7 @@ const seededExperience: WorkExperience[] = [
 const seededProjects: Project[] = [
   {
     id: 'seed-proj-1',
+    visible: true,
     name: 'Resume Builder',
     description: 'Interactive resume builder with live preview and export support.',
     descriptionBullets: [
@@ -224,6 +235,7 @@ const seededProjects: Project[] = [
   },
   {
     id: 'seed-proj-2',
+    visible: true,
     name: 'Hiring Pipeline Dashboard',
     description: 'Internal dashboard for applicant tracking and interview performance metrics.',
     descriptionBullets: [
@@ -236,6 +248,7 @@ const seededProjects: Project[] = [
   },
   {
     id: 'seed-proj-3',
+    visible: true,
     name: 'Realtime Incident Board',
     description: 'Live incident timeline and alert routing tool for engineering teams.',
     descriptionBullets: [
@@ -248,6 +261,7 @@ const seededProjects: Project[] = [
   },
   {
     id: 'seed-proj-4',
+    visible: true,
     name: 'Portfolio CMS Starter',
     description: 'Starter template for portfolio websites with markdown and image optimization.',
     descriptionBullets: [
@@ -1107,7 +1121,7 @@ export const useResumeStore = create<ResumeStore>()(
       removeEducation: (id) => set((s) => ({ education: s.education.filter((e) => e.id !== id) })),
 
       addExperience: () => set((s) => {
-        const nextExperience = [...s.experience, { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', description: '', descriptionBullets: [''] }];
+        const nextExperience = [...s.experience, { id: uuidv4(), visible: true, company: '', position: '', startDate: '', endDate: '', description: '', descriptionBullets: [''] }];
         return { experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience) };
       }),
       updateExperience: (id, data) => set((s) => {
@@ -1121,7 +1135,7 @@ export const useResumeStore = create<ResumeStore>()(
       })),
 
       addProject: () => set((s) => {
-        const nextProjects = [...s.projects, { id: uuidv4(), name: '', description: '', descriptionBullets: [''], completionDate: '', technologies: '', link: '' }];
+        const nextProjects = [...s.projects, { id: uuidv4(), visible: true, name: '', description: '', descriptionBullets: [''], completionDate: '', technologies: '', link: '' }];
         return { projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects) };
       }),
       updateProject: (id, data) => set((s) => {
@@ -1221,7 +1235,7 @@ export const useResumeStore = create<ResumeStore>()(
         if (!merged.references) merged.references = [];
         if (!merged.interests) merged.interests = [];
         if (!merged.skills) merged.skills = [];
-        if (!merged.style?.sidebarWidth) merged.style = { ...current.style, ...merged.style, sidebarWidth: merged.style?.sidebarWidth || 30 };
+        merged.style = { ...current.style, ...merged.style, sidebarWidth: merged.style?.sidebarWidth || 30 };
         merged.experience = (merged.experience || []).map(normalizeExperience);
         merged.projects = (merged.projects || []).map(normalizeProject);
         if (typeof merged.experienceManualOrder !== 'boolean') merged.experienceManualOrder = false;
@@ -1229,6 +1243,11 @@ export const useResumeStore = create<ResumeStore>()(
         if (!merged.experienceManualOrder) merged.experience = sortWorkExperienceByDateDesc(merged.experience);
         if (!merged.projectsManualOrder) merged.projects = sortProjectsByDateDesc(merged.projects);
         if (!merged.personalInfo?.linkedin) merged.personalInfo = { ...current.personalInfo, ...merged.personalInfo };
+        merged.photo = { ...current.photo, ...merged.photo };
+        if (typeof merged.photo.headerHeight !== 'number') merged.photo.headerHeight = 180;
+        if (typeof merged.photo.marginTop !== 'number') merged.photo.marginTop = 0;
+        if (typeof merged.photo.marginBottom !== 'number') merged.photo.marginBottom = 0;
+        if (typeof merged.photo.contentGap !== 'number') merged.photo.contentGap = 14;
         merged.sectionOrder = (merged.sectionOrder || []).map((section: ResumeSection) => ({
           ...section,
           title: getSectionTitle(section.type, activeLocale),

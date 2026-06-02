@@ -48,13 +48,30 @@ import { getSectionLabel } from "@/utils/sectionTranslations";
 import { getUiText } from "@/utils/uiTranslations";
 
 // ─── Contact icons for resume ───
-const CONTACT_ICONS: Record<string, string> = {
-  email: "✉",
-  phone: "☎",
-  location: "⌖",
+const CONTACT_ICONS: Record<string, React.ReactNode> = {
+  email: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[1.15em] w-[1.15em]" aria-hidden="true">
+      <rect x="3.25" y="5.25" width="17.5" height="13.5" rx="2.25" />
+      <path d="M4.5 7 12 12.75 19.5 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  phone: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[1.15em] w-[1.15em]" aria-hidden="true">
+      <path d="M7.6 4.75h2.1c.4 0 .76.27.87.65l.88 3.05a.94.94 0 0 1-.27.98l-1.41 1.28a13.45 13.45 0 0 0 4.62 4.62l1.28-1.41a.94.94 0 0 1 .98-.27l3.05.88c.38.11.65.47.65.87v2.1c0 .69-.56 1.25-1.25 1.25h-.9C10.47 19.75 4.25 13.53 4.25 5.99v-.9c0-.69.56-1.25 1.25-1.25Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  location: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[1.15em] w-[1.15em]" aria-hidden="true">
+      <path d="M12 20.25s6-5.54 6-10.15a6 6 0 1 0-12 0c0 4.61 6 10.15 6 10.15Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="10.1" r="2.1" />
+    </svg>
+  ),
   linkedin: "🔗",
   website: "🌐",
 };
+
+const DEFAULT_HEADER_IMAGE_URL = "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg";
+const PRESET_SIDEBAR_COLORS = ['#dbeafe', '#fee2e2', '#dcfce7', '#ede9fe', '#fef3c7', '#cffafe', '#e5e7eb', '#e0e7ff'];
 
 // ─── Style helpers ───
 function getHeadingSizeClass(size: StyleConfig["headingSize"]) {
@@ -165,7 +182,8 @@ function SectionContent({
       const experienceList = experienceManualOrder && !experienceItems
         ? baseExperience
         : sortWorkExperienceByDateDesc(baseExperience);
-      if (!experienceList.length)
+      const visibleExperience = experienceList.filter((item) => item.visible !== false);
+      if (!visibleExperience.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No experience added
@@ -173,7 +191,7 @@ function SectionContent({
         );
       return (
         <>
-          {experienceList.map((exp) => {
+          {visibleExperience.map((exp) => {
             const bullets = (exp.descriptionBullets && exp.descriptionBullets.length > 0
               ? exp.descriptionBullets
               : exp.description
@@ -214,7 +232,8 @@ function SectionContent({
       const projectList = projectsManualOrder && !projectItems
         ? baseProjects
         : sortProjectsByDateDesc(baseProjects);
-      if (!projectList.length)
+      const visibleProjects = projectList.filter((item) => item.visible !== false);
+      if (!visibleProjects.length)
         return (
           <p className="text-gray-400 italic" style={{ fontSize: "0.85em" }}>
             No projects added
@@ -222,7 +241,7 @@ function SectionContent({
         );
       return (
         <>
-          {projectList.map((proj) => {
+          {visibleProjects.map((proj) => {
             const bullets = (proj.descriptionBullets && proj.descriptionBullets.length > 0
               ? proj.descriptionBullets
               : proj.description
@@ -501,12 +520,18 @@ function ContactRow({
   };
   const iconNode = (type: keyof typeof CONTACT_ICONS) => {
     if (!showHeaderIcons) return null;
+    const icon = CONTACT_ICONS[type];
+    const wrapperClass =
+      type === 'email' || type === 'phone' || type === 'location'
+        ? 'mr-1.5 inline-flex translate-y-[0.08em] items-center justify-center'
+        : 'inline-block leading-none';
     return (
       <span
         aria-hidden="true"
-        className={`inline-block leading-none ${type === 'email' ? 'text-[1.08em]' : 'text-[1em]'}`}
+        className={wrapperClass}
       >
-        {CONTACT_ICONS[type]}{' '}
+        {icon}
+        {typeof icon === 'string' ? ' ' : null}
       </span>
     );
   };
@@ -531,77 +556,84 @@ function ContactRow({
   );
 }
 
-// ─── Draggable photo in header (mouse-based, not dnd-kit) ───
+// ─── Header photo ───
 function DraggablePhoto({
   photo,
-  headerRef,
+  onPhotoDragStart,
+  onPhotoDragMove,
+  onPhotoDragEnd,
 }: {
   photo: PhotoConfig;
-  headerRef: React.RefObject<HTMLDivElement | null>;
+  onPhotoDragStart?: () => void;
+  onPhotoDragMove?: (x: number, y: number) => void;
+  onPhotoDragEnd?: () => void;
 }) {
   const { setPhoto } = useResumeStore();
-  const [dragging, setDragging] = useState(false);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  }, []);
-
-  useEffect(() => {
-    if (!dragging) return;
-    const handleMove = (e: MouseEvent) => {
-      if (!headerRef.current) return;
-      const rect = headerRef.current.getBoundingClientRect();
-      const pageRect = headerRef.current
-        .closest(".resume-page")
-        ?.getBoundingClientRect();
-      const pageTopMarginPx = 12;
-
-      const x = Math.max(
-        0,
-        Math.min(100, ((e.clientX - rect.left) / rect.width) * 100),
-      );
-
-      const minCenterYInViewport = pageRect
-        ? pageRect.top + pageTopMarginPx + photo.size / 2
-        : rect.top + photo.size / 2;
-      const minYPercent = ((minCenterYInViewport - rect.top) / rect.height) * 100;
-
-      const y = Math.max(
-        minYPercent,
-        Math.min(130, ((e.clientY - rect.top) / rect.height) * 100),
-      );
-      setPhoto({ x: Math.round(x), y: Math.round(y) });
-    };
-    const handleUp = () => setDragging(false);
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [dragging, headerRef, setPhoto]);
+  const { focusPanel } = useUIStore();
 
   if (!photo.url) return null;
 
   return (
-    <img
-      src={photo.url}
-      alt="Profile"
-      onMouseDown={handleMouseDown}
-      className={`absolute select-none ${dragging ? "cursor-grabbing ring-2 ring-blue-400" : "cursor-grab hover:ring-2 hover:ring-blue-300"} print:cursor-default print:ring-0`}
-      style={{
-        width: photo.size,
-        height: photo.size,
-        borderRadius: `${photo.borderRadius}%`,
-        objectFit: "cover",
-        left: `${photo.x}%`,
-        top: `${photo.y}%`,
-        transform: "translate(-50%, -50%)",
-        zIndex: 10,
-      }}
-    />
+    <div className="relative group/photo shrink-0">
+      <img
+        src={photo.url}
+        alt="Profile"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          focusPanel('panel-header-image');
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          onPhotoDragStart?.();
+          onPhotoDragMove?.(e.clientX, e.clientY);
+        }}
+        onPointerMove={(e) => {
+          if (e.buttons === 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onPhotoDragMove?.(e.clientX, e.clientY);
+        }}
+        onPointerUp={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPhotoDragMove?.(e.clientX, e.clientY);
+          onPhotoDragEnd?.();
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }}
+        onPointerCancel={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPhotoDragEnd?.();
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+        }}
+        className="select-none touch-none cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-300 print:cursor-default print:ring-0"
+        style={{
+          width: photo.size,
+          height: photo.size,
+          borderRadius: `${photo.borderRadius}%`,
+          objectFit: "cover",
+        }}
+      />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setPhoto({ url: '' });
+          focusPanel('panel-header-image');
+        }}
+        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity print:hidden"
+        title="Remove from resume"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 
@@ -617,35 +649,141 @@ function PersonalHeader({
   photo: PhotoConfig;
   onPreviewInteract?: () => void;
 }) {
-  const { personalInfo } = useResumeStore();
+  const { personalInfo, setPhoto } = useResumeStore();
   const { focusPanel } = useUIStore();
-  const headerRef = useRef<HTMLDivElement>(null);
+  const [isPhotoDragging, setIsPhotoDragging] = useState(false);
+  const [activePhotoDropTarget, setActivePhotoDropTarget] = useState<string | null>(null);
+  const PAGE_HEIGHT = 1123;
+  const PAGE_PAD_TOP = layout === "compact" ? 32 : 48;
+  const PAGE_PAD_BOTTOM = 24;
+  const maxHeaderHeightPx = Math.floor((PAGE_HEIGHT - PAGE_PAD_TOP - PAGE_PAD_BOTTOM) / 2);
+  const verticalPosition = photo.verticalPosition ?? "center";
+  const requestedHorizontalPosition = photo.horizontalPosition ?? (verticalPosition === "center" ? "right" : "center");
+  const horizontalPosition = verticalPosition === "center" && requestedHorizontalPosition === "center"
+    ? "right"
+    : requestedHorizontalPosition;
+  const contentGapPx = Math.max(0, photo.contentGap ?? 14);
+  const headerHeightPx = Math.max(80, Math.min(maxHeaderHeightPx, photo.headerHeight ?? 180));
+  const headerMarginTopPx = Math.max(0, photo.marginTop ?? 0);
+  const headerMarginBottomPx = Math.max(0, photo.marginBottom ?? 0);
 
   const handleHeaderClick = () => {
     focusPanel('panel-header');
     onPreviewInteract?.();
   };
+  const headerMaxHeightStyle = `${maxHeaderHeightPx}px`;
+  const stackJustifyClass =
+    horizontalPosition === "left"
+      ? "justify-start"
+      : horizontalPosition === "right"
+        ? "justify-end"
+        : "justify-center";
 
-  // Compute text alignment offset based on photo position
-  const photoOnLeft = photo.url && photo.x < 35;
-  const photoOnRight = photo.url && photo.x > 65;
-  const textPadding = photo.url ? `${photo.size + 16}px` : "0";
-  const baseHeaderMinHeight =
-    layout === "modern"
-      ? (photo.url ? Math.max(100, photo.size + 32) : 80)
-      : layout === "compact"
-        ? (photo.url ? Math.max(60, photo.size * 0.7 + 16) : 0)
-        : (photo.url ? Math.max(80, photo.size + 16) : 0);
-  // If the photo is dragged above the header top edge, descend the header
-  // content block below the photo's bottom edge so it never covers the name.
-  const topPhotoOffsetPx = (() => {
-    if (!photo.url) return 0;
-    const photoCenterFromHeaderTopPx = (photo.y / 100) * Math.max(baseHeaderMinHeight, 1);
-    const photoTopFromHeaderTopPx = photoCenterFromHeaderTopPx - photo.size / 2;
-    if (photoTopFromHeaderTopPx >= 0) return 0;
-    const photoBottomFromHeaderTopPx = photoCenterFromHeaderTopPx + photo.size / 2;
-    return Math.ceil(Math.max(0, photoBottomFromHeaderTopPx) + 12);
-  })();
+  const getDropTargetByPoint = (x: number, y: number) => {
+    if (typeof document === "undefined") return null;
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const targetEl = el?.closest("[data-photo-drop-target]") as HTMLElement | null;
+    if (!targetEl) return null;
+    return photoDropTargets.find((target) => target.id === targetEl.dataset.photoDropTarget) ?? null;
+  };
+
+  const photoDropTargets: Array<{
+    id: string;
+    label: string;
+    vertical: PhotoConfig["verticalPosition"];
+    horizontal: PhotoConfig["horizontalPosition"];
+    className: string;
+  }> = [
+    { id: "top-left", label: "Top left", vertical: "top", horizontal: "left", className: "col-start-1 row-start-1" },
+    { id: "top-center", label: "Top center", vertical: "top", horizontal: "center", className: "col-start-2 row-start-1" },
+    { id: "top-right", label: "Top right", vertical: "top", horizontal: "right", className: "col-start-3 row-start-1" },
+    { id: "center-left", label: "Center left", vertical: "center", horizontal: "left", className: "col-start-1 row-start-2" },
+    { id: "center-right", label: "Center right", vertical: "center", horizontal: "right", className: "col-start-3 row-start-2" },
+    { id: "bottom-left", label: "Bottom left", vertical: "bottom", horizontal: "left", className: "col-start-1 row-start-3" },
+    { id: "bottom-center", label: "Bottom center", vertical: "bottom", horizontal: "center", className: "col-start-2 row-start-3" },
+    { id: "bottom-right", label: "Bottom right", vertical: "bottom", horizontal: "right", className: "col-start-3 row-start-3" },
+  ];
+
+  const applyPhotoDropTarget = (target: { vertical: PhotoConfig["verticalPosition"]; horizontal: PhotoConfig["horizontalPosition"] }) => {
+    setPhoto({
+      verticalPosition: target.vertical,
+      horizontalPosition: target.horizontal,
+    });
+    focusPanel('panel-header-image');
+    onPreviewInteract?.();
+    setIsPhotoDragging(false);
+    setActivePhotoDropTarget(null);
+  };
+
+  const handlePhotoPointerMove = (x: number, y: number) => {
+    if (!isPhotoDragging) return;
+    const hoveredTarget = getDropTargetByPoint(x, y);
+    setActivePhotoDropTarget(hoveredTarget?.id ?? null);
+  };
+
+  const handlePhotoPointerEnd = () => {
+    if (!isPhotoDragging) return;
+    const target = photoDropTargets.find((item) => item.id === activePhotoDropTarget);
+    if (target) {
+      applyPhotoDropTarget(target);
+      return;
+    }
+    setIsPhotoDragging(false);
+    setActivePhotoDropTarget(null);
+  };
+
+  const renderPhotoLayout = (content: React.ReactNode) => {
+    if (!photo.url) return content;
+
+    if (verticalPosition === "center") {
+      const photoNode = (
+        <DraggablePhoto
+          photo={photo}
+          onPhotoDragStart={() => setIsPhotoDragging(true)}
+          onPhotoDragMove={handlePhotoPointerMove}
+          onPhotoDragEnd={handlePhotoPointerEnd}
+        />
+      );
+      return (
+        <div
+          className={`flex items-center min-w-0 ${horizontalPosition === "left" ? "" : "flex-row-reverse"}`}
+          style={{
+            minHeight: `${headerHeightPx}px`,
+            columnGap: `${contentGapPx}px`,
+          }}
+        >
+          {photoNode}
+          <div className="min-w-0 flex-1">{content}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col" style={{ rowGap: "12px" }}>
+        {verticalPosition === "top" && (
+          <div className={`flex ${stackJustifyClass}`}>
+            <DraggablePhoto
+              photo={photo}
+              onPhotoDragStart={() => setIsPhotoDragging(true)}
+              onPhotoDragMove={handlePhotoPointerMove}
+              onPhotoDragEnd={handlePhotoPointerEnd}
+            />
+          </div>
+        )}
+        {content}
+        {verticalPosition === "bottom" && (
+          <div className={`flex ${stackJustifyClass}`}>
+            <DraggablePhoto
+              photo={photo}
+              onPhotoDragStart={() => setIsPhotoDragging(true)}
+              onPhotoDragMove={handlePhotoPointerMove}
+              onPhotoDragEnd={handlePhotoPointerEnd}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (layout === "modern") {
     const align = s.headerAlignment || "left";
@@ -657,39 +795,66 @@ function PersonalHeader({
           : "text-center";
     return (
       <div
-        ref={headerRef}
         onClick={handleHeaderClick}
         className="text-white -mx-12 -mt-12 mb-6 px-8 py-8 relative cursor-pointer"
         style={{
           background: s.accentColor,
-          minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : 80,
+          minHeight: `${headerHeightPx}px`,
+          maxHeight: headerMaxHeightStyle,
+          marginTop: `${headerMarginTopPx}px`,
+          marginBottom: `${24 + headerMarginBottomPx}px`,
+          overflow: "hidden",
         }}
       >
-        <DraggablePhoto photo={photo} headerRef={headerRef} />
-        <div
-          className={textAlign}
-          style={{
-            paddingLeft: photoOnLeft ? textPadding : 0,
-            paddingRight: photoOnRight ? textPadding : 0,
-            paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
-          }}
-        >
-          {personalInfo.fullName && (
-            <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
-          )}
-          <ContactRow
-            personalInfo={personalInfo}
-            accentColor={s.accentColor}
-            light
-          />
-          {personalInfo.summary && (
-            <p
-              className={`mt-2 opacity-90 max-w-[500px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
-            >
-              {personalInfo.summary}
-            </p>
-          )}
-        </div>
+        {isPhotoDragging && (
+          <div className="absolute inset-3 z-20 grid grid-cols-3 grid-rows-3 gap-2 rounded-xl border border-white/35 bg-white/12 p-2 backdrop-blur-[1px]">
+            {photoDropTargets.map((target) => {
+              const isActive = activePhotoDropTarget === target.id;
+              return (
+                <button
+                  key={target.id}
+                  type="button"
+                  data-photo-drop-target={target.id}
+                  onPointerEnter={(e) => {
+                    if (!isPhotoDragging) return;
+                    setActivePhotoDropTarget(target.id);
+                  }}
+                  onPointerLeave={() => {
+                    if (!isPhotoDragging) return;
+                    if (activePhotoDropTarget === target.id) setActivePhotoDropTarget(null);
+                  }}
+                  onPointerUp={() => {
+                    if (!isPhotoDragging) return;
+                    applyPhotoDropTarget(target);
+                  }}
+                  onClick={() => applyPhotoDropTarget(target)}
+                  className={`${target.className} rounded-lg border text-[10px] font-semibold uppercase tracking-[0.14em] transition ${isActive ? "border-white bg-white/90 text-slate-900" : "border-white/45 bg-white/20 text-white hover:bg-white/30"}`}
+                >
+                  {target.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {renderPhotoLayout(
+          <div className={textAlign}>
+            {personalInfo.fullName && (
+              <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
+            )}
+            <ContactRow
+              personalInfo={personalInfo}
+              accentColor={s.accentColor}
+              light
+            />
+            {personalInfo.summary && (
+              <p
+                className={`mt-2 opacity-90 max-w-[500px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
+              >
+                {personalInfo.summary}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -697,36 +862,64 @@ function PersonalHeader({
   if (layout === "compact") {
     return (
       <div
-        ref={headerRef}
         onClick={handleHeaderClick}
         className="mb-3 pb-2 relative cursor-pointer"
         style={{
           borderBottom: `2px solid ${s.accentColor}`,
-          minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : "auto",
+          minHeight: `${headerHeightPx}px`,
+          maxHeight: headerMaxHeightStyle,
+          marginTop: `${headerMarginTopPx}px`,
+          marginBottom: `${headerMarginBottomPx}px`,
+          overflow: "hidden",
         }}
       >
-        <DraggablePhoto photo={photo} headerRef={headerRef} />
-        <div
-          style={{
-            paddingLeft: photoOnLeft ? textPadding : 0,
-            paddingRight: photoOnRight ? textPadding : 0,
-            paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
-          }}
-        >
-          <div className="flex items-baseline justify-between">
-            {personalInfo.fullName && (
-              <h1 className="font-bold" style={{ fontSize: '1.3em' }}>{personalInfo.fullName}</h1>
-            )}
-            <div className="text-xs text-gray-600 flex gap-2">
-              {personalInfo.email && <span>{personalInfo.email}</span>}
-              {personalInfo.phone && <span>| {personalInfo.phone}</span>}
-              {personalInfo.location && <span>| {personalInfo.location}</span>}
-            </div>
+        {isPhotoDragging && (
+          <div className="absolute inset-2 z-20 grid grid-cols-3 grid-rows-3 gap-2 rounded-xl border border-slate-300 bg-white/80 p-2 backdrop-blur-[1px]">
+            {photoDropTargets.map((target) => {
+              const isActive = activePhotoDropTarget === target.id;
+              return (
+                <button
+                  key={target.id}
+                  type="button"
+                  data-photo-drop-target={target.id}
+                  onPointerEnter={(e) => {
+                    if (!isPhotoDragging) return;
+                    setActivePhotoDropTarget(target.id);
+                  }}
+                  onPointerLeave={() => {
+                    if (!isPhotoDragging) return;
+                    if (activePhotoDropTarget === target.id) setActivePhotoDropTarget(null);
+                  }}
+                  onPointerUp={() => {
+                    if (!isPhotoDragging) return;
+                    applyPhotoDropTarget(target);
+                  }}
+                  onClick={() => applyPhotoDropTarget(target)}
+                  className={`${target.className} rounded-lg border text-[10px] font-semibold uppercase tracking-[0.14em] transition ${isActive ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-300 bg-white/90 text-slate-600 hover:border-blue-400 hover:text-blue-700"}`}
+                >
+                  {target.label}
+                </button>
+              );
+            })}
           </div>
-          {personalInfo.summary && (
-            <p className="mt-1 text-gray-600">{personalInfo.summary}</p>
-          )}
-        </div>
+        )}
+        {renderPhotoLayout(
+          <div>
+            <div className="flex items-baseline justify-between gap-3">
+              {personalInfo.fullName && (
+                <h1 className="font-bold" style={{ fontSize: '1.3em' }}>{personalInfo.fullName}</h1>
+              )}
+              <div className="text-xs text-gray-600 flex gap-2 flex-wrap justify-end">
+                {personalInfo.email && <span>{personalInfo.email}</span>}
+                {personalInfo.phone && <span>| {personalInfo.phone}</span>}
+                {personalInfo.location && <span>| {personalInfo.location}</span>}
+              </div>
+            </div>
+            {personalInfo.summary && (
+              <p className="mt-1 text-gray-600">{personalInfo.summary}</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -742,32 +935,61 @@ function PersonalHeader({
 
   return (
     <div
-      ref={headerRef}
       onClick={handleHeaderClick}
       className="mb-4 relative cursor-pointer"
-      style={{ minHeight: photo.url ? baseHeaderMinHeight + topPhotoOffsetPx : "auto" }}
+      style={{
+        minHeight: `${headerHeightPx}px`,
+        maxHeight: headerMaxHeightStyle,
+        marginTop: `${headerMarginTopPx}px`,
+        marginBottom: `${headerMarginBottomPx}px`,
+        overflow: "hidden",
+      }}
     >
-      <DraggablePhoto photo={photo} headerRef={headerRef} />
-      <div
-        className={textAlign}
-        style={{
-          paddingLeft: photoOnLeft ? textPadding : 0,
-          paddingRight: photoOnRight ? textPadding : 0,
-          paddingTop: topPhotoOffsetPx > 0 ? `${topPhotoOffsetPx}px` : 0,
-        }}
-      >
-        {personalInfo.fullName && (
-          <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
-        )}
-        <ContactRow personalInfo={personalInfo} accentColor={s.accentColor} />
-        {personalInfo.summary && (
-          <p
-            className={`mt-2 text-gray-700 max-w-[600px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
-          >
-            {personalInfo.summary}
-          </p>
-        )}
-      </div>
+      {isPhotoDragging && (
+        <div className="absolute inset-2 z-20 grid grid-cols-3 grid-rows-3 gap-2 rounded-xl border border-slate-300 bg-white/80 p-2 backdrop-blur-[1px]">
+          {photoDropTargets.map((target) => {
+            const isActive = activePhotoDropTarget === target.id;
+            return (
+              <button
+                key={target.id}
+                type="button"
+                data-photo-drop-target={target.id}
+                onPointerEnter={(e) => {
+                  if (!isPhotoDragging) return;
+                  setActivePhotoDropTarget(target.id);
+                }}
+                onPointerLeave={() => {
+                  if (!isPhotoDragging) return;
+                  if (activePhotoDropTarget === target.id) setActivePhotoDropTarget(null);
+                }}
+                onPointerUp={() => {
+                  if (!isPhotoDragging) return;
+                  applyPhotoDropTarget(target);
+                }}
+                onClick={() => applyPhotoDropTarget(target)}
+                className={`${target.className} rounded-lg border text-[10px] font-semibold uppercase tracking-[0.14em] transition ${isActive ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-300 bg-white/90 text-slate-600 hover:border-blue-400 hover:text-blue-700"}`}
+              >
+                {target.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {renderPhotoLayout(
+        <div className={textAlign}>
+          {personalInfo.fullName && (
+            <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
+          )}
+          <ContactRow personalInfo={personalInfo} accentColor={s.accentColor} />
+          {personalInfo.summary && (
+            <p
+              className={`mt-2 text-gray-700 max-w-[600px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
+            >
+              {personalInfo.summary}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -790,7 +1012,7 @@ function ResumeDraggableSection({
   interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
-  const { style, removeSectionFromResume } = useResumeStore();
+  const { style, layout, removeSectionFromResume, sectionOrder, reorderSections, moveSectionToZone } = useResumeStore();
   const { focusPanel } = useUIStore();
   const {
     attributes,
@@ -818,6 +1040,23 @@ function ResumeDraggableSection({
     onPreviewInteract?.(section);
   };
 
+  const moveSectionBy = (direction: -1 | 1) => {
+    const zoneSections = sectionOrder.filter((item) => item.zone === section.zone);
+    const zoneIndex = zoneSections.findIndex((item) => item.id === section.id);
+    const targetZoneSection = zoneSections[zoneIndex + direction];
+    if (!targetZoneSection) return;
+
+    const oldIndex = sectionOrder.findIndex((item) => item.id === section.id);
+    const newIndex = sectionOrder.findIndex((item) => item.id === targetZoneSection.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    reorderSections(arrayMove(sectionOrder, oldIndex, newIndex));
+  };
+
+  const moveAcrossColumns = (targetZone: ColumnZone) => {
+    if (layout !== "two-column" || targetZone === section.zone) return;
+    moveSectionToZone(section.id, targetZone);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -831,16 +1070,66 @@ function ResumeDraggableSection({
       data-section-zone={section.zone}
       className={`${getSpacingClass(style.sectionSpacing)} break-inside-avoid relative rounded p-2 transition-all hover:bg-gray-50/50 active:cursor-grabbing group/sec`}
     >
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          removeSectionFromResume(section.id);
-        }}
-        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover/sec:opacity-100 transition-opacity print:hidden"
-        title="Remove from resume"
-      >
-        ×
-      </button>
+      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover/sec:opacity-100 transition-opacity print:hidden">
+        {layout === "two-column" && section.zone === "main" && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              moveAcrossColumns("sidebar");
+            }}
+            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            title="Move to left column"
+          >
+            ←
+          </button>
+        )}
+        {layout === "two-column" && section.zone === "sidebar" && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              moveAcrossColumns("main");
+            }}
+            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            title="Move to right column"
+          >
+            →
+          </button>
+        )}
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveSectionBy(-1);
+          }}
+          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          title="Move up"
+        >
+          ↑
+        </button>
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveSectionBy(1);
+          }}
+          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          title="Move down"
+        >
+          ↓
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeSectionFromResume(section.id);
+          }}
+          className="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+          title="Remove from resume"
+        >
+          ×
+        </button>
+      </div>
       <h2
         className={headingClass}
         style={{
@@ -942,7 +1231,7 @@ function ResumeProxyDraggableSection({
   interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
-  const { style } = useResumeStore();
+  const { style, layout, sectionOrder, reorderSections, moveSectionToZone, removeSectionFromResume } = useResumeStore();
   const { showBodyIcons, sectionIcons, focusPanel } = useUIStore();
   const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
   const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
@@ -973,6 +1262,23 @@ function ResumeProxyDraggableSection({
     onPreviewInteract?.(section);
   };
 
+  const moveSectionBy = (direction: -1 | 1) => {
+    const zoneSections = sectionOrder.filter((item) => item.zone === section.zone);
+    const zoneIndex = zoneSections.findIndex((item) => item.id === section.id);
+    const targetZoneSection = zoneSections[zoneIndex + direction];
+    if (!targetZoneSection) return;
+
+    const oldIndex = sectionOrder.findIndex((item) => item.id === section.id);
+    const newIndex = sectionOrder.findIndex((item) => item.id === targetZoneSection.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    reorderSections(arrayMove(sectionOrder, oldIndex, newIndex));
+  };
+
+  const moveAcrossColumns = (targetZone: ColumnZone) => {
+    if (layout !== "two-column" || targetZone === section.zone) return;
+    moveSectionToZone(section.id, targetZone);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -984,8 +1290,68 @@ function ResumeProxyDraggableSection({
       data-section-type={section.type}
       data-section-id={section.id}
       data-section-zone={section.zone}
-      className={`${getSpacingClass(style.sectionSpacing)} relative rounded p-2 active:cursor-grabbing`}
+      className={`${getSpacingClass(style.sectionSpacing)} relative rounded p-2 active:cursor-grabbing group/sec`}
     >
+      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover/sec:opacity-100 transition-opacity print:hidden">
+        {layout === "two-column" && section.zone === "main" && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              moveAcrossColumns("sidebar");
+            }}
+            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            title="Move to left column"
+          >
+            ←
+          </button>
+        )}
+        {layout === "two-column" && section.zone === "sidebar" && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              moveAcrossColumns("main");
+            }}
+            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            title="Move to right column"
+          >
+            →
+          </button>
+        )}
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveSectionBy(-1);
+          }}
+          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          title="Move up"
+        >
+          ↑
+        </button>
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveSectionBy(1);
+          }}
+          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          title="Move down"
+        >
+          ↓
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeSectionFromResume(section.id);
+          }}
+          className="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+          title="Remove from resume"
+        >
+          ×
+        </button>
+      </div>
       <h2
         className={headingClass}
         style={{
@@ -1302,6 +1668,7 @@ export default function Home() {
     layout,
     style: s,
     photo,
+    setPhoto,
     education,
     experience,
     experienceManualOrder,
@@ -1335,6 +1702,11 @@ export default function Home() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  const handleAddPhotoFromPill = () => {
+    setPhoto({ url: DEFAULT_HEADER_IMAGE_URL });
+    focusPanel("panel-header-image");
+  };
 
   useEffect(() => setMounted(true), []);
 
@@ -1520,7 +1892,8 @@ export default function Home() {
   const CONTINUATION_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 48 : 120;
   const SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 24 : FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX;
   const SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX = layout === "two-column" ? 72 : CONTINUATION_DETAIL_SPLIT_BUFFER_PX;
-  const TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT = 930;
+  const DEFAULT_TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT = 930;
+  const TWO_COLUMN_CONTINUATION_MIN_HEIGHT = USABLE_HEIGHT;
 
   // Track which section index starts page 2+
   const [pageSplitIndex, setPageSplitIndex] = useState<number>(-1);
@@ -1544,6 +1917,7 @@ export default function Home() {
   const [trailingDetailSplitSectionId, setTrailingDetailSplitSectionId] = useState<string | null>(null);
   const [trailingDetailContinuationChunks, setTrailingDetailContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
   const [trailingDetailTransitionItemEnd, setTrailingDetailTransitionItemEnd] = useState<number>(0);
+  const [twoColumnFirstPageMinHeight, setTwoColumnFirstPageMinHeight] = useState<number>(DEFAULT_TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -1551,9 +1925,15 @@ export default function Home() {
       if (!contentRef.current) return;
       const container = contentRef.current;
       const containerRect = container.getBoundingClientRect();
-      const buildChunks = (itemHeights: number[], startIndex: number, capacity: number) => {
+      const buildChunks = (
+        itemHeights: number[],
+        startIndex: number,
+        firstCapacity: number,
+        continuationCapacity = firstCapacity,
+      ) => {
         const chunks: Array<{ start: number; end: number }> = [];
         let start = Math.max(0, startIndex);
+        let activeCapacity = Math.max(1, firstCapacity);
 
         while (start < itemHeights.length) {
           let end = start;
@@ -1561,13 +1941,14 @@ export default function Home() {
 
           while (end < itemHeights.length) {
             const nextHeight = itemHeights[end];
-            if (end > start && used + nextHeight > capacity) break;
+            if (end > start && used + nextHeight > activeCapacity) break;
             used += nextHeight;
             end += 1;
           }
 
           chunks.push({ start, end });
           start = end;
+          activeCapacity = Math.max(1, continuationCapacity);
         }
 
         return chunks;
@@ -1583,13 +1964,17 @@ export default function Home() {
       const twoColumnTopOffset = twoColumnContainer
         ? twoColumnContainer.getBoundingClientRect().top - containerRect.top
         : 0;
-      const pageContentHeight = layout === "two-column"
-        ? TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT
+      const firstPageContentHeight = layout === "two-column"
+        ? Math.max(120, USABLE_HEIGHT - twoColumnTopOffset)
+        : MEASURE_USABLE_HEIGHT;
+      const continuationPageContentHeight = layout === "two-column"
+        ? USABLE_HEIGHT
         : MEASURE_USABLE_HEIGHT;
       const pageSplitThreshold = layout === "two-column"
-        ? twoColumnTopOffset + pageContentHeight
-        : pageContentHeight;
+        ? twoColumnTopOffset + firstPageContentHeight
+        : firstPageContentHeight;
       if (layout === "two-column") {
+        setTwoColumnFirstPageMinHeight(firstPageContentHeight);
         const sidebarMeasuredSections = Array.from(
           container.querySelectorAll('[data-page-section][data-section-zone="sidebar"]')
         ) as HTMLElement[];
@@ -1600,11 +1985,15 @@ export default function Home() {
           const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
           return rect.height + marginTop + marginBottom;
         });
-        const sidebarCapacity = Math.max(
+        const sidebarFirstPageCapacity = Math.max(
           120,
-          pageContentHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+          firstPageContentHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
         );
-        const chunks = buildChunks(sidebarHeights, 0, sidebarCapacity);
+        const sidebarContinuationCapacity = Math.max(
+          120,
+          continuationPageContentHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+        );
+        const chunks = buildChunks(sidebarHeights, 0, sidebarFirstPageCapacity, sidebarContinuationCapacity);
         setSidebarContinuationChunks(chunks);
 
         const firstChunk = chunks[0] ?? { start: 0, end: sidebarMeasuredSections.length };
@@ -1648,7 +2037,7 @@ export default function Home() {
               .reduce((acc, height) => acc + height, 0);
             const availableForCarryItems = Math.max(
               0,
-              pageContentHeight - usedByPrecedingSections - carryChromeHeight - SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX
+              firstPageContentHeight - usedByPrecedingSections - carryChromeHeight - SIDEBAR_FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX
             );
 
             let carryCount = 0;
@@ -1724,7 +2113,7 @@ export default function Home() {
           const itemsTotalHeight = itemHeights.reduce((acc, height) => acc + height, 0);
           const sectionRect = sidebarOverflowSection.getBoundingClientRect();
           const sectionChromeHeight = Math.max(0, sectionRect.height - itemsTotalHeight);
-          const perPageItemsCapacityRaw = Math.max(120, pageContentHeight - sectionChromeHeight);
+          const perPageItemsCapacityRaw = Math.max(120, continuationPageContentHeight - sectionChromeHeight);
           const perPageItemsCapacity = Math.max(
             120,
             perPageItemsCapacityRaw - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
@@ -1790,7 +2179,7 @@ export default function Home() {
 
               const trailingCapacity = Math.max(
                 120,
-                pageContentHeight - trailingChromeHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+                continuationPageContentHeight - trailingChromeHeight - SIDEBAR_CONTINUATION_DETAIL_SPLIT_BUFFER_PX
               );
               const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
               const trailingType =
@@ -1835,9 +2224,11 @@ export default function Home() {
           const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
           return rect.height + marginTop + marginBottom;
         });
-        const mainCapacity = Math.max(120, pageContentHeight - 8);
-        setMainSectionContinuationChunks(buildChunks(mainHeights, 0, mainCapacity));
+        const mainFirstPageCapacity = Math.max(120, firstPageContentHeight - 8);
+        const mainContinuationCapacity = Math.max(120, continuationPageContentHeight - 8);
+        setMainSectionContinuationChunks(buildChunks(mainHeights, 0, mainFirstPageCapacity, mainContinuationCapacity));
       } else {
+        setTwoColumnFirstPageMinHeight(DEFAULT_TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT);
         setSidebarContinuationChunks([]);
         setMainSectionContinuationChunks([]);
         setSidebarDetailSplitSectionType(null);
@@ -1903,7 +2294,7 @@ export default function Home() {
           const itemsTotalHeight = itemHeights.reduce((acc, height) => acc + height, 0);
           const sectionRect = overflowSection.getBoundingClientRect();
           const sectionChromeHeight = Math.max(0, sectionRect.height - itemsTotalHeight);
-          const perPageItemsCapacityRaw = Math.max(120, pageContentHeight - sectionChromeHeight);
+          const perPageItemsCapacityRaw = Math.max(120, continuationPageContentHeight - sectionChromeHeight);
           const perPageItemsCapacity = Math.max(
             120,
             perPageItemsCapacityRaw - FIRST_PAGE_DETAIL_SPLIT_BUFFER_PX
@@ -1973,7 +2364,7 @@ export default function Home() {
               }
               const trailingCapacity = Math.max(
                 120,
-                pageContentHeight - trailingChromeHeight - CONTINUATION_DETAIL_SPLIT_BUFFER_PX
+                continuationPageContentHeight - trailingChromeHeight - CONTINUATION_DETAIL_SPLIT_BUFFER_PX
               );
               const trailingChunks = buildChunks(trailingItemHeights, transitionItemEnd, trailingCapacity);
               const trailingType =
@@ -3136,15 +3527,13 @@ export default function Home() {
               </button>
               {!sectionsCollapsed && (
                 <div className="space-y-3">
-                  {/* Non-draggable: Header (Personal Info + Photo) */}
+                  {/* Non-draggable: Header (Introduction) */}
                   <div className="bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
                     <CollapsiblePanel
                       title={`👤 ${ui.introduction}`}
                       persistId="panel-header"
                     >
                       <PersonalInfoContent />
-                      <hr className="my-3 border-amber-200" />
-                      <PhotoContent />
                     </CollapsiblePanel>
                   </div>
 
@@ -3175,12 +3564,36 @@ export default function Home() {
                               {SECTION_ICONS[type]} {getSectionLabel(activeLocale, type)}
                             </button>
                               ))}
+                              {!photo.url && (
+                                <button
+                                  type="button"
+                                  onClick={handleAddPhotoFromPill}
+                                  className="text-xs px-2.5 py-1 rounded-full border transition border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 cursor-pointer"
+                                >
+                                  🖼 {ui.photo}
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
                       </>
                     );
                   })()}
+
+                  {photo.url && (
+                    <div
+                      data-panel-id="panel-header-image"
+                      className="rounded-lg shadow-sm overflow-hidden transition-all bg-emerald-50/60 border border-emerald-200"
+                      style={{ borderLeft: `4px solid ${s.accentColor}` }}
+                    >
+                      <CollapsiblePanel
+                        title={`🖼 ${ui.photo}`}
+                        persistId="panel-header-image"
+                      >
+                        <HeaderImageContent />
+                      </CollapsiblePanel>
+                    </div>
+                  )}
 
                   {/* Active section editors (draggable) */}
                   {sortedSidebarSections.map((section) => (
@@ -3233,11 +3646,11 @@ export default function Home() {
                 onPreviewInteract={() => setIsMobileEditorOpen(true)}
               />
               {layout === "two-column" ? (
-                <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
+                <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${twoColumnFirstPageMinHeight}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
                   <div
                     className="shrink-0 p-5 pt-4"
                     style={{
-                      background: s.accentColor + "10",
+                      background: s.sidebarColor,
                       width: `${s.sidebarWidth}%`,
                     }}
                   >
@@ -3288,7 +3701,7 @@ export default function Home() {
                       <div
                         className="flex gap-0"
                         style={{
-                          minHeight: `${TWO_COLUMN_FIRST_PAGE_MIN_HEIGHT}px`,
+                            minHeight: `${twoColumnFirstPageMinHeight}px`,
                           margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px`,
                         }}
                       >
@@ -3296,7 +3709,7 @@ export default function Home() {
                           id="zone-sidebar"
                           className="shrink-0 p-5 pt-4"
                           style={{
-                            background: s.accentColor + "10",
+                            background: s.sidebarColor,
                             width: `${s.sidebarWidth}%`,
                           }}
                         >
@@ -3334,14 +3747,14 @@ export default function Home() {
                         <div
                           className="flex gap-0"
                           style={{
-                            minHeight: "850px",
+                            minHeight: `${TWO_COLUMN_CONTINUATION_MIN_HEIGHT}px`,
                             margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px`,
                           }}
                         >
                           <div
                             className="shrink-0 p-5 pt-4"
                             style={{
-                              background: s.accentColor + "10",
+                              background: s.sidebarColor,
                               width: `${s.sidebarWidth}%`,
                             }}
                           >
@@ -3432,7 +3845,7 @@ function LayoutPickerContent() {
                 <div className="flex gap-0.5 flex-1">
                   <div
                     className="w-1/3 rounded-sm"
-                    style={{ background: style.accentColor, opacity: 0.3 }}
+                    style={{ background: style.sidebarColor }}
                   />
                   <div className="flex-1 bg-gray-100 rounded-sm" />
                 </div>
@@ -3443,7 +3856,8 @@ function LayoutPickerContent() {
         ))}
       </div>
       {layout === "two-column" && (
-        <div>
+        <div className="space-y-3">
+          <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">
             {ui.sidebarWidth}: {style.sidebarWidth}%
           </label>
@@ -3458,6 +3872,27 @@ function LayoutPickerContent() {
           <div className="flex justify-between text-[10px] text-gray-400">
             <span>{ui.narrow}</span>
             <span>{ui.wide}</span>
+          </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">{ui.styleSidebarColor}</label>
+            <div className="flex gap-1.5 flex-wrap items-center">
+              {PRESET_SIDEBAR_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setStyle({ sidebarColor: color })}
+                  className={`w-6 h-6 rounded-full border-2 transition ${style.sidebarColor === color ? "border-gray-800 scale-110" : "border-transparent"}`}
+                  style={{ background: color }}
+                />
+              ))}
+              <input
+                type="color"
+                value={style.sidebarColor}
+                onChange={(e) => setStyle({ sidebarColor: e.target.value })}
+                className="w-6 h-6 rounded cursor-pointer border-0 p-0"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -3568,8 +4003,13 @@ function PersonalInfoContent() {
 }
 
 // ─── Photo ───
-function PhotoContent() {
-  const { photo, setPhoto } = useResumeStore();
+function HeaderImageContent() {
+  const { photo, setPhoto, activeLocale } = useResumeStore();
+  const previewWidth = 40;
+  const previewHeight = 40;
+  const previewRadius = photo.borderRadius;
+  const verticalPosition = photo.verticalPosition ?? "center";
+
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -3583,7 +4023,7 @@ function PhotoContent() {
         htmlFor="display-image-upload"
         className="inline-flex items-center justify-center rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-blue-700 cursor-pointer"
       >
-        {photo.url ? "Replace display image" : "Add a display image"}
+        {photo.url ? "Replace header image" : "Add header image"}
       </label>
       <input
         id="display-image-upload"
@@ -3600,42 +4040,17 @@ function PhotoContent() {
               alt=""
               className="object-cover"
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: `${photo.borderRadius}%`,
+                width: previewWidth,
+                height: previewHeight,
+                borderRadius: `${previewRadius}%`,
               }}
             />
             <button
               onClick={() => setPhoto({ url: "" })}
-              className="text-xs text-red-500"
+              className="text-xs text-red-600 hover:text-red-700 font-medium"
             >
               Remove
             </button>
-          </div>
-          <p className="text-xs text-gray-500 italic">
-            Drag the photo on the resume header to reposition.
-          </p>
-          <div>
-            <label className="text-xs text-gray-500">X: {photo.x}%</label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={photo.x}
-              onChange={(e) => setPhoto({ x: +e.target.value })}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500">Y: {photo.y}%</label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={photo.y}
-              onChange={(e) => setPhoto({ y: +e.target.value })}
-              className="w-full"
-            />
           </div>
           <div>
             <label className="text-xs text-gray-500">
@@ -3652,7 +4067,7 @@ function PhotoContent() {
           </div>
           <div>
             <label className="text-xs text-gray-500">
-              Roundness: {photo.borderRadius}%
+              Roundness: {photo.borderRadius}% (Square to Circle)
             </label>
             <input
               type="range"
@@ -3660,6 +4075,19 @@ function PhotoContent() {
               max={50}
               value={photo.borderRadius}
               onChange={(e) => setPhoto({ borderRadius: +e.target.value })}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">
+              Image/Introduction Space: {photo.contentGap ?? 14}px
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={120}
+              value={photo.contentGap ?? 14}
+              onChange={(e) => setPhoto({ contentGap: +e.target.value })}
               className="w-full"
             />
           </div>
