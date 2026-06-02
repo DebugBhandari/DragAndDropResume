@@ -6,6 +6,8 @@ import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certif
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 import { getSectionLabel } from '@/utils/sectionTranslations';
 
+export const RESUME_STORAGE_KEY = 'resume-storage-v2';
+
 const SUPPORTED_LOCALES: LocaleCode[] = ['en', 'fi', 'sv', 'es', 'de', 'fr', 'ne', 'zh', 'ja'];
 
 const BASE_SECTION_TEMPLATE: Omit<ResumeSection, 'title'>[] = [
@@ -1202,7 +1204,7 @@ export const useResumeStore = create<ResumeStore>()(
       }),
       };
     },
-    { name: 'resume-storage',
+    { name: RESUME_STORAGE_KEY,
       merge: (persisted: any, current: any) => {
         const merged = { ...current, ...persisted };
 

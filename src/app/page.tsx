@@ -25,7 +25,7 @@ import SectionEditor from "@/components/SectionEditor";
 import StyleEditor from "@/components/StyleEditor";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import FeedbackWidget from "@/components/FeedbackWidget";
-import { useResumeStore } from "@/store/useResumeStore";
+import { RESUME_STORAGE_KEY, useResumeStore } from "@/store/useResumeStore";
 import { useUIStore } from "@/store/useUIStore";
 import {
   SectionType,
@@ -1454,7 +1454,7 @@ const EMPTY_SECTION_FLAGS: Record<SectionType, boolean> = {
 function parsePersistedResumeData(): Partial<SectionDataSnapshot> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem("resume-storage");
+    const raw = window.localStorage.getItem(RESUME_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed?.state ?? {};
@@ -1808,20 +1808,45 @@ export default function Home() {
     });
   }, [layout, personalInfo.email]);
 
+  const pdfTitle = useCallback(() => {
+    const compactName = String(personalInfo.fullName ?? "")
+      .trim()
+      .replace(/\s+/g, "")
+      .replace(/[^\p{L}\p{N}_-]/gu, "");
+    const baseName = compactName.length > 0 ? compactName : "Resume";
+    return `${baseName}Resume`;
+  }, [personalInfo.fullName]);
+
+  const isIOSLike = useCallback(() => {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    const iOSDevice = /iP(hone|ad|od)/i.test(ua);
+    const iPadDesktopUA = /Macintosh/i.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
+    return iOSDevice || iPadDesktopUA;
+  }, []);
+
   const handleWindowPrint = useCallback(() => {
     if (typeof window === "undefined") return;
+    const originalTitle = document.title;
+    document.title = pdfTitle();
 
     const handleAfterPrint = () => {
+      document.title = originalTitle;
       trackExportSuccess("window_print");
     };
 
     window.addEventListener("afterprint", handleAfterPrint, { once: true });
     window.print();
-  }, [trackExportSuccess]);
+
+    // iOS browsers sometimes skip afterprint; restore the title regardless.
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1200);
+  }, [pdfTitle, trackExportSuccess]);
 
   const handlePrint = useReactToPrint({
     contentRef: resumeRef,
-    documentTitle: "Resume",
+    documentTitle: pdfTitle(),
     // Override the global print CSS that uses position:absolute (needed for window.print()
     // visibility trick) — in useReactToPrint's isolated iframe the content is already the
     // only thing on the page, so static positioning is correct and prevents blank output.
@@ -1832,12 +1857,17 @@ export default function Home() {
   });
 
   const handleExportPdf = useCallback(() => {
+    if (isIOSLike()) {
+      handleWindowPrint();
+      return;
+    }
+
     try {
       handlePrint?.();
     } catch {
       handleWindowPrint();
     }
-  }, [handlePrint, handleWindowPrint]);
+  }, [handlePrint, handleWindowPrint, isIOSLike]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;

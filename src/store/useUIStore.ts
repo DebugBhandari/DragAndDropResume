@@ -71,6 +71,6 @@ export const useUIStore = create<UIStore>()(
         };
       }),
     }),
-    { name: 'resume-ui' }
+    { name: 'resume-ui-v2' }
   )
 );
