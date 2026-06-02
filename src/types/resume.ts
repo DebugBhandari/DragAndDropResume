@@ -88,7 +88,7 @@ export interface Interest {
   name: string;
 }
 
-export type LocaleCode = 'en' | 'fi' | 'es' | 'de' | 'fr' | 'ne' | 'zh' | 'ja';
+export type LocaleCode = 'en' | 'fi' | 'sv' | 'es' | 'de' | 'fr' | 'ne' | 'zh' | 'ja';
 
 export type SectionType = 'education' | 'experience' | 'projects' | 'languages' | 'skills' | 'certificates' | 'awards' | 'volunteer' | 'references' | 'interests';
 export type ColumnZone = 'main' | 'sidebar';

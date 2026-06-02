@@ -494,13 +494,29 @@ function ContactRow({
 }) {
   const { showHeaderIcons } = useUIStore();
   const linkStyle = light ? {} : { color: accentColor };
+  const withProtocol = (value: string) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return trimmed;
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+  const iconNode = (type: keyof typeof CONTACT_ICONS) => {
+    if (!showHeaderIcons) return null;
+    return (
+      <span
+        aria-hidden="true"
+        className={`inline-block leading-none ${type === 'email' ? 'text-[1.08em]' : 'text-[1em]'}`}
+      >
+        {CONTACT_ICONS[type]}{' '}
+      </span>
+    );
+  };
 
   const items = [
-    personalInfo.email && <span key="email">{showHeaderIcons && CONTACT_ICONS.email + " "}{personalInfo.email}</span>,
-    personalInfo.phone && <span key="phone">{showHeaderIcons && CONTACT_ICONS.phone + " "}{personalInfo.phone}</span>,
-    personalInfo.location && <span key="location">{showHeaderIcons && CONTACT_ICONS.location + " "}{personalInfo.location}</span>,
-    personalInfo.linkedin && <a key="linkedin" href={personalInfo.linkedin} target="_blank" rel="noopener noreferrer" style={linkStyle}>{showHeaderIcons && CONTACT_ICONS.linkedin + " "}{personalInfo.linkedin}</a>,
-    personalInfo.website && <a key="website" href={personalInfo.website} target="_blank" rel="noopener noreferrer" style={linkStyle}>{showHeaderIcons && CONTACT_ICONS.website + " "}{personalInfo.website}</a>,
+    personalInfo.email && <span key="email">{iconNode('email')}{personalInfo.email}</span>,
+    personalInfo.phone && <span key="phone">{iconNode('phone')}{personalInfo.phone}</span>,
+    personalInfo.location && <span key="location">{iconNode('location')}{personalInfo.location}</span>,
+    personalInfo.linkedin && <a key="linkedin" href={withProtocol(personalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{iconNode('linkedin')}{personalInfo.linkedin}</a>,
+    personalInfo.website && <a key="website" href={withProtocol(personalInfo.website)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{iconNode('website')}{personalInfo.website}</a>,
   ].filter(Boolean);
 
   const row1 = items.slice(0, 3);
@@ -1009,6 +1025,7 @@ const SECTION_ICONS: Record<SectionType, string> = {
 const LOCALE_OPTIONS: { code: LocaleCode; label: string; flag: string }[] = [
   { code: "en", label: "English", flag: "🇬🇧" },
   { code: "fi", label: "Finnish", flag: "🇫🇮" },
+  { code: "sv", label: "Swedish", flag: "🇸🇪" },
   { code: "es", label: "Spanish", flag: "🇪🇸" },
   { code: "de", label: "German", flag: "🇩🇪" },
   { code: "fr", label: "French", flag: "🇫🇷" },
@@ -3490,9 +3507,20 @@ function LanguagePickerContent() {
 
 // ─── Personal Info ───
 function PersonalInfoContent() {
-  const { personalInfo, updatePersonalInfo } = useResumeStore();
+  const { personalInfo, updatePersonalInfo, activeLocale } = useResumeStore();
+  const { showHeaderIcons, toggleHeaderIcons } = useUIStore();
+  const ui = getUiText(activeLocale);
   return (
     <div className="space-y-3">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={showHeaderIcons}
+          onChange={toggleHeaderIcons}
+          className="w-3.5 h-3.5 rounded"
+        />
+        <span className="text-xs text-gray-600">{ui.showIconOnResume} ({ui.introduction})</span>
+      </label>
       <input
         className="input-field"
         placeholder="Full Name"

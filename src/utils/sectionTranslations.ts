@@ -3,6 +3,7 @@ import { LocaleCode, SectionType } from '@/types/resume';
 const LOCALE_TO_LANGUAGE_KEY: Record<LocaleCode, keyof typeof SECTION_TRANSLATIONS> = {
   en: 'english',
   fi: 'finnish',
+  sv: 'swedish',
   es: 'spanish',
   de: 'german',
   fr: 'french',
@@ -48,6 +49,18 @@ export const SECTION_TRANSLATIONS = {
     volunteer: 'Vapaaehtoistyo',
     references: 'Suosittelijat',
     interests: 'Kiinnostuksen kohteet',
+  },
+  swedish: {
+    'work-experience': 'Arbetslivserfarenhet',
+    education: 'Utbildning',
+    projects: 'Projekt',
+    skills: 'Kompetenser',
+    languages: 'Sprak',
+    certificates: 'Certifikat',
+    awards: 'Utmarkelser',
+    volunteer: 'Volontararbete',
+    references: 'Referenser',
+    interests: 'Intressen',
   },
   spanish: {
     'work-experience': 'Experiencia Laboral',
