@@ -40,9 +40,12 @@ import {
   Language,
   Skill,
   Interest,
+  LocaleCode,
 } from "@/types/resume";
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/dateSort";
 import { trackAnalyticsEvent } from "@/utils/analytics";
+import { getSectionLabel } from "@/utils/sectionTranslations";
+import { getUiText } from "@/utils/uiTranslations";
 
 // ─── Contact icons for resume ───
 const CONTACT_ICONS: Record<string, string> = {
@@ -1003,18 +1006,16 @@ const SECTION_ICONS: Record<SectionType, string> = {
   interests: "❤️",
 };
 
-const SECTION_LABELS: Record<SectionType, string> = {
-  experience: "Work Experience",
-  education: "Education",
-  projects: "Projects",
-  skills: "Skills",
-  languages: "Languages",
-  certificates: "Certificates",
-  awards: "Awards",
-  volunteer: "Volunteer",
-  references: "References",
-  interests: "Interests",
-};
+const LOCALE_OPTIONS: { code: LocaleCode; label: string; flag: string }[] = [
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "fi", label: "Finnish", flag: "🇫🇮" },
+  { code: "es", label: "Spanish", flag: "🇪🇸" },
+  { code: "de", label: "German", flag: "🇩🇪" },
+  { code: "fr", label: "French", flag: "🇫🇷" },
+  { code: "ne", label: "Nepali", flag: "🇳🇵" },
+  { code: "zh", label: "Mandarin", flag: "🇨🇳" },
+  { code: "ja", label: "Japanese", flag: "🇯🇵" },
+];
 
 const ALL_SECTION_TYPES: SectionType[] = [
   "experience",
@@ -1164,8 +1165,9 @@ function SidebarDraggablePanel({
   showBodyIcons: boolean;
   hasData: boolean;
 }) {
-  const { style } = useResumeStore();
+  const { style, activeLocale } = useResumeStore();
   const { sectionIcons, setSectionIcon } = useUIStore();
+  const ui = getUiText(activeLocale);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `sidebar-${section.id}`,
     data: { origin: "sidebar", sectionId: section.id, type: section.type },
@@ -1205,7 +1207,7 @@ function SidebarDraggablePanel({
                 }}
                 className="w-3 h-3"
               />
-              Show icon on resume
+              {ui.showIconOnResume}
             </label>
           </div>
           <SectionEditor type={section.type} />
@@ -1273,6 +1275,7 @@ export default function Home() {
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
   const {
+    activeLocale,
     personalInfo,
     sectionOrder,
     reorderSections,
@@ -1295,6 +1298,8 @@ export default function Home() {
     references,
     interests,
   } = useResumeStore();
+  const ui = getUiText(activeLocale);
+  const selectedLocaleFlag = LOCALE_OPTIONS.find((option) => option.code === activeLocale)?.flag ?? "🇬🇧";
   const {
     showHeaderIcons,
     showBodyIcons,
@@ -3004,7 +3009,7 @@ export default function Home() {
     >
       <div className="min-h-screen bg-gray-100">
         <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">Easy Resume</h1>
+          <h1 className="text-lg font-bold text-gray-800">{ui.appTitle}</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -3012,13 +3017,13 @@ export default function Home() {
               className="lg:hidden inline-flex items-center justify-center h-10 w-24 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition text-sm font-medium"
               aria-label="Open editor"
             >
-              Edit
+              {ui.edit}
             </button>
             <button
               onClick={handleExportPdf}
               className="inline-flex items-center justify-center h-10 w-24 lg:w-auto bg-blue-600 text-white px-4 rounded hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap"
             >
-              Export PDF
+              {ui.exportPdf}
             </button>
           </div>
         </header>
@@ -3042,13 +3047,13 @@ export default function Home() {
             } as React.CSSProperties}
           >
             <div className="flex items-center justify-between mb-2 lg:hidden">
-              <p className="text-sm font-semibold text-gray-700">Editor</p>
+              <p className="text-sm font-semibold text-gray-700">{ui.editor}</p>
               <button
                 type="button"
                 onClick={() => setIsMobileEditorOpen(false)}
                 className="px-2 py-1 rounded border border-gray-300 text-sm text-gray-700"
               >
-                Close
+                {ui.close}
               </button>
             </div>
             {/* Settings Group */}
@@ -3061,7 +3066,7 @@ export default function Home() {
                 <p
                   className={`text-xs font-semibold uppercase tracking-widest ${settingsCollapsed ? "text-gray-700" : "text-gray-400"}`}
                 >
-                  ⚙️ Settings
+                  ⚙️ {ui.settings}
                 </p>
                 <span
                   className={`text-gray-400 text-sm transition-transform ${settingsCollapsed ? "" : "rotate-180"}`}
@@ -3072,12 +3077,21 @@ export default function Home() {
               {!settingsCollapsed && (
                 <div className="space-y-3 mt-2">
                   <div className="bg-white rounded-lg shadow">
-                    <CollapsiblePanel title="Layout" persistId="panel-layout">
+                    <CollapsiblePanel
+                      title={ui.language}
+                      persistId="panel-language"
+                      rightAdornment={<span className="text-base leading-none">{selectedLocaleFlag}</span>}
+                    >
+                      <LanguagePickerContent />
+                    </CollapsiblePanel>
+                  </div>
+                  <div className="bg-white rounded-lg shadow">
+                    <CollapsiblePanel title={ui.layout} persistId="panel-layout">
                       <LayoutPickerContent />
                     </CollapsiblePanel>
                   </div>
                   <div className="bg-white rounded-lg shadow">
-                    <CollapsiblePanel title="Style" persistId="panel-style">
+                    <CollapsiblePanel title={ui.style} persistId="panel-style">
                       <StyleEditor />
                     </CollapsiblePanel>
                   </div>
@@ -3095,7 +3109,7 @@ export default function Home() {
                 <p
                   className={`text-xs font-semibold uppercase tracking-widest ${sectionsCollapsed ? "text-gray-700" : "text-gray-400"}`}
                 >
-                  📄 Sections
+                  📄 {ui.sections}
                 </p>
                 <span
                   className={`text-gray-400 text-sm transition-transform ${sectionsCollapsed ? "" : "rotate-180"}`}
@@ -3108,7 +3122,7 @@ export default function Home() {
                   {/* Non-draggable: Header (Personal Info + Photo) */}
                   <div className="bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
                     <CollapsiblePanel
-                      title="👤 Header"
+                      title={`👤 ${ui.introduction}`}
                       persistId="panel-header"
                     >
                       <PersonalInfoContent />
@@ -3128,7 +3142,7 @@ export default function Home() {
                         {!!extraAvailable.length && (
                           <div className="bg-gray-50 rounded-lg p-3">
                             <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2">
-                              Add to resume
+                              {ui.addToResume}
                             </p>
                             <div className="flex flex-wrap gap-1.5">
                               {extraAvailable.map((type) => (
@@ -3141,7 +3155,7 @@ export default function Home() {
                                   : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
                               }`}
                             >
-                              {SECTION_ICONS[type]} {SECTION_LABELS[type]}
+                              {SECTION_ICONS[type]} {getSectionLabel(activeLocale, type)}
                             </button>
                               ))}
                             </div>
@@ -3272,7 +3286,7 @@ export default function Home() {
                           {renderTwoColumnSidebarPageOneSections()}
                           {!sidebarSections.length && (
                             <p className="text-xs text-gray-400 italic text-center mt-8">
-                              Drop sections here
+                              {ui.dropSectionsHere}
                             </p>
                           )}
                         </DroppableZone>
@@ -3280,7 +3294,7 @@ export default function Home() {
                           {renderTwoColumnMainPageOneSections()}
                           {!mainSections.length && (
                             <p className="text-xs text-gray-400 italic text-center mt-8">
-                              Drop sections here
+                              {ui.dropSectionsHere}
                             </p>
                           )}
                         </DroppableZone>
@@ -3337,7 +3351,7 @@ export default function Home() {
 
         <footer className="px-4 pb-5 pt-1">
           <div className="mx-auto max-w-[1800px] text-center text-xs text-gray-500">
-            Tip: drag sections to reorder them, and drag the photo in the header to position it.
+            {ui.tipDragSections}
           </div>
         </footer>
       </div>
@@ -3352,12 +3366,13 @@ export default function Home() {
 
 // ─── Layout Picker ───
 function LayoutPickerContent() {
-  const { layout, setLayout, style, setStyle } = useResumeStore();
+  const { layout, setLayout, style, setStyle, activeLocale } = useResumeStore();
+  const ui = getUiText(activeLocale);
   const layouts: { type: LayoutType; name: string }[] = [
-    { type: "classic", name: "Classic" },
-    { type: "modern", name: "Modern" },
-    { type: "compact", name: "Compact" },
-    { type: "two-column", name: "Two Column" },
+    { type: "classic", name: ui.layoutClassic },
+    { type: "modern", name: ui.layoutModern },
+    { type: "compact", name: ui.layoutCompact },
+    { type: "two-column", name: ui.layoutTwoColumn },
   ];
   return (
     <div className="space-y-3">
@@ -3413,7 +3428,7 @@ function LayoutPickerContent() {
       {layout === "two-column" && (
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">
-            Sidebar Width: {style.sidebarWidth}%
+            {ui.sidebarWidth}: {style.sidebarWidth}%
           </label>
           <input
             type="range"
@@ -3424,11 +3439,51 @@ function LayoutPickerContent() {
             className="w-full"
           />
           <div className="flex justify-between text-[10px] text-gray-400">
-            <span>Narrow</span>
-            <span>Wide</span>
+            <span>{ui.narrow}</span>
+            <span>{ui.wide}</span>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LanguagePickerContent() {
+  const { activeLocale, setLocale, style } = useResumeStore();
+  const ui = getUiText(activeLocale);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">
+        {ui.chooseLanguageProfile}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {LOCALE_OPTIONS.map((localeOption) => {
+          const checked = activeLocale === localeOption.code;
+          return (
+            <label
+              key={localeOption.code}
+              className={`relative inline-flex items-center justify-center rounded-full cursor-pointer transition ${
+                checked
+                  ? "ring-2 ring-offset-1"
+                  : "opacity-80 hover:opacity-100"
+              }`}
+              style={checked ? { boxShadow: `0 0 0 2px ${style.accentColor}` } : undefined}
+              title={localeOption.label}
+            >
+              <input
+                type="radio"
+                name="resume-language"
+                value={localeOption.code}
+                checked={checked}
+                onChange={() => setLocale(localeOption.code)}
+                className="sr-only"
+              />
+              <span className="text-2xl leading-none">{localeOption.flag}</span>
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const SETTINGS_PANEL_IDS = ['panel-layout', 'panel-style'];
+const SETTINGS_PANEL_IDS = ['panel-language', 'panel-layout', 'panel-style'];
 const isSettingsPanel = (id: string) => SETTINGS_PANEL_IDS.includes(id);
 const isSectionsPanel = (id: string) => id === 'panel-header' || id.startsWith('sec-');
 const isManagedPanel = (id: string) => isSettingsPanel(id) || isSectionsPanel(id);
