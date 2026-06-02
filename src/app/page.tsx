@@ -70,7 +70,7 @@ const CONTACT_ICONS: Record<string, React.ReactNode> = {
   website: "🌐",
 };
 
-const DEFAULT_HEADER_IMAGE_URL = "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg";
+const DEFAULT_HEADER_IMAGE_URL = "/default-profile.svg";
 const PRESET_SIDEBAR_COLORS = ['#dbeafe', '#fee2e2', '#dcfce7', '#ede9fe', '#fef3c7', '#cffafe', '#e5e7eb', '#e0e7ff'];
 
 // ─── Style helpers ───
@@ -1844,6 +1844,97 @@ export default function Home() {
     }, 1200);
   }, [pdfTitle, trackExportSuccess]);
 
+  const handleIOSPrint = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const source = resumeRef.current;
+    if (!source) {
+      handleWindowPrint();
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      handleWindowPrint();
+      return;
+    }
+
+    const headStyles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((node) => node.outerHTML)
+      .join("\n");
+
+    const printMarkup = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${pdfTitle()}</title>
+    ${headStyles}
+    <style>
+      html, body { margin: 0; padding: 0; background: white; }
+      .resume-pages { display: block !important; gap: 0 !important; padding: 0 !important; }
+      .resume-page {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        overflow: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        padding: 48px 48px 24px 48px !important;
+        margin: 0 !important;
+        page-break-after: always;
+      }
+      .resume-page:last-child { page-break-after: auto; }
+      [data-page-section] { break-inside: avoid !important; page-break-inside: avoid !important; }
+      [data-page-section][data-section-type="experience"],
+      [data-page-section][data-section-type="projects"] {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+      }
+      .resume-page [data-page-section] [data-exp-item],
+      .resume-page [data-page-section] [data-project-item] {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+      }
+      @page { size: A4; margin: 0; }
+    </style>
+  </head>
+  <body>${source.outerHTML}</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(printMarkup);
+    printWindow.document.close();
+
+    const triggerPrint = () => {
+      printWindow.focus();
+      printWindow.print();
+      trackExportSuccess("window_print");
+    };
+
+    const images = Array.from(printWindow.document.images);
+    if (images.length === 0) {
+      setTimeout(triggerPrint, 60);
+      return;
+    }
+
+    let pending = images.length;
+    const markReady = () => {
+      pending -= 1;
+      if (pending <= 0) setTimeout(triggerPrint, 60);
+    };
+
+    images.forEach((img) => {
+      if (img.complete) {
+        markReady();
+      } else {
+        img.addEventListener("load", markReady, { once: true });
+        img.addEventListener("error", markReady, { once: true });
+      }
+    });
+  }, [handleWindowPrint, pdfTitle, trackExportSuccess]);
+
   const handlePrint = useReactToPrint({
     contentRef: resumeRef,
     documentTitle: pdfTitle(),
@@ -1858,7 +1949,7 @@ export default function Home() {
 
   const handleExportPdf = useCallback(() => {
     if (isIOSLike()) {
-      handleWindowPrint();
+      handleIOSPrint();
       return;
     }
 
@@ -1867,7 +1958,7 @@ export default function Home() {
     } catch {
       handleWindowPrint();
     }
-  }, [handlePrint, handleWindowPrint, isIOSLike]);
+  }, [handleIOSPrint, handlePrint, handleWindowPrint, isIOSLike]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
