@@ -146,13 +146,13 @@ const defaultStyle: StyleConfig = { accentColor: '#059669', sidebarColor: '#dbea
 const defaultPhoto: PhotoConfig = {
   url: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg',
   verticalPosition: 'center',
-  horizontalPosition: 'right',
+  horizontalPosition: 'left',
   headerHeight: 180,
   marginTop: 0,
   marginBottom: 0,
-  size: 82,
+  size: 113,
   borderRadius: 50,
-  contentGap: 14,
+  contentGap: 24,
 };
 const seededPersonalInfo: PersonalInfo = {
   fullName: 'Easy Resume',
@@ -1247,7 +1247,7 @@ export const useResumeStore = create<ResumeStore>()(
         if (typeof merged.photo.headerHeight !== 'number') merged.photo.headerHeight = 180;
         if (typeof merged.photo.marginTop !== 'number') merged.photo.marginTop = 0;
         if (typeof merged.photo.marginBottom !== 'number') merged.photo.marginBottom = 0;
-        if (typeof merged.photo.contentGap !== 'number') merged.photo.contentGap = 14;
+        if (typeof merged.photo.contentGap !== 'number') merged.photo.contentGap = 24;
         merged.sectionOrder = (merged.sectionOrder || []).map((section: ResumeSection) => ({
           ...section,
           title: getSectionTitle(section.type, activeLocale),
