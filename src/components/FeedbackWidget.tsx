@@ -92,23 +92,23 @@ export default function FeedbackWidget() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-90 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
+        className="feedback-trigger studio-secondary-button inline-flex h-10 items-center justify-center px-3 text-sm font-semibold"
         aria-label={ui.openFeedbackAria}
       >
         {ui.feedbackButton}
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-100 flex items-end justify-center bg-slate-900/45 p-3 backdrop-blur-sm sm:items-center sm:p-6">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl">
-            <div className="bg-linear-to-r from-sky-50 via-cyan-50 to-blue-50 px-5 py-4 sm:px-6">
-              <div className="mb-1 inline-flex rounded-full border border-sky-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+        <div className="feedback-overlay fixed inset-0 z-100 flex items-end justify-center p-3 backdrop-blur-sm sm:items-center sm:p-6">
+          <div className="feedback-modal w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl">
+            <div className="feedback-modal-header px-5 py-4 sm:px-6">
+              <div className="feedback-modal-badge mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
                 {ui.feedbackContact}
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">{ui.feedbackSendTitle}</h2>
-                  <p className="text-sm text-slate-600">
+                  <h2 className="feedback-modal-title text-xl font-bold">{ui.feedbackSendTitle}</h2>
+                  <p className="feedback-modal-subtitle text-sm">
                     {ui.feedbackSubtitle}
                   </p>
                 </div>
@@ -120,7 +120,7 @@ export default function FeedbackWidget() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg px-2 py-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  className="feedback-close rounded-lg px-2 py-1 transition"
                   aria-label={ui.closeFeedbackAria}
                 >
                   x
@@ -157,7 +157,7 @@ export default function FeedbackWidget() {
 
                 {status !== "idle" && (
                   <p
-                    className={`text-sm ${status === "success" ? "text-emerald-700" : "text-red-600"}`}
+                    className={`text-sm ${status === "success" ? "feedback-status-success" : "feedback-status-error"}`}
                   >
                     {statusMessage}
                   </p>
@@ -167,14 +167,14 @@ export default function FeedbackWidget() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="feedback-cancel rounded-lg px-3 py-2 text-sm font-medium"
                   >
                     {ui.feedbackCancel}
                   </button>
                   <button
                     type="submit"
                     disabled={!isValid || isSubmitting}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                    className="feedback-submit rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? ui.feedbackSending : ui.feedbackSend}
                   </button>

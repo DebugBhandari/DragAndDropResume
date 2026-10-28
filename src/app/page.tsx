@@ -1736,6 +1736,17 @@ export default function Home() {
     focusPanel("panel-header-image");
   };
 
+  const handleOpenResumeImport = () => {
+    focusPanel("panel-header");
+    setIsMobileEditorOpen(true);
+    window.setTimeout(() => {
+      document.querySelector(".resume-import-card")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  };
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -3565,26 +3576,13 @@ export default function Home() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragId(null)}
     >
-      <div className="resume-studio min-h-screen" data-theme={studioTheme}>
+      <div className="resume-studio" data-theme={studioTheme}>
         <header className="studio-header sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="studio-mark" aria-hidden="true">R</div>
-            <div>
-              <p className="studio-kicker">Resume studio</p>
-              <h1 className="text-lg font-bold text-white tracking-tight">{ui.appTitle}</h1>
-            </div>
+            <h1 className="hidden text-lg font-bold text-white tracking-tight sm:block">{ui.appTitle}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleStudioTheme}
-              className="studio-theme-switch inline-flex items-center gap-2 h-10 px-2.5 sm:px-3 text-xs font-bold uppercase tracking-[0.12em]"
-              aria-label={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
-              title={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
-            >
-              <span aria-hidden="true">{studioTheme === 'dark' ? '☀' : '☾'}</span>
-              <span className="hidden sm:inline">{studioTheme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
             <button
               type="button"
               onClick={() => setIsMobileEditorOpen(true)}
@@ -3652,6 +3650,14 @@ export default function Home() {
               </button>
               {!settingsCollapsed && (
                 <div className="space-y-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenResumeImport}
+                    className="resume-import-button studio-import-button w-full min-h-11 px-3 text-sm"
+                  >
+                    <span aria-hidden="true">↑</span>
+                    Import résumé
+                  </button>
                   <div className="bg-white rounded-lg shadow">
                     <CollapsiblePanel
                       title={ui.language}
@@ -3696,7 +3702,7 @@ export default function Home() {
               {!sectionsCollapsed && (
                 <div className="space-y-3">
                   {/* Non-draggable: Header (Introduction) */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
+                  <div className="section-introduction-panel bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
                     <CollapsiblePanel
                       title={`👤 ${ui.introduction}`}
                       persistId="panel-header"
@@ -3841,7 +3847,7 @@ export default function Home() {
           </div>
 
           {/* Resume Preview */}
-          <div className="studio-canvas w-full lg:flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-92px)]">
+          <div className="studio-canvas w-full lg:flex-1 overflow-y-auto overflow-x-hidden">
             <div className="studio-canvas-toolbar">
               <span className="studio-canvas-status"><span aria-hidden="true">●</span> Live preview</span>
               <span className="hidden sm:inline">Drag sections directly on the page</span>
@@ -3956,12 +3962,25 @@ export default function Home() {
             {ui.tipDragSections}
           </div>
         </footer>
+
+        <div className="studio-floating-controls fixed bottom-4 right-4 z-90 flex items-center gap-2">
+          <FeedbackWidget />
+          <button
+            type="button"
+            onClick={toggleStudioTheme}
+            className="studio-theme-switch inline-flex h-10 items-center gap-2 px-2.5 text-xs font-bold uppercase tracking-[0.12em] sm:px-3"
+            aria-label={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
+            title={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            <span aria-hidden="true">{studioTheme === 'dark' ? '☀' : '☾'}</span>
+            <span className="hidden sm:inline">{studioTheme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+        </div>
       </div>
 
       <DragOverlay>
         <DragOverlayContent sectionId={activeDragId} />
       </DragOverlay>
-      <FeedbackWidget />
     </DndContext>
   );
 }
