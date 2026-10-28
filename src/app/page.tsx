@@ -6,6 +6,7 @@ import {
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -18,6 +19,7 @@ import {
   SortableContext,
   useSortable,
   arrayMove,
+  sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
@@ -41,6 +43,8 @@ import {
   Skill,
   Interest,
   LocaleCode,
+  ResumeImportDraft,
+  ResumeImportSelection,
 } from "@/types/resume";
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/dateSort";
 import { trackAnalyticsEvent } from "@/utils/analytics";
@@ -1057,6 +1061,9 @@ function ResumeDraggableSection({
     moveSectionToZone(section.id, targetZone);
   };
 
+  const canMoveUp = sectionOrder.filter((item) => item.zone === section.zone).findIndex((item) => item.id === section.id) > 0;
+  const canMoveDown = sectionOrder.filter((item) => item.zone === section.zone).findIndex((item) => item.id === section.id) < sectionOrder.filter((item) => item.zone === section.zone).length - 1;
+
   return (
     <div
       ref={setNodeRef}
@@ -1068,64 +1075,77 @@ function ResumeDraggableSection({
       data-section-type={section.type}
       data-section-id={section.id}
       data-section-zone={section.zone}
-      className={`${getSpacingClass(style.sectionSpacing)} break-inside-avoid relative rounded p-2 transition-all hover:bg-gray-50/50 active:cursor-grabbing group/sec`}
+      className={`${getSpacingClass(style.sectionSpacing)} resume-draggable-section break-inside-avoid relative rounded-lg p-2 transition-all hover:bg-blue-50/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 active:cursor-grabbing group/sec`}
     >
-      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover/sec:opacity-100 transition-opacity print:hidden">
+      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 transition-opacity print:hidden">
         {layout === "two-column" && section.zone === "main" && (
           <button
+            type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               moveAcrossColumns("sidebar");
             }}
-            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            className="resume-section-action w-6 h-6 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center"
             title="Move to left column"
+            aria-label={`Move ${section.title} to the left column`}
           >
             ←
           </button>
         )}
         {layout === "two-column" && section.zone === "sidebar" && (
           <button
+            type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               moveAcrossColumns("main");
             }}
-            className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+            className="resume-section-action w-6 h-6 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center"
             title="Move to right column"
+            aria-label={`Move ${section.title} to the right column`}
           >
             →
           </button>
         )}
         <button
+          type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             moveSectionBy(-1);
           }}
-          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          disabled={!canMoveUp}
+          className="resume-section-action w-6 h-6 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-35"
           title="Move up"
+          aria-label={`Move ${section.title} up`}
         >
           ↑
         </button>
         <button
+          type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             moveSectionBy(1);
           }}
-          className="w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] flex items-center justify-center"
+          disabled={!canMoveDown}
+          className="resume-section-action w-6 h-6 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-35"
           title="Move down"
+          aria-label={`Move ${section.title} down`}
         >
           ↓
         </button>
         <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             removeSectionFromResume(section.id);
           }}
-          className="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+          className="resume-section-action w-6 h-6 rounded-full bg-red-500 text-white text-sm flex items-center justify-center"
           title="Remove from resume"
+          aria-label={`Remove ${section.title} from resume`}
         >
           ×
         </button>
@@ -1620,6 +1640,11 @@ function DroppableZone({
       style={zoneStyle}
     >
       {children}
+      {isOver && (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 rounded-lg border border-dashed border-blue-400 bg-blue-50/95 px-3 py-2 text-center text-xs font-semibold text-blue-700 shadow-sm print:hidden" role="status">
+          Release to place this section here
+        </div>
+      )}
     </div>
   );
 }
@@ -1631,14 +1656,14 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
   const section = sectionOrder.find((s) => s.id === sectionId);
   if (!section) return null;
   return (
-    <div className="bg-white shadow-xl rounded p-3 border-2 border-blue-400 opacity-90 w-[200px]">
+    <div className="bg-white shadow-2xl rounded-xl p-3 border-2 border-blue-400 opacity-95 w-[220px] ring-4 ring-blue-100">
       <h2
         className="text-xs font-bold uppercase"
         style={{ color: style.accentColor }}
       >
         {section.title}
       </h2>
-      <p className="text-xs text-gray-400 mt-1">Drop into a zone</p>
+      <p className="text-xs text-gray-500 mt-1">Move it anywhere in your resume</p>
     </div>
   );
 }
@@ -1697,10 +1722,13 @@ export default function Home() {
     toggleSections,
     activePanelId,
     focusPanel,
+    studioTheme,
+    toggleStudioTheme,
   } = useUIStore();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleAddPhotoFromPill = () => {
@@ -3535,29 +3563,48 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveDragId(null)}
     >
-      <div className="min-h-screen bg-gray-100">
-        <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">{ui.appTitle}</h1>
+      <div className="resume-studio min-h-screen" data-theme={studioTheme}>
+        <header className="studio-header sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="studio-mark" aria-hidden="true">R</div>
+            <div>
+              <p className="studio-kicker">Resume studio</p>
+              <h1 className="text-lg font-bold text-white tracking-tight">{ui.appTitle}</h1>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={toggleStudioTheme}
+              className="studio-theme-switch inline-flex items-center gap-2 h-10 px-2.5 sm:px-3 text-xs font-bold uppercase tracking-[0.12em]"
+              aria-label={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
+              title={`Switch to ${studioTheme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              <span aria-hidden="true">{studioTheme === 'dark' ? '☀' : '☾'}</span>
+              <span className="hidden sm:inline">{studioTheme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsMobileEditorOpen(true)}
-              className="lg:hidden inline-flex items-center justify-center h-10 w-24 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition text-sm font-medium"
+              className="studio-secondary-button lg:hidden inline-flex items-center justify-center h-10 w-24 text-sm font-medium"
               aria-label="Open editor"
             >
               {ui.edit}
             </button>
             <button
+              type="button"
               onClick={handleExportPdf}
-              className="inline-flex items-center justify-center h-10 w-24 lg:w-auto bg-blue-600 text-white px-4 rounded hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap"
+              className="studio-export-button inline-flex items-center justify-center h-10 w-28 lg:w-auto px-4 text-sm font-semibold whitespace-nowrap"
             >
+              <span aria-hidden="true">↓</span>
               {ui.exportPdf}
             </button>
           </div>
         </header>
 
-        <main ref={mainLayoutRef} className="flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
+        <main ref={mainLayoutRef} className="studio-workspace flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
           {isMobileEditorOpen && (
             <button
               type="button"
@@ -3570,17 +3617,17 @@ export default function Home() {
           {/* Editor Sidebar */}
           <div
             ref={sidebarRef}
-            className={`fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm bg-gray-100 p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-(--editor-pane-width) lg:max-w-none lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto lg:p-0 lg:pr-2 lg:bg-transparent lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+            className={`studio-editor fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-(--editor-pane-width) lg:max-w-none lg:max-h-[calc(100vh-92px)] lg:overflow-y-auto lg:p-3 lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
             style={{
               ["--editor-pane-width" as string]: `${editorPaneWidth}px`,
             } as React.CSSProperties}
           >
             <div className="flex items-center justify-between mb-2 lg:hidden">
-              <p className="text-sm font-semibold text-gray-700">{ui.editor}</p>
+              <p className="text-sm font-semibold text-white">{ui.editor}</p>
               <button
                 type="button"
                 onClick={() => setIsMobileEditorOpen(false)}
-                className="px-2 py-1 rounded border border-gray-300 text-sm text-gray-700"
+                className="studio-secondary-button px-2 py-1 text-sm"
               >
                 {ui.close}
               </button>
@@ -3590,10 +3637,10 @@ export default function Home() {
               <button
                 type="button"
                 onClick={toggleSettings}
-                className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition ${settingsCollapsed ? "bg-white shadow-sm hover:shadow" : "bg-transparent"}`}
+                className={`studio-group-trigger flex items-center justify-between w-full px-3 py-2.5 rounded-xl transition ${settingsCollapsed ? "studio-group-trigger-collapsed" : ""}`}
               >
                 <p
-                  className={`text-xs font-semibold uppercase tracking-widest ${settingsCollapsed ? "text-gray-700" : "text-gray-400"}`}
+                  className="text-xs font-semibold uppercase tracking-widest"
                 >
                   ⚙️ {ui.settings}
                 </p>
@@ -3633,10 +3680,10 @@ export default function Home() {
               <button
                 type="button"
                 onClick={toggleSections}
-                className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition ${sectionsCollapsed ? "bg-white shadow-sm hover:shadow" : "bg-transparent"}`}
+                className={`studio-group-trigger flex items-center justify-between w-full px-3 py-2.5 rounded-xl transition ${sectionsCollapsed ? "studio-group-trigger-collapsed" : ""}`}
               >
                 <p
-                  className={`text-xs font-semibold uppercase tracking-widest ${sectionsCollapsed ? "text-gray-700" : "text-gray-400"}`}
+                  className="text-xs font-semibold uppercase tracking-widest"
                 >
                   📄 {ui.sections}
                 </p>
@@ -3737,7 +3784,7 @@ export default function Home() {
                 event.preventDefault();
                 setIsResizingEditor(true);
               }}
-              className="w-2 rounded bg-gray-200/80 hover:bg-blue-300 active:bg-blue-400 cursor-col-resize transition-colors"
+              className="studio-resize-handle w-2 rounded cursor-col-resize transition-colors"
               aria-label="Resize editor pane"
               title="Drag to resize editor"
             />
@@ -3794,7 +3841,11 @@ export default function Home() {
           </div>
 
           {/* Resume Preview */}
-          <div className="w-full lg:flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-80px)]">
+          <div className="studio-canvas w-full lg:flex-1 overflow-y-auto overflow-x-hidden max-h-[60vh] lg:max-h-[calc(100vh-92px)]">
+            <div className="studio-canvas-toolbar">
+              <span className="studio-canvas-status"><span aria-hidden="true">●</span> Live preview</span>
+              <span className="hidden sm:inline">Drag sections directly on the page</span>
+            </div>
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
             <div
               ref={resumeRef}
@@ -3809,7 +3860,7 @@ export default function Home() {
                 >
                   {/* Page 1 */}
                   <div
-                    className="resume-page shadow-lg rounded"
+                    className="resume-page studio-resume-page shadow-lg rounded"
                     style={{ ...pageStyle }}
                   >
                     <PersonalHeader
@@ -3861,7 +3912,7 @@ export default function Home() {
                   {Array.from({ length: continuationPageCount }).map((_, continuationPageIndex) => (
                     <div
                       key={`resume-page-continuation-${continuationPageIndex}`}
-                      className="resume-page shadow-lg rounded"
+                      className="resume-page studio-resume-page shadow-lg rounded"
                       style={{ ...pageStyle }}
                     >
                       {layout === "two-column" ? (
@@ -3900,8 +3951,8 @@ export default function Home() {
           </div>
         </main>
 
-        <footer className="px-4 pb-5 pt-1">
-          <div className="mx-auto max-w-[1800px] text-center text-xs text-gray-500">
+        <footer className="studio-footer px-4 pb-5 pt-1">
+          <div className="mx-auto max-w-[1800px] text-center text-xs">
             {ui.tipDragSections}
           </div>
         </footer>
@@ -4068,6 +4119,7 @@ function PersonalInfoContent() {
   const ui = getUiText(activeLocale);
   return (
     <div className="space-y-3">
+      <ResumeImportContent />
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
@@ -4119,6 +4171,75 @@ function PersonalInfoContent() {
         value={personalInfo.summary}
         onChange={(e) => updatePersonalInfo({ summary: e.target.value })}
       />
+    </div>
+  );
+}
+
+function ResumeImportContent() {
+  const { applyImportDraft } = useResumeStore();
+  const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
+  const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, experience: true, education: true, skills: true, languages: true });
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setStatus('uploading');
+    setMessage('Reading your résumé privately on this server…');
+    setDraft(null);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const response = await fetch('/api/resume-import', { method: 'POST', body: formData });
+      const result = await response.json() as { draft?: ResumeImportDraft; message?: string };
+      if (!response.ok || !result.draft) throw new Error(result.message || 'Unable to import this résumé.');
+      setDraft(result.draft);
+      setMessage('Review the detected details, then choose what to add.');
+      setStatus('idle');
+    } catch (error) {
+      setStatus('error');
+      setMessage(error instanceof Error ? error.message : 'Unable to import this résumé.');
+    }
+  }
+
+  const detected = draft ? [
+    ['personalInfo', 'Personal details', Object.values(draft.personalInfo).some(Boolean)],
+    ['experience', `${draft.experience.length} work experience${draft.experience.length === 1 ? '' : 's'}`, draft.experience.length > 0],
+    ['education', `${draft.education.length} education item${draft.education.length === 1 ? '' : 's'}`, draft.education.length > 0],
+    ['skills', `${draft.skills.length} skill${draft.skills.length === 1 ? '' : 's'}`, draft.skills.length > 0],
+    ['languages', `${draft.languages.length} language${draft.languages.length === 1 ? '' : 's'}`, draft.languages.length > 0],
+  ] as const : [];
+
+  return (
+    <div className="resume-import-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.12em]">Private AI import</p>
+          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. OCR and AI run on this server; files are deleted after extraction.</p>
+        </div>
+        <label className={`resume-import-button shrink-0 ${status === 'uploading' ? 'pointer-events-none opacity-60' : ''}`}>
+          {status === 'uploading' ? 'Importing…' : 'Import résumé'}
+          <input type="file" accept="application/pdf,image/png,image/jpeg" className="sr-only" onChange={handleImport} disabled={status === 'uploading'} />
+        </label>
+      </div>
+      {message && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
+      {draft && (
+        <div className="mt-3 space-y-2 border-t pt-3">
+          {detected.filter(([, , available]) => available).map(([key, label]) => (
+            <label key={key} className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+              <span>{label}</span>
+              <input type="checkbox" checked={selection[key]} onChange={(event) => setSelection((current) => ({ ...current, [key]: event.target.checked }))} />
+            </label>
+          ))}
+          {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" className="resume-import-apply" onClick={() => { applyImportDraft(draft, selection); setDraft(null); setMessage('Selected details were added to your résumé.'); }}>Apply selected</button>
+            <button type="button" className="resume-import-cancel" onClick={() => { setDraft(null); setMessage(''); }}>Discard</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

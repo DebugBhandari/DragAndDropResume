@@ -148,3 +148,20 @@ export interface ResumeData {
   style: StyleConfig;
   photo: PhotoConfig;
 }
+
+export interface ResumeImportDraft {
+  personalInfo: Partial<PersonalInfo>;
+  experience: Array<Omit<WorkExperience, 'id' | 'visible'>>;
+  education: Array<Omit<Education, 'id'>>;
+  skills: Array<Omit<Skill, 'id'>>;
+  languages: Array<Omit<Language, 'id'>>;
+  warnings: string[];
+}
+
+export interface ResumeImportSelection {
+  personalInfo: boolean;
+  experience: boolean;
+  education: boolean;
+  skills: boolean;
+  languages: boolean;
+}

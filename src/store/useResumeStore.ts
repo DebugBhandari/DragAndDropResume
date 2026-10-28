@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certificate, Award, Volunteer, Reference, Interest, PersonalInfo, ResumeSection, SectionType, LayoutType, StyleConfig, PhotoConfig, ColumnZone, LocaleCode } from '@/types/resume';
+import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certificate, Award, Volunteer, Reference, Interest, PersonalInfo, ResumeSection, SectionType, LayoutType, StyleConfig, PhotoConfig, ColumnZone, LocaleCode, ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 import { getSectionLabel } from '@/utils/sectionTranslations';
 
@@ -1014,6 +1014,7 @@ interface ResumeStore extends ResumeData {
   setStyle: (style: Partial<StyleConfig>) => void;
   setPhoto: (photo: Partial<PhotoConfig>) => void;
   updatePersonalInfo: (info: Partial<PersonalInfo>) => void;
+  applyImportDraft: (draft: ResumeImportDraft, selection: ResumeImportSelection) => void;
   addEducation: () => void;
   updateEducation: (id: string, data: Partial<Education>) => void;
   removeEducation: (id: string) => void;
@@ -1117,6 +1118,30 @@ export const useResumeStore = create<ResumeStore>()(
       setStyle: (s: Partial<StyleConfig>) => set((state) => ({ style: { ...state.style, ...s } })),
       setPhoto: (p: Partial<PhotoConfig>) => set((state) => ({ photo: { ...state.photo, ...p } })),
       updatePersonalInfo: (info: Partial<PersonalInfo>) => set((s) => ({ personalInfo: { ...s.personalInfo, ...info } })),
+      applyImportDraft: (draft, selection) => set((s) => {
+        const importedSectionTypes: SectionType[] = [];
+        if (selection.experience && draft.experience.length) importedSectionTypes.push('experience');
+        if (selection.education && draft.education.length) importedSectionTypes.push('education');
+        if (selection.skills && draft.skills.length) importedSectionTypes.push('skills');
+        if (selection.languages && draft.languages.length) importedSectionTypes.push('languages');
+        const missingSections = getSectionTemplates(s.activeLocale).filter((section) =>
+          importedSectionTypes.includes(section.type) && !s.sectionOrder.some((current) => current.type === section.type),
+        );
+        const nextExperience = selection.experience
+          ? [...s.experience, ...draft.experience.map((item) => ({ ...item, id: uuidv4(), visible: true, descriptionBullets: item.descriptionBullets.length ? item.descriptionBullets : [''] }))]
+          : s.experience;
+        const nextProjects = s.projects;
+        return {
+          personalInfo: selection.personalInfo ? { ...s.personalInfo, ...draft.personalInfo } : s.personalInfo,
+          experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience),
+          projects: nextProjects,
+          education: selection.education ? [...s.education, ...draft.education.map((item) => ({ ...item, id: uuidv4() }))] : s.education,
+          skills: selection.skills ? [...s.skills, ...draft.skills.map((item) => ({ ...item, id: uuidv4() }))] : s.skills,
+          languages: selection.languages ? [...s.languages, ...draft.languages.map((item) => ({ ...item, id: uuidv4() }))] : s.languages,
+          sectionOrder: [...s.sectionOrder, ...missingSections],
+          removedSections: s.removedSections.filter((type) => !importedSectionTypes.includes(type)),
+        };
+      }),
 
       addEducation: () => set((s) => ({ education: [...s.education, { id: uuidv4(), institution: '', degree: '', field: '', startDate: '', endDate: '', description: '' }] })),
       updateEducation: (id, data) => set((s) => ({ education: s.education.map((e) => (e.id === id ? { ...e, ...data } : e)) })),

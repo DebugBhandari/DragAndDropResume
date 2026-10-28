@@ -5,6 +5,7 @@ const SETTINGS_PANEL_IDS = ['panel-language', 'panel-layout', 'panel-style'];
 const isSettingsPanel = (id: string) => SETTINGS_PANEL_IDS.includes(id);
 const isSectionsPanel = (id: string) => id === 'panel-header' || id === 'panel-header-image' || id.startsWith('sec-');
 const isManagedPanel = (id: string) => isSettingsPanel(id) || isSectionsPanel(id);
+export type StudioTheme = 'light' | 'dark';
 
 interface UIStore {
   showHeaderIcons: boolean;
@@ -14,6 +15,7 @@ interface UIStore {
   sectionsCollapsed: boolean;
   activePanelId: string;
   panelStates: Record<string, boolean>;
+  studioTheme: StudioTheme;
   toggleHeaderIcons: () => void;
   toggleBodyIcons: () => void;
   setSectionIcon: (sectionId: string, show: boolean) => void;
@@ -21,6 +23,7 @@ interface UIStore {
   toggleSections: () => void;
   setPanelOpen: (id: string, open: boolean) => void;
   focusPanel: (id: string) => void;
+  toggleStudioTheme: () => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -33,6 +36,7 @@ export const useUIStore = create<UIStore>()(
       sectionsCollapsed: false,
       activePanelId: 'panel-layout',
       panelStates: {},
+      studioTheme: 'dark',
       toggleHeaderIcons: () => set((s) => ({ showHeaderIcons: !s.showHeaderIcons })),
       toggleBodyIcons: () => set((s) => ({ showBodyIcons: !s.showBodyIcons })),
       setSectionIcon: (sectionId, show) => set((s) => ({ sectionIcons: { ...s.sectionIcons, [sectionId]: show } })),
@@ -70,6 +74,7 @@ export const useUIStore = create<UIStore>()(
           sectionsCollapsed: isSectionsPanel(id) ? false : s.sectionsCollapsed,
         };
       }),
+      toggleStudioTheme: () => set((s) => ({ studioTheme: s.studioTheme === 'dark' ? 'light' : 'dark' })),
     }),
     { name: 'resume-ui-v2' }
   )
