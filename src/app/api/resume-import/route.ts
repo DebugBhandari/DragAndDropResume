@@ -96,9 +96,12 @@ async function extractEmbeddedProfilePhoto(pdfPath: string, workspace: string) {
   if (!candidate) return '';
 
   await execFileAsync('pdfimages', ['-f', '1', '-l', '1', '-png', pdfPath, prefix], { timeout: 20_000, maxBuffer: 1024 * 1024 });
-  const extractedFiles = await readdir(workspace);
-  const expectedSuffix = `-${String(candidate.index).padStart(3, '0')}.png`;
-  const fileName = extractedFiles.find((name) => name.startsWith('embedded-image-') && name.endsWith(expectedSuffix));
+  const extractedFiles = (await readdir(workspace))
+    .filter((name) => /^embedded-image-\d+\.png$/.test(name))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const pageOneImages = findEmbeddedPdfImages(stdout).filter((image) => image.page === 1);
+  const candidatePosition = pageOneImages.findIndex((image) => image.index === candidate.index);
+  const fileName = candidatePosition >= 0 ? extractedFiles[candidatePosition] : undefined;
   if (!fileName) return '';
 
   const imagePath = join(workspace, fileName);
