@@ -1656,14 +1656,14 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
   const section = sectionOrder.find((s) => s.id === sectionId);
   if (!section) return null;
   return (
-    <div className="bg-white shadow-2xl rounded-xl p-3 border-2 border-blue-400 opacity-95 w-[220px] ring-4 ring-blue-100">
+    <div className="drag-overlay-hint pointer-events-none inline-flex max-w-44 items-center gap-2 rounded-full px-3 py-1.5">
+      <span className="text-xs opacity-65" aria-hidden="true">↕</span>
       <h2
-        className="text-xs font-bold uppercase"
+        className="truncate text-[11px] font-bold uppercase tracking-wide"
         style={{ color: style.accentColor }}
       >
         {section.title}
       </h2>
-      <p className="text-xs text-gray-500 mt-1">Move it anywhere in your resume</p>
     </div>
   );
 }
