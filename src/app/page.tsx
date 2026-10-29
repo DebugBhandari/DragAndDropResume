@@ -4197,7 +4197,7 @@ function PersonalInfoContent() {
 function ResumeImportContent() {
   const { applyImportDraft } = useResumeStore();
   const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
-  const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, experience: true, education: true, skills: true, languages: true });
+  const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, photo: true, experience: true, education: true, skills: true, languages: true });
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
@@ -4232,6 +4232,7 @@ function ResumeImportContent() {
 
   const detected = draft ? [
     ['personalInfo', 'Personal details', Object.values(draft.personalInfo).some(Boolean)],
+    ['photo', 'Profile photo embedded in the PDF', Boolean(draft.photoDataUrl)],
     ['experience', `${draft.experience.length} work experience${draft.experience.length === 1 ? '' : 's'}`, draft.experience.length > 0],
     ['education', `${draft.education.length} education item${draft.education.length === 1 ? '' : 's'}`, draft.education.length > 0],
     ['skills', `${draft.skills.length} skill${draft.skills.length === 1 ? '' : 's'}`, draft.skills.length > 0],
@@ -4243,7 +4244,7 @@ function ResumeImportContent() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em]">Private AI import</p>
-          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. OCR and AI run on this server; files are deleted after extraction.</p>
+          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. OCR and AI run on this server; files are deleted after extraction. An embedded PDF profile photo may be offered for review.</p>
         </div>
         <label className={`resume-import-button shrink-0 ${status === 'uploading' ? 'pointer-events-none opacity-60' : ''}`}>
           {status === 'uploading' ? 'Importing…' : 'Import résumé'}
@@ -4253,6 +4254,12 @@ function ResumeImportContent() {
       {message && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
+          {draft.photoDataUrl && (
+            <div className="resume-import-photo-preview">
+              <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />
+              <p className="text-xs opacity-75">Review the embedded PDF image before applying it as your profile photo.</p>
+            </div>
+          )}
           {detected.filter(([, , available]) => available).map(([key, label]) => (
             <label key={key} className="flex items-center justify-between gap-3 text-xs cursor-pointer">
               <span>{label}</span>

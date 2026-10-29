@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -11,6 +11,7 @@ export const maxDuration = 240;
 const execFileAsync = promisify(execFile);
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_PAGES = 3;
+const MAX_IMPORTED_PHOTO_BYTES = 1_000_000;
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 function text(value: unknown, max = 500) {
@@ -65,6 +66,47 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
   };
 }
 
+type EmbeddedPdfImage = {
+  page: number;
+  index: number;
+  width: number;
+  height: number;
+};
+
+function findEmbeddedPdfImages(output: string) {
+  return output.split('\n').flatMap((line): EmbeddedPdfImage[] => {
+    const columns = line.trim().split(/\s+/);
+    if (!/^\d+$/.test(columns[0] ?? '') || !/^\d+$/.test(columns[1] ?? '')) return [];
+    const width = Number(columns[3]);
+    const height = Number(columns[4]);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return [];
+    return [{ page: Number(columns[0]), index: Number(columns[1]), width, height }];
+  });
+}
+
+async function extractEmbeddedProfilePhoto(pdfPath: string, workspace: string) {
+  const prefix = join(workspace, 'embedded-image');
+  const { stdout } = await execFileAsync('pdfimages', ['-list', pdfPath], { timeout: 12_000, maxBuffer: 1024 * 1024 });
+  const candidate = findEmbeddedPdfImages(stdout)
+    .filter(({ page, width, height }) => {
+      const aspectRatio = width / height;
+      return page === 1 && width >= 100 && height >= 100 && width * height >= 20_000 && aspectRatio >= 0.55 && aspectRatio <= 1.5;
+    })
+    .sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+  if (!candidate) return '';
+
+  await execFileAsync('pdfimages', ['-f', '1', '-l', '1', '-png', pdfPath, prefix], { timeout: 20_000, maxBuffer: 1024 * 1024 });
+  const extractedFiles = await readdir(workspace);
+  const expectedSuffix = `-${String(candidate.index).padStart(3, '0')}.png`;
+  const fileName = extractedFiles.find((name) => name.startsWith('embedded-image-') && name.endsWith(expectedSuffix));
+  if (!fileName) return '';
+
+  const imagePath = join(workspace, fileName);
+  const info = await stat(imagePath);
+  if (info.size === 0 || info.size > MAX_IMPORTED_PHOTO_BYTES) return '';
+  return `data:image/png;base64,${(await readFile(imagePath)).toString('base64')}`;
+}
+
 async function ocrImage(path: string) {
   const { stdout } = await execFileAsync('tesseract', [path, 'stdout', '--oem', '1', '--psm', '3', '-l', 'eng'], { timeout: 60_000, maxBuffer: 2_000_000 });
   return stdout;
@@ -100,6 +142,9 @@ export async function POST(request: Request) {
     const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg';
     const sourcePath = join(workspace, `source.${extension}`);
     await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
+    const photoDataUrl = file.type === 'application/pdf'
+      ? await extractEmbeddedProfilePhoto(sourcePath, workspace).catch(() => '')
+      : '';
     const extractedText = (await extractDocument(sourcePath, file.type, workspace)).trim().slice(0, 30_000);
     if (extractedText.length < 30) return Response.json({ message: 'No readable résumé text was found in this file.' }, { status: 422 });
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
@@ -112,7 +157,7 @@ export async function POST(request: Request) {
     if (!response.ok) throw new Error('The local résumé model is unavailable.');
     const result = await response.json() as { message?: { content?: string } };
     const draft = sanitizeDraft(JSON.parse(result.message?.content ?? '{}'));
-    return Response.json({ draft });
+    return Response.json({ draft: { ...draft, photoDataUrl: photoDataUrl || undefined } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to import this résumé right now.';
     return Response.json({ message }, { status: 500 });

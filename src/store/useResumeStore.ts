@@ -1133,6 +1133,7 @@ export const useResumeStore = create<ResumeStore>()(
         const nextProjects = s.projects;
         return {
           personalInfo: selection.personalInfo ? { ...s.personalInfo, ...draft.personalInfo } : s.personalInfo,
+          photo: selection.photo && draft.photoDataUrl ? { ...s.photo, url: draft.photoDataUrl } : s.photo,
           experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience),
           projects: nextProjects,
           education: selection.education ? [...s.education, ...draft.education.map((item) => ({ ...item, id: uuidv4() }))] : s.education,
