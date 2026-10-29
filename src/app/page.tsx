@@ -1,6 +1,5 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useReactToPrint } from "react-to-print";
 import {
   DndContext,
   DragEndEvent,
@@ -1883,7 +1882,7 @@ export default function Home() {
     }, 1200);
   }, [pdfTitle, trackExportSuccess]);
 
-  const handleIOSPrint = useCallback(() => {
+  const handleDocumentPrint = useCallback(() => {
     if (typeof window === "undefined") return;
     const source = resumeRef.current;
     if (!source) {
@@ -1971,51 +1970,9 @@ export default function Home() {
     });
   }, [handleWindowPrint, pdfTitle, trackExportSuccess]);
 
-  const handlePrint = useReactToPrint({
-    contentRef: resumeRef,
-    documentTitle: pdfTitle(),
-    // The isolated iframe has only resumeRef, so static positioning is correct.
-    // Keep the fixed A4 cards intact: preview pagination and exported pagination
-    // must be based on the same page box.
-    pageStyle: `
-      @page { size: 794px 1123px; margin: 0; }
-      @media print {
-        html, body { margin: 0 !important; padding: 0 !important; }
-        body * { visibility: visible !important; }
-        .resume-pages { position: static !important; left: auto !important; top: auto !important; }
-        .resume-page {
-          box-sizing: border-box !important;
-          width: 794px !important;
-          min-width: 794px !important;
-          max-width: 794px !important;
-          height: 1123px !important;
-          min-height: 1123px !important;
-          max-height: 1123px !important;
-          overflow: hidden !important;
-          margin: 0 !important;
-          break-after: page;
-          page-break-after: always;
-        }
-        .resume-page:last-child { break-after: auto; page-break-after: auto; }
-      }
-    `,
-    onAfterPrint: () => {
-      trackExportSuccess("react_to_print");
-    },
-  });
-
   const handleExportPdf = useCallback(() => {
-    if (isIOSLike()) {
-      handleIOSPrint();
-      return;
-    }
-
-    try {
-      handlePrint?.();
-    } catch {
-      handleWindowPrint();
-    }
-  }, [handleIOSPrint, handlePrint, handleWindowPrint, isIOSLike]);
+    handleDocumentPrint();
+  }, [handleDocumentPrint]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
