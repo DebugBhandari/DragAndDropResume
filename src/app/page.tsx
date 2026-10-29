@@ -1678,6 +1678,7 @@ export default function Home() {
     activeLocale,
     personalInfo,
     sectionOrder,
+    clearResume,
     reorderSections,
     moveSectionToZone,
     removeSectionFromResume,
@@ -1737,6 +1738,15 @@ export default function Home() {
         block: "center",
       });
     }, 100);
+  };
+
+  const handleClearResume = () => {
+    if (!window.confirm('Clear this résumé? This permanently removes all current résumé content from this browser.')) {
+      return;
+    }
+
+    clearResume();
+    focusPanel('panel-header');
   };
 
   useEffect(() => setMounted(true), []);
@@ -3632,6 +3642,13 @@ export default function Home() {
                   >
                     <span aria-hidden="true">↑</span>
                     Import résumé
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearResume}
+                    className="w-full min-h-11 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-800"
+                  >
+                    Clear résumé
                   </button>
                   <div className="bg-white rounded-lg shadow">
                     <CollapsiblePanel

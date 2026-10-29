@@ -1017,6 +1017,7 @@ const isLocaleCode = (value: unknown): value is LocaleCode =>
 
 interface ResumeStore extends ResumeData {
   activeLocale: LocaleCode;
+  clearResume: () => void;
   setLocale: (locale: LocaleCode) => void;
   setLayout: (layout: LayoutType) => void;
   setStyle: (style: Partial<StyleConfig>) => void;
@@ -1093,6 +1094,35 @@ export const useResumeStore = create<ResumeStore>()(
         layout: 'modern',
         style: defaultStyle,
         photo: defaultPhoto,
+
+      clearResume: () => set((state) => ({
+        personalInfo: {
+          fullName: '',
+          email: '',
+          phone: '',
+          location: '',
+          summary: '',
+          linkedin: '',
+          website: '',
+        },
+        education: [],
+        experience: [],
+        projects: [],
+        languages: [],
+        skills: [],
+        certificates: [],
+        awards: [],
+        volunteer: [],
+        references: [],
+        interests: [],
+        sectionOrder: getDefaultSections(state.activeLocale),
+        removedSections: [],
+        experienceManualOrder: false,
+        projectsManualOrder: false,
+        layout: 'modern',
+        style: { ...defaultStyle },
+        photo: { ...defaultPhoto },
+      })),
 
       setLocale: (locale) => set((state) => {
         if (locale === state.activeLocale) return state;
