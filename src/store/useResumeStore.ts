@@ -12,14 +12,14 @@ const SUPPORTED_LOCALES: LocaleCode[] = ['en', 'fi', 'sv', 'es', 'de', 'fr', 'ne
 
 const BASE_SECTION_TEMPLATE: Omit<ResumeSection, 'title'>[] = [
   { id: 'section-experience', type: 'experience', zone: 'main' },
-  { id: 'section-education', type: 'education', zone: 'main' },
   { id: 'section-projects', type: 'projects', zone: 'main' },
+  { id: 'section-skills', type: 'skills', zone: 'main' },
+  { id: 'section-languages', type: 'languages', zone: 'main' },
+  { id: 'section-education', type: 'education', zone: 'main' },
   { id: 'section-volunteer', type: 'volunteer', zone: 'main' },
-  { id: 'section-skills', type: 'skills', zone: 'sidebar' },
-  { id: 'section-languages', type: 'languages', zone: 'sidebar' },
-  { id: 'section-certificates', type: 'certificates', zone: 'sidebar' },
-  { id: 'section-awards', type: 'awards', zone: 'sidebar' },
-  { id: 'section-interests', type: 'interests', zone: 'sidebar' },
+  { id: 'section-certificates', type: 'certificates', zone: 'main' },
+  { id: 'section-awards', type: 'awards', zone: 'main' },
+  { id: 'section-interests', type: 'interests', zone: 'main' },
   { id: 'section-references', type: 'references', zone: 'main' },
 ];
 
@@ -1217,7 +1217,9 @@ export const useResumeStore = create<ResumeStore>()(
       removeInterest: (id) => set((s) => ({ interests: s.interests.filter((i) => i.id !== id) })),
 
       reorderSections: (sections) => set({ sectionOrder: sections }),
-      moveSectionToZone: (sectionId, zone) => set((s) => ({ sectionOrder: s.sectionOrder.map((sec) => sec.id === sectionId ? { ...sec, zone } : sec) })),
+      moveSectionToZone: (sectionId) => set((s) => ({
+        sectionOrder: s.sectionOrder.map((sec) => sec.id === sectionId ? { ...sec, zone: 'main' } : sec),
+      })),
       addSectionToResume: (type) => set((s) => {
         if (s.sectionOrder.find((sec) => sec.type === type)) return s;
         const template = getSectionTemplates(s.activeLocale).find((section) => section.type === type);
@@ -1231,6 +1233,11 @@ export const useResumeStore = create<ResumeStore>()(
       };
     },
     { name: RESUME_STORAGE_KEY,
+      onRehydrateStorage: () => (state) => {
+        // Persist the merge-normalized stack so stale removedSections and sidebar
+        // zones are repaired once instead of being reinterpreted on every reload.
+        state?.reorderSections(state.sectionOrder);
+      },
       merge: (persisted: any, current: any) => {
         const merged = { ...current, ...persisted };
 
@@ -1254,9 +1261,13 @@ export const useResumeStore = create<ResumeStore>()(
         );
 
         const existingTypes = (merged.sectionOrder || []).map((s: any) => s.type);
-        const removed = merged.removedSections || [];
-        const missing = autoVisibleSections.filter((s) => !existingTypes.includes(s.type) && !removed.includes(s.type));
+        const missing = autoVisibleSections.filter((s) => !existingTypes.includes(s.type));
         if (missing.length) merged.sectionOrder = [...(merged.sectionOrder || []), ...missing];
+        // Older saved resumes could retain populated sections in removedSections.
+        // A populated section always belongs in the preview's single ordered stack.
+        merged.removedSections = (merged.removedSections || []).filter(
+          (type: SectionType) => !sectionHasData(type, merged)
+        );
         // Ensure new fields exist
         if (!merged.awards) merged.awards = [];
         if (!merged.volunteer) merged.volunteer = [];
@@ -1279,6 +1290,7 @@ export const useResumeStore = create<ResumeStore>()(
         merged.sectionOrder = (merged.sectionOrder || []).map((section: ResumeSection) => ({
           ...section,
           title: getSectionTitle(section.type, activeLocale),
+          zone: 'main',
         }));
 
         return merged;

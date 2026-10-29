@@ -1432,13 +1432,6 @@ const ALL_SECTION_TYPES: SectionType[] = [
   "interests",
 ];
 
-const PRIORITY_SECTION_TYPES: SectionType[] = [
-  "experience",
-  "projects",
-  "skills",
-  "languages",
-];
-
 function hasAnyText(values: unknown[]) {
   return values.some((value) => String(value ?? "").trim().length > 0);
 }
@@ -1823,41 +1816,6 @@ export default function Home() {
       interests: sectionHasData("interests", persistedSnapshot),
     });
   }, []);
-
-  useEffect(() => {
-    const sectionData: SectionDataSnapshot = {
-      education,
-      experience,
-      projects,
-      languages,
-      skills,
-      certificates,
-      awards,
-      volunteer,
-      references,
-      interests,
-    };
-    const requiredSectionTypes: SectionType[] = ["education", "skills", "languages"];
-    const missingSectionTypes = requiredSectionTypes.filter(
-      (type) => sectionHasData(type, sectionData) && !sectionOrder.some((section) => section.type === type),
-    );
-
-    if (missingSectionTypes.length === 0) return;
-    missingSectionTypes.forEach((type) => addSectionToResume(type));
-  }, [
-    addSectionToResume,
-    awards,
-    certificates,
-    education,
-    experience,
-    interests,
-    languages,
-    projects,
-    references,
-    sectionOrder,
-    skills,
-    volunteer,
-  ]);
 
   const trackExportSuccess = useCallback((method: "react_to_print" | "window_print") => {
     trackAnalyticsEvent("pdf_export_success", {
@@ -2632,19 +2590,6 @@ export default function Home() {
     },
     {} as Partial<Record<SectionType, ResumeSection>>,
   );
-  const priorityRank = PRIORITY_SECTION_TYPES.reduce(
-    (acc, type, index) => {
-      acc[type] = index;
-      return acc;
-    },
-    {} as Record<SectionType, number>,
-  );
-  const sortedSidebarSections = [...sectionOrder].sort((a, b) => {
-    const rankA = priorityRank[a.type] ?? Number.MAX_SAFE_INTEGER;
-    const rankB = priorityRank[b.type] ?? Number.MAX_SAFE_INTEGER;
-    if (rankA !== rankB) return rankA - rankB;
-    return sectionOrder.findIndex((section) => section.id === a.id) - sectionOrder.findIndex((section) => section.id === b.id);
-  });
   const sectionDataState = {
     education,
     experience,
@@ -2806,13 +2751,14 @@ export default function Home() {
     pageSplitIndex === -1
       ? 0
       : canUseDetailSplit
-        ? effectiveContinuationChunks.length + sequenceAfterPrimarySplit.length
+        ? effectiveContinuationChunks.length
         : effectiveLinearSectionContinuationChunks.length;
 
-  // Once a detail section (Experience/Projects) spans pages, continuation
-  // sections must never be skipped while attempting to fit another detail
-  // split. Each remaining section gets a safe, dedicated continuation page.
-  const trailingContinuationPageCount = 0;
+  // A trailing Experience/Projects section may need its own continuation chunks.
+  // All ordinary sections continue immediately after the final detail chunk.
+  const trailingContinuationPageCount = hasTrailingDetailSplit
+    ? effectiveTrailingContinuationChunks.length + (trailingBeforeSections.length > 0 ? 1 : 0)
+    : 0;
 
   const effectiveSidebarChunks =
     layout === "two-column"
@@ -3339,15 +3285,7 @@ export default function Home() {
     if (isPrimaryChunkPage) {
       const chunk = effectiveContinuationChunks[chunkIndex];
       if (!chunk) {
-        const continuationSection = afterSplit[chunkIndex - effectiveContinuationChunks.length];
-        if (!continuationSection) return null;
-        return (
-          <ResumeDraggableSection
-            key={continuationSection.id}
-            section={continuationSection}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
-          />
-        );
+        return null;
       }
       const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
       const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
@@ -3370,6 +3308,13 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
+          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
         </>
       );
     }
@@ -3390,15 +3335,7 @@ export default function Home() {
 
     const detailChunkIndex = trailingChunkIndex - (hasTrailingBeforePage ? 1 : 0);
     const trailingChunk = effectiveTrailingContinuationChunks[detailChunkIndex];
-    if (!trailingChunk) {
-      return trailingAfterSections.map((sec) => (
-        <ResumeDraggableSection
-          key={sec.id}
-          section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
-        />
-      ));
-    }
+    if (!trailingChunk) return null;
     const trailingExperienceItems =
       trailingDetailSplitSectionType === "experience"
         ? sortedExperience.slice(trailingChunk.start, trailingChunk.end)
@@ -3417,6 +3354,13 @@ export default function Home() {
           projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
+        {detailChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ))}
       </>
     );
   };
@@ -3500,15 +3444,7 @@ export default function Home() {
     if (isPrimaryChunkPage) {
       const chunk = effectiveContinuationChunks[chunkIndex];
       if (!chunk) {
-        const continuationSection = afterSplit[chunkIndex - effectiveContinuationChunks.length];
-        if (!continuationSection) return null;
-        return (
-          <ResumeDraggableSection
-            key={continuationSection.id}
-            section={continuationSection}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
-          />
-        );
+        return null;
       }
       const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
       const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
@@ -3531,6 +3467,13 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
+          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
+            <ResumeDraggableSection
+              key={sec.id}
+              section={sec}
+              onPreviewInteract={() => setIsMobileEditorOpen(true)}
+            />
+          ))}
         </>
       );
     }
@@ -3551,15 +3494,7 @@ export default function Home() {
 
     const detailChunkIndex = trailingChunkIndex - (hasTrailingBeforePage ? 1 : 0);
     const trailingChunk = effectiveTrailingContinuationChunks[detailChunkIndex];
-    if (!trailingChunk) {
-      return trailingAfterSections.map((sec) => (
-        <ResumeDraggableSection
-          key={sec.id}
-          section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
-        />
-      ));
-    }
+    if (!trailingChunk) return null;
     const trailingExperienceItems =
       trailingDetailSplitSectionType === "experience"
         ? sortedExperience.slice(trailingChunk.start, trailingChunk.end)
@@ -3578,6 +3513,13 @@ export default function Home() {
           projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
+        {detailChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
+          <ResumeDraggableSection
+            key={sec.id}
+            section={sec}
+            onPreviewInteract={() => setIsMobileEditorOpen(true)}
+          />
+        ))}
       </>
     );
   };
@@ -3785,7 +3727,7 @@ export default function Home() {
                   )}
 
                   {/* Active section editors (draggable) */}
-                  {sortedSidebarSections.map((section) => (
+                  {sectionOrder.map((section) => (
                     <SidebarDraggablePanel
                       key={section.id}
                       section={section}
