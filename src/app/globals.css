@@ -341,7 +341,6 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
     gap: 0 !important;
     padding: 0 !important;
     display: block !important;
@@ -349,16 +348,17 @@
   .resume-page {
     box-shadow: none !important;
     border-radius: 0 !important;
-    overflow: visible !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: auto !important;
-    padding: 48px 48px 24px 48px !important;
+    /* The preview explicitly distributes content into 794 × 1123px A4 pages.
+       Do not turn those pages back into auto-height blocks for the browser's
+       second pagination pass, or the export no longer matches the preview. */
+    box-sizing: border-box !important;
+    overflow: hidden !important;
     margin: 0 !important;
+    break-after: page;
     page-break-after: always;
   }
   .resume-page:last-child {
+    break-after: auto;
     page-break-after: auto;
   }
   [data-page-section] {
@@ -384,7 +384,7 @@
     -webkit-column-break-inside: avoid !important;
   }
   @page {
-    size: A4;
+    size: 794px 1123px;
     margin: 0;
   }
 }

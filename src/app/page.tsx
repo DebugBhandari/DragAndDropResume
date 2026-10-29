@@ -1914,16 +1914,13 @@ export default function Home() {
       .resume-page {
         box-shadow: none !important;
         border-radius: 0 !important;
-        overflow: visible !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        min-height: auto !important;
-        padding: 48px 48px 24px 48px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
         margin: 0 !important;
+        break-after: page;
         page-break-after: always;
       }
-      .resume-page:last-child { page-break-after: auto; }
+      .resume-page:last-child { break-after: auto; page-break-after: auto; }
       [data-page-section] { break-inside: avoid !important; page-break-inside: avoid !important; }
       [data-page-section][data-section-type="experience"],
       [data-page-section][data-section-type="projects"] {
@@ -1936,7 +1933,7 @@ export default function Home() {
         page-break-inside: avoid !important;
         -webkit-column-break-inside: avoid !important;
       }
-      @page { size: A4; margin: 0; }
+      @page { size: 794px 1123px; margin: 0; }
     </style>
   </head>
   <body>${source.outerHTML}</body>
@@ -1977,10 +1974,31 @@ export default function Home() {
   const handlePrint = useReactToPrint({
     contentRef: resumeRef,
     documentTitle: pdfTitle(),
-    // Override the global print CSS that uses position:absolute (needed for window.print()
-    // visibility trick) — in useReactToPrint's isolated iframe the content is already the
-    // only thing on the page, so static positioning is correct and prevents blank output.
-    pageStyle: "@media print { body * { visibility: visible !important; } .resume-pages { position: static !important; } }",
+    // The isolated iframe has only resumeRef, so static positioning is correct.
+    // Keep the fixed A4 cards intact: preview pagination and exported pagination
+    // must be based on the same page box.
+    pageStyle: `
+      @page { size: 794px 1123px; margin: 0; }
+      @media print {
+        html, body { margin: 0 !important; padding: 0 !important; }
+        body * { visibility: visible !important; }
+        .resume-pages { position: static !important; left: auto !important; top: auto !important; }
+        .resume-page {
+          box-sizing: border-box !important;
+          width: 794px !important;
+          min-width: 794px !important;
+          max-width: 794px !important;
+          height: 1123px !important;
+          min-height: 1123px !important;
+          max-height: 1123px !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          break-after: page;
+          page-break-after: always;
+        }
+        .resume-page:last-child { break-after: auto; page-break-after: auto; }
+      }
+    `,
     onAfterPrint: () => {
       trackExportSuccess("react_to_print");
     },
