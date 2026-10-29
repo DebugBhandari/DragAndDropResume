@@ -1824,6 +1824,41 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    const sectionData: SectionDataSnapshot = {
+      education,
+      experience,
+      projects,
+      languages,
+      skills,
+      certificates,
+      awards,
+      volunteer,
+      references,
+      interests,
+    };
+    const requiredSectionTypes: SectionType[] = ["education", "skills", "languages"];
+    const missingSectionTypes = requiredSectionTypes.filter(
+      (type) => sectionHasData(type, sectionData) && !sectionOrder.some((section) => section.type === type),
+    );
+
+    if (missingSectionTypes.length === 0) return;
+    missingSectionTypes.forEach((type) => addSectionToResume(type));
+  }, [
+    addSectionToResume,
+    awards,
+    certificates,
+    education,
+    experience,
+    interests,
+    languages,
+    projects,
+    references,
+    sectionOrder,
+    skills,
+    volunteer,
+  ]);
+
   const trackExportSuccess = useCallback((method: "react_to_print" | "window_print") => {
     trackAnalyticsEvent("pdf_export_success", {
       method,
