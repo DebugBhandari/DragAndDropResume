@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import type { ResumeImportDraft } from '@/types/resume';
 
 export const runtime = 'nodejs';
-export const maxDuration = 90;
+export const maxDuration = 240;
 
 const execFileAsync = promisify(execFile);
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     const extractedText = (await extractDocument(sourcePath, file.type, workspace)).trim().slice(0, 30_000);
     if (extractedText.length < 30) return Response.json({ message: 'No readable résumé text was found in this file.' }, { status: 422 });
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(75_000),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(210_000),
       body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b', stream: false, format: 'json', options: { temperature: 0 }, messages: [
         { role: 'system', content: 'Extract factual résumé data. Return one JSON object only. Use exactly these top-level keys: personalInfo, experience, education, skills, languages, warnings. personalInfo uses fullName, email, phone, location, linkedin, website, summary. skills and languages must be arrays of objects, never maps or strings. Never invent facts. Use empty strings or arrays for unknown values. Experience entries must have company, position, startDate, endDate, descriptionBullets. Education entries must have institution, degree, field, startDate, endDate, description. Skills use Expert, Advanced, Intermediate, or Beginner. Languages use Native, Fluent, Advanced, Intermediate, or Beginner.' },
         { role: 'user', content: extractedText },
