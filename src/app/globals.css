@@ -331,6 +331,12 @@
   .resume-pages * {
     visibility: visible;
     cursor: default !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .resume-modern-introduction {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .resume-section-action,
   .resume-draggable-section {

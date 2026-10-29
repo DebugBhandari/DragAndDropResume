@@ -799,7 +799,7 @@ function PersonalHeader({
     return (
       <div
         onClick={handleHeaderClick}
-        className="text-white -mx-12 -mt-12 mb-6 px-8 py-8 relative cursor-pointer"
+        className="resume-modern-introduction text-white -mx-12 -mt-12 mb-6 px-8 py-8 relative cursor-pointer"
         style={{
           background: s.accentColor,
           minHeight: `${headerHeightPx}px`,
@@ -1909,6 +1909,14 @@ export default function Home() {
     ${headStyles}
     <style>
       html, body { margin: 0; padding: 0; background: white; }
+      .resume-pages, .resume-pages * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .resume-modern-introduction {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       .resume-pages { display: block !important; gap: 0 !important; padding: 0 !important; }
       .resume-page {
         box-shadow: none !important;
@@ -2731,6 +2739,11 @@ export default function Home() {
       ? sequenceAfterPrimarySplit[trailingSplitIndex]
       : null;
 
+  const trailingBeforeSections =
+    trailingSplitIndex !== -1
+      ? sequenceAfterPrimarySplit.slice(0, trailingSplitIndex)
+      : [];
+
   const trailingAfterSections =
     trailingSplitIndex !== -1
       ? sequenceAfterPrimarySplit.slice(trailingSplitIndex + 1)
@@ -2758,20 +2771,13 @@ export default function Home() {
     pageSplitIndex === -1
       ? 0
       : canUseDetailSplit
-        ? (
-            hasTrailingDetailSplit
-              ? effectiveContinuationChunks.length
-              : Math.max(effectiveContinuationChunks.length, sequenceAfterPrimarySplit.length > 0 ? 1 : 0)
-          )
+        ? effectiveContinuationChunks.length + sequenceAfterPrimarySplit.length
         : effectiveLinearSectionContinuationChunks.length;
 
-  const trailingContinuationPageCount =
-    pageSplitIndex === -1 || !hasTrailingDetailSplit
-      ? 0
-      : Math.max(
-          effectiveTrailingContinuationChunks.length,
-          trailingAfterSections.length > 0 ? 1 : 0
-        );
+  // Once a detail section (Experience/Projects) spans pages, continuation
+  // sections must never be skipped while attempting to fit another detail
+  // split. Each remaining section gets a safe, dedicated continuation page.
+  const trailingContinuationPageCount = 0;
 
   const effectiveSidebarChunks =
     layout === "two-column"
@@ -3298,14 +3304,15 @@ export default function Home() {
     if (isPrimaryChunkPage) {
       const chunk = effectiveContinuationChunks[chunkIndex];
       if (!chunk) {
-        if (chunkIndex > 0) return null;
-        return afterSplit.map((sec) => (
+        const continuationSection = afterSplit[chunkIndex - effectiveContinuationChunks.length];
+        if (!continuationSection) return null;
+        return (
           <ResumeDraggableSection
-            key={sec.id}
-            section={sec}
+            key={continuationSection.id}
+            section={continuationSection}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
-        ));
+        );
       }
       const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
       const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
@@ -3328,25 +3335,6 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
-          {hasTrailingDetailSplit &&
-            trailingSplitSection &&
-            chunkIndex === effectiveContinuationChunks.length - 1 &&
-            clampedTrailingTransitionItemEnd > 0 && (
-              <ResumeProxyDraggableSection
-                section={trailingSplitSection}
-                proxyId={`${trailingSplitSection.id}-linear-transition-${chunkIndex}`}
-                experienceItems={transitionExperienceItems}
-                projectItems={transitionProjectItems}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
-            )}
-          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
-            <ResumeDraggableSection
-              key={sec.id}
-              section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
-            />
-          ))}
         </>
       );
     }
@@ -3354,9 +3342,20 @@ export default function Home() {
     if (!hasTrailingDetailSplit || !trailingSplitSection) return null;
 
     const trailingChunkIndex = chunkIndex - primaryContinuationPageCount;
-    const trailingChunk = effectiveTrailingContinuationChunks[trailingChunkIndex];
+    const hasTrailingBeforePage = trailingBeforeSections.length > 0;
+    if (hasTrailingBeforePage && trailingChunkIndex === 0) {
+      return trailingBeforeSections.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    const detailChunkIndex = trailingChunkIndex - (hasTrailingBeforePage ? 1 : 0);
+    const trailingChunk = effectiveTrailingContinuationChunks[detailChunkIndex];
     if (!trailingChunk) {
-      if (trailingChunkIndex > 0) return null;
       return trailingAfterSections.map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
@@ -3383,13 +3382,6 @@ export default function Home() {
           projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
-        {trailingChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
-          <ResumeDraggableSection
-            key={sec.id}
-            section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
-          />
-        ))}
       </>
     );
   };
@@ -3473,14 +3465,15 @@ export default function Home() {
     if (isPrimaryChunkPage) {
       const chunk = effectiveContinuationChunks[chunkIndex];
       if (!chunk) {
-        if (chunkIndex > 0) return null;
-        return afterSplit.map((sec) => (
+        const continuationSection = afterSplit[chunkIndex - effectiveContinuationChunks.length];
+        if (!continuationSection) return null;
+        return (
           <ResumeDraggableSection
-            key={sec.id}
-            section={sec}
+            key={continuationSection.id}
+            section={continuationSection}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
-        ));
+        );
       }
       const splitExperienceItems = detailSplitSectionType === "experience" ? sortedExperience.slice(chunk.start, chunk.end) : undefined;
       const splitProjectItems = detailSplitSectionType === "projects" ? sortedProjects.slice(chunk.start, chunk.end) : undefined;
@@ -3503,25 +3496,6 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
-          {hasTrailingDetailSplit &&
-            trailingSplitSection &&
-            chunkIndex === effectiveContinuationChunks.length - 1 &&
-            clampedTrailingTransitionItemEnd > 0 && (
-              <ResumeProxyDraggableSection
-                section={trailingSplitSection}
-                proxyId={`${trailingSplitSection.id}-main-transition-${chunkIndex}`}
-                experienceItems={transitionExperienceItems}
-                projectItems={transitionProjectItems}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
-            )}
-          {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
-            <ResumeDraggableSection
-              key={sec.id}
-              section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
-            />
-          ))}
         </>
       );
     }
@@ -3529,9 +3503,20 @@ export default function Home() {
     if (!hasTrailingDetailSplit || !trailingSplitSection) return null;
 
     const trailingChunkIndex = chunkIndex - primaryContinuationPageCount;
-    const trailingChunk = effectiveTrailingContinuationChunks[trailingChunkIndex];
+    const hasTrailingBeforePage = trailingBeforeSections.length > 0;
+    if (hasTrailingBeforePage && trailingChunkIndex === 0) {
+      return trailingBeforeSections.map((sec) => (
+        <ResumeDraggableSection
+          key={sec.id}
+          section={sec}
+          onPreviewInteract={() => setIsMobileEditorOpen(true)}
+        />
+      ));
+    }
+
+    const detailChunkIndex = trailingChunkIndex - (hasTrailingBeforePage ? 1 : 0);
+    const trailingChunk = effectiveTrailingContinuationChunks[detailChunkIndex];
     if (!trailingChunk) {
-      if (trailingChunkIndex > 0) return null;
       return trailingAfterSections.map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
@@ -3558,13 +3543,6 @@ export default function Home() {
           projectItems={trailingProjectItems}
           onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
-        {trailingChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
-          <ResumeDraggableSection
-            key={sec.id}
-            section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
-          />
-        ))}
       </>
     );
   };
