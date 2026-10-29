@@ -4212,7 +4212,14 @@ function ResumeImportContent() {
       const formData = new FormData();
       formData.set('file', file);
       const response = await fetch('/api/resume-import', { method: 'POST', body: formData });
-      const result = await response.json() as { draft?: ResumeImportDraft; message?: string };
+      const responseBody = await response.text();
+      let result: { draft?: ResumeImportDraft; message?: string };
+      try {
+        result = JSON.parse(responseBody) as { draft?: ResumeImportDraft; message?: string };
+      } catch {
+        const preview = responseBody.replace(/\s+/g, ' ').slice(0, 180);
+        throw new Error(`Import failed with HTTP ${response.status}. ${preview || 'The server returned a non-JSON response.'}`);
+      }
       if (!response.ok || !result.draft) throw new Error(result.message || 'Unable to import this résumé.');
       setDraft(result.draft);
       setMessage('Review the detected details, then choose what to add.');
