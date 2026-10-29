@@ -3308,6 +3308,18 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
+          {hasTrailingDetailSplit &&
+            trailingSplitSection &&
+            chunkIndex === effectiveContinuationChunks.length - 1 &&
+            clampedTrailingTransitionItemEnd > 0 && (
+              <ResumeProxyDraggableSection
+                section={trailingSplitSection}
+                proxyId={`${trailingSplitSection.id}-linear-transition-${chunkIndex}`}
+                experienceItems={transitionExperienceItems}
+                projectItems={transitionProjectItems}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            )}
           {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
             <ResumeDraggableSection
               key={sec.id}
@@ -3467,6 +3479,18 @@ export default function Home() {
             projectItems={splitProjectItems}
             onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
+          {hasTrailingDetailSplit &&
+            trailingSplitSection &&
+            chunkIndex === effectiveContinuationChunks.length - 1 &&
+            clampedTrailingTransitionItemEnd > 0 && (
+              <ResumeProxyDraggableSection
+                section={trailingSplitSection}
+                proxyId={`${trailingSplitSection.id}-main-transition-${chunkIndex}`}
+                experienceItems={transitionExperienceItems}
+                projectItems={transitionProjectItems}
+                onPreviewInteract={() => setIsMobileEditorOpen(true)}
+              />
+            )}
           {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
             <ResumeDraggableSection
               key={sec.id}
