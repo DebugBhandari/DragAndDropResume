@@ -2080,6 +2080,7 @@ export default function Home() {
   const [detailSplitItemIndex, setDetailSplitItemIndex] = useState<number | null>(null);
   const [sidebarContinuationChunks, setSidebarContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
   const [mainSectionContinuationChunks, setMainSectionContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
+  const [linearSectionContinuationChunks, setLinearSectionContinuationChunks] = useState<Array<{ start: number; end: number }>>([]);
   const [sidebarDetailSplitSectionType, setSidebarDetailSplitSectionType] = useState<"skills" | "languages" | "interests" | "experience" | "projects" | null>(null);
   const [sidebarDetailSplitSectionId, setSidebarDetailSplitSectionId] = useState<string | null>(null);
   const [sidebarDetailSplitItemIndex, setSidebarDetailSplitItemIndex] = useState<number | null>(null);
@@ -2440,6 +2441,22 @@ export default function Home() {
         }
       }
       setPageSplitIndex(splitIdx);
+      if (layout === "two-column") {
+        setLinearSectionContinuationChunks([]);
+      } else {
+        const linearSectionHeights = Array.from(sections).map((section) => {
+          const rect = section.getBoundingClientRect();
+          const styles = window.getComputedStyle(section);
+          const marginTop = Number.parseFloat(styles.marginTop || "0") || 0;
+          const marginBottom = Number.parseFloat(styles.marginBottom || "0") || 0;
+          return rect.height + marginTop + marginBottom;
+        });
+        setLinearSectionContinuationChunks(
+          splitIdx === -1
+            ? []
+            : buildChunks(linearSectionHeights, splitIdx, continuationPageContentHeight),
+        );
+      }
       if (splitIdx !== -1 && overflowMeasuredSection) {
         const overflowSection = overflowMeasuredSection;
         const overflowType = overflowSection?.dataset?.sectionType;
@@ -2725,6 +2742,15 @@ export default function Home() {
         )
       : [];
 
+  const effectiveLinearSectionContinuationChunks =
+    layout !== "two-column" && pageSplitIndex !== -1
+      ? (
+          linearSectionContinuationChunks.length > 0
+            ? linearSectionContinuationChunks
+            : [{ start: pageSplitIndex, end: sectionOrder.length }]
+        )
+      : [];
+
   const linearTrailingSections =
     detailSplitSectionIndex !== null ? sectionOrder.slice(detailSplitSectionIndex + 1) : [];
   const twoColumnTrailingSections =
@@ -2780,7 +2806,7 @@ export default function Home() {
               ? effectiveContinuationChunks.length
               : Math.max(effectiveContinuationChunks.length, sequenceAfterPrimarySplit.length > 0 ? 1 : 0)
           )
-        : 1;
+        : effectiveLinearSectionContinuationChunks.length;
 
   const trailingContinuationPageCount =
     pageSplitIndex === -1 || !hasTrailingDetailSplit
@@ -3297,8 +3323,9 @@ export default function Home() {
     if (pageSplitIndex === -1) return null;
 
     if (!canUseDetailSplit) {
-      if (chunkIndex > 0) return null;
-      return sectionOrder.slice(pageSplitIndex).map((sec) => (
+      const chunk = effectiveLinearSectionContinuationChunks[chunkIndex];
+      if (!chunk) return null;
+      return sectionOrder.slice(chunk.start, chunk.end).map((sec) => (
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
