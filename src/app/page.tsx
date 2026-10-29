@@ -2304,10 +2304,7 @@ export default function Home() {
               let transitionUsed = 0;
               while (transitionItemEnd < trailingItemHeights.length) {
                 const nextHeight = trailingItemHeights[transitionItemEnd];
-                if (
-                  transitionItemEnd > 0 &&
-                  transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems
-                ) {
+                if (transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems) {
                   break;
                 }
                 transitionUsed += nextHeight;
@@ -2506,10 +2503,7 @@ export default function Home() {
               let transitionUsed = 0;
               while (transitionItemEnd < trailingItemHeights.length) {
                 const nextHeight = trailingItemHeights[transitionItemEnd];
-                if (
-                  transitionItemEnd > 0 &&
-                  transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems
-                ) {
+                if (transitionUsed + nextHeight > availableOnPrimaryLastPageForTrailingItems) {
                   break;
                 }
                 transitionUsed += nextHeight;
