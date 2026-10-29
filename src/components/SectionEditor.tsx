@@ -6,9 +6,13 @@ import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/da
 export default function SectionEditor({ type }: { type: SectionType }) {
   const store = useResumeStore();
 
+  const preventPanelKeyboardDrag = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+  };
+
   if (type === 'education') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" onKeyDown={preventPanelKeyboardDrag}>
         {store.education.map((edu) => (
           <div key={edu.id} className="form-card">
             <button onClick={() => store.removeEducation(edu.id)} className="remove-btn">✕</button>
@@ -34,7 +38,7 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       ? store.experience
       : sortWorkExperienceByDateDesc(store.experience);
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" onKeyDown={preventPanelKeyboardDrag}>
         {experienceList.map((exp) => (
           <div key={exp.id} className="form-card group">
             <button
@@ -139,7 +143,7 @@ export default function SectionEditor({ type }: { type: SectionType }) {
       ? store.projects
       : sortProjectsByDateDesc(store.projects);
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" onKeyDown={preventPanelKeyboardDrag}>
         {projectList.map((proj) => (
           <div key={proj.id} className="form-card group">
             <button
