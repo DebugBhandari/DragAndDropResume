@@ -10,10 +10,8 @@ export type LastImportTiming = {
   fileSizeBytes: number;
   timingsMs: {
     uploadWrite: number;
-    pdfTextExtraction: number;
-    pdfRasterization: number;
-    tesseract: number;
-    deterministicDraft: number;
+    doclingConversion: number;
+    markdownParsing: number;
     ollama: number;
     photoExtraction: number;
     total: number;

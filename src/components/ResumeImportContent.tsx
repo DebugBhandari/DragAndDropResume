@@ -107,17 +107,17 @@ export default function ResumeImportContent() {
             appliedItemsRef.current.personalInfo = personalInfoKey;
           }
           if (update.source === 'extracted') {
-            setMessage('Quick preview is ready. Detected personal details are already in your résumé preview while AI cleanup continues…');
-            setProgressUpdates((current) => [...current, 'Quick preview is ready — detected personal details were added to the preview.'].slice(-6));
+            setMessage('PDF extract is ready. Detected personal details are already in your résumé preview while AI continues…');
+            setProgressUpdates((current) => [...current, 'PDF extract is ready — detected personal details were added to the preview.'].slice(-6));
             setIsAiRefining(true);
           }
           if (update.source === 'ai-partial') {
-            setMessage('PDF/Tesseract extraction is ready to use now. Ollama is preparing an enhanced alternative in the background.');
+            setMessage('PDF extract is ready to use now. Ollama is preparing the PDF extract + AI alternative in the background.');
             setIsAiRefining(true);
           }
           if (update.source === 'ai') {
-            setMessage('Ollama cleanup is complete. Choose PDF/Tesseract extraction only or PDF/Tesseract + Ollama before applying selected details.');
-            setProgressUpdates((current) => [...current, 'Ollama cleanup is complete — both import options are ready.'].slice(-6));
+            setMessage('AI extraction is complete. Choose PDF extract or PDF extract + AI before applying selected details.');
+            setProgressUpdates((current) => [...current, 'AI extraction is complete — both import options are ready.'].slice(-6));
             setIsAiRefining(false);
           }
         }
@@ -191,7 +191,7 @@ export default function ResumeImportContent() {
     }
     applyImportDraft(nextDraft, nextSelection);
     setAppliedCount((count) => count + 1);
-    setMessage(isAiRefining ? 'Selected PDF/Tesseract details added. Ollama cleanup continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF/Tesseract + Ollama' : 'PDF/Tesseract'} details were added to your résumé.`);
+    setMessage(isAiRefining ? 'Selected PDF extract details added. Ollama continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details were added to your résumé.`);
     setProgressUpdates((current) => [...current, 'Selected new details added.'].slice(-6));
   }
 
@@ -212,11 +212,11 @@ export default function ResumeImportContent() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em]">Private AI import</p>
-          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. Option 1 uses fast PDF/Tesseract text only; Option 2 adds the PDF profile image and Ollama enrichment when ready. Files are deleted after extraction.</p>
+          <p className="mt-1 text-xs opacity-75">Import a PDF. Option 1 converts it to Markdown with Docling and parses it locally; Option 2 enriches the same extract with Ollama. Files are deleted after extraction.</p>
         </div>
         <label className={`resume-import-button shrink-0 ${status === 'uploading' ? 'pointer-events-none opacity-60' : ''}`}>
           {status === 'uploading' ? 'Importing…' : 'Import résumé'}
-          <input type="file" accept="application/pdf,image/png,image/jpeg" className="sr-only" onChange={handleImport} disabled={status === 'uploading'} />
+          <input type="file" accept="application/pdf" className="sr-only" onChange={handleImport} disabled={status === 'uploading'} />
         </label>
       </div>
       {message && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
@@ -224,7 +224,7 @@ export default function ResumeImportContent() {
         <div className="resume-import-status mt-3 p-3 text-xs">
           <div className="resume-import-status-title flex items-center gap-2 font-semibold">
             <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
-            {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF/Tesseract draft available — Ollama cleanup continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
+            {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
           </div>
           {draft?.personalInfo.fullName && <p className="mt-1 opacity-80">Detected résumé: <strong>{draft.personalInfo.fullName}</strong>. The remaining details are loading now.</p>}
           <ol className="resume-import-status-list mt-2 space-y-1">
@@ -234,15 +234,15 @@ export default function ResumeImportContent() {
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="resume-import-refining-note text-xs">The fast PDF/Tesseract draft is selected and ready to apply now. Detected personal details already appear in the preview while Ollama prepares its enhanced alternative.</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">The PDF extract is selected and ready to apply now. Detected personal details already appear in the preview while Ollama prepares the PDF extract + AI alternative.</p>}
           {enhancedDraft && isEnhancedDraftReady && (
             <div className="resume-import-source-picker" role="group" aria-label="Choose import data source">
               <p className="text-xs font-semibold">Choose the data to review and apply</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF/Tesseract extraction</button>
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF/Tesseract + image + Ollama</button>
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
               </div>
-              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using extracted text with the PDF profile image and Ollama’s structured work and project details.' : 'Using only the fast PDF text extraction or Tesseract OCR result — no LLM parsing or profile image.'}</p>
+              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the Docling PDF extract with local Ollama’s structured work and project details, plus a PDF profile-image candidate when found.' : 'Using only the Docling PDF-to-Markdown extract and local TypeScript parser — no LLM parsing or profile image.'}</p>
             </div>
           )}
           {draft.photoDataUrl && (
@@ -259,7 +259,7 @@ export default function ResumeImportContent() {
           ))}
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected {selectedDraftSource === 'enhanced' ? 'PDF + image + Ollama' : 'PDF/Tesseract'} data{appliedCount ? ' again' : ''}</button>
+            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected {selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} data{appliedCount ? ' again' : ''}</button>
             <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setExtractedDraft(null); setEnhancedDraft(null); setIsEnhancedDraftReady(false); setSelectedDraftSource('extracted'); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>

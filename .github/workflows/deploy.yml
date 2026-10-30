@@ -133,6 +133,15 @@ jobs:
             apt-get install -y nginx
           fi
 
+          DOCLING_VENV=/opt/drag-and-drop-resume-docling
+          if [ ! -x "$DOCLING_VENV/bin/docling" ]; then
+            apt-get update
+            apt-get install -y python3-venv
+            python3 -m venv "$DOCLING_VENV"
+            "$DOCLING_VENV/bin/pip" install --upgrade pip
+            "$DOCLING_VENV/bin/pip" install 'docling>=2.0,<3.0'
+          fi
+
           mkdir -p "$APP_DIR"
           rm -rf "$APP_DIR/.next" "$APP_DIR/public"
           tar -xzf "/tmp/${SERVICE_NAME}-release.tgz" -C "$APP_DIR"
@@ -155,6 +164,7 @@ jobs:
           Environment=NODE_ENV=production
           Environment=OLLAMA_BASE_URL=http://127.0.0.1:11434
           Environment=OLLAMA_RESUME_MODEL=qwen2.5:3b
+          Environment=DOCLING_BIN=/opt/drag-and-drop-resume-docling/bin/docling
           Environment=EXPORT_ANALYTICS_DATABASE_URL=${EXPORT_ANALYTICS_DATABASE_URL}
           Environment=FEEDBACK_SMTP_HOST=${FEEDBACK_SMTP_HOST}
           Environment=FEEDBACK_SMTP_PORT=${FEEDBACK_SMTP_PORT}

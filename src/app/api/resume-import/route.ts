@@ -12,9 +12,9 @@ export const maxDuration = 300;
 const execFileAsync = promisify(execFile);
 const encoder = new TextEncoder();
 const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_PDF_PAGES = 3;
 const MAX_IMPORTED_PHOTO_BYTES = 1_000_000;
-const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const ALLOWED_TYPES = new Set(['application/pdf']);
+const DOCLING_BIN = process.env.DOCLING_BIN ?? 'docling';
 let aiRefinementInFlight = false;
 
 type ImportEvent =
@@ -245,7 +245,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   draft.education = parseEducation([...sections.education, ...lines.filter((line) => QUALIFICATION_PATTERN.test(line))]);
   draft.experience = parseExperience(sections.experience);
   draft.projects = parseProjects(sections.projects);
-  draft.warnings.push('Fast extraction uses PDF/Tesseract text, headings, and subheadings. Review titles and dates before exporting; Ollama can provide a second, enhanced option.');
+  draft.warnings.push('PDF extract uses Docling Markdown, headings, and section detection. Review titles and dates before exporting; AI can provide a second, enhanced option.');
   return draft;
 }
 function compactTextForAi(rawText: string) {
@@ -430,45 +430,39 @@ async function extractEmbeddedProfilePhoto(pdfPath: string, workspace: string) {
   const imagePath = join(workspace, fileName); const info = await stat(imagePath);
   return info.size > 0 && info.size <= MAX_IMPORTED_PHOTO_BYTES ? `data:image/png;base64,${(await readFile(imagePath)).toString('base64')}` : '';
 }
-async function ocrImage(path: string, timings: LastImportTiming['timingsMs']) {
+async function extractDoclingMarkdown(pdfPath: string, workspace: string, progress: (message: string) => void, timings: LastImportTiming['timingsMs']) {
+  const outputDirectory = join(workspace, 'docling');
+  await mkdir(outputDirectory, { recursive: true });
+  progress('Converting the PDF to structured Markdown with Docling…');
   const startedAt = performance.now();
   try {
-    const { stdout } = await execFileAsync('tesseract', [path, 'stdout', '--oem', '1', '--psm', '3', '-l', 'eng'], { timeout: 60_000, maxBuffer: 2_000_000 });
-    return stdout;
+    await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--no-ocr', pdfPath], { timeout: 120_000, maxBuffer: 2_000_000 });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Docling could not convert this PDF.';
+    throw new Error(`Docling PDF extraction failed. ${detail}`);
   } finally {
-    timings.tesseract += Math.round(performance.now() - startedAt);
+    timings.doclingConversion = Math.round(performance.now() - startedAt);
   }
-}
-async function extractDocument(path: string, type: string, workspace: string, progress: (message: string) => void, timings: LastImportTiming['timingsMs']) {
-  if (type !== 'application/pdf') { progress('Scanning the image with OCR…'); return ocrImage(path, timings); }
-  progress('Extracting text from the PDF…');
-  const textStartedAt = performance.now();
-  const { stdout } = await execFileAsync('pdftotext', ['-layout', path, '-'], { timeout: 30_000, maxBuffer: 2_000_000 });
-  timings.pdfTextExtraction = Math.round(performance.now() - textStartedAt);
-  if (stdout.replace(/\s/g, '').length >= 100) return stdout;
-  progress('This looks like a scanned PDF. Preparing OCR…');
-  const prefix = join(workspace, 'page');
-  const rasterStartedAt = performance.now();
-  await execFileAsync('pdftoppm', ['-png', '-r', '150', '-f', '1', '-l', String(MAX_PDF_PAGES), path, prefix], { timeout: 60_000 });
-  timings.pdfRasterization = Math.round(performance.now() - rasterStartedAt);
-  const pages: string[] = [];
-  for (let index = 1; index <= MAX_PDF_PAGES; index += 1) {
-    progress(`Reading scanned page ${index} of ${MAX_PDF_PAGES}…`);
-    try { const page = await ocrImage(`${prefix}-${index}.png`, timings); if (page.trim()) pages.push(page); if (pages.join('').replace(/\s/g, '').length >= 1_500) break; } catch { /* Continue with the remaining pages. */ }
+  const markdownPath = join(outputDirectory, 'source.md');
+  try {
+    return await readFile(markdownPath, 'utf8');
+  } catch {
+    const files = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
+    if (!files[0]) throw new Error('Docling did not produce Markdown for this PDF.');
+    return readFile(join(outputDirectory, files[0]), 'utf8');
   }
-  return pages.join('\n\n--- Page break ---\n\n');
 }
 
 export async function POST(request: Request) {
   let formData: FormData;
-  try { formData = await request.formData(); } catch { return Response.json({ message: 'Upload a PDF, PNG, or JPEG file.' }, { status: 400 }); }
+  try { formData = await request.formData(); } catch { return Response.json({ message: 'Upload a PDF file.' }, { status: 400 }); }
   const file = formData.get('file');
-  if (!(file instanceof File) || !ALLOWED_TYPES.has(file.type) || file.size === 0 || file.size > MAX_BYTES) return Response.json({ message: 'Upload a PDF, PNG, or JPEG no larger than 10 MB.' }, { status: 400 });
+  if (!(file instanceof File) || !ALLOWED_TYPES.has(file.type) || file.size === 0 || file.size > MAX_BYTES) return Response.json({ message: 'Upload a PDF no larger than 10 MB.' }, { status: 400 });
   const stream = new ReadableStream({
     async start(controller) {
       const emit = (event: ImportEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       const startedAt = performance.now();
-      const timings: LastImportTiming['timingsMs'] = { uploadWrite: 0, pdfTextExtraction: 0, pdfRasterization: 0, tesseract: 0, deterministicDraft: 0, ollama: 0, photoExtraction: 0, total: 0 };
+      const timings: LastImportTiming['timingsMs'] = { uploadWrite: 0, doclingConversion: 0, markdownParsing: 0, ollama: 0, photoExtraction: 0, total: 0 };
       const timing: LastImportTiming = { startedAt: new Date().toISOString(), status: 'running', fileType: file.type, fileSizeBytes: file.size, timingsMs: timings };
       const saveTiming = async (status: LastImportTiming['status'], error?: string) => {
         timings.total = Math.round(performance.now() - startedAt);
@@ -482,22 +476,19 @@ export async function POST(request: Request) {
         await saveTiming('running');
         emit({ type: 'progress', message: 'Saving your file securely for processing…' });
         workspace = await mkdtemp(join(tmpdir(), 'resume-import-')); await mkdir(workspace, { recursive: true });
-        const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg';
-        const sourcePath = join(workspace, `source.${extension}`); const uploadStartedAt = performance.now(); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer())); timings.uploadWrite = Math.round(performance.now() - uploadStartedAt);
-        const extractedText = (await extractDocument(sourcePath, file.type, workspace, (message) => emit({ type: 'progress', message }), timings)).trim();
-        if (extractedText.length < 30) throw new Error('No readable résumé text was found in this file.');
-        emit({ type: 'progress', message: 'Building a quick preview from the extracted text…' });
-        const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.deterministicDraft = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
-        const photoPromise = file.type === 'application/pdf'
-          ? (async () => {
-            const photoStartedAt = performance.now();
-            try { return await extractEmbeddedProfilePhoto(sourcePath, workspace); }
-            catch { return ''; }
-            finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
-          })()
-          : Promise.resolve('');
-        if (file.type === 'application/pdf') emit({ type: 'progress', message: 'Fast PDF/Tesseract draft is ready. Extracting the PDF profile image while Ollama works…' });
-        emit({ type: 'progress', message: 'Fast PDF/Tesseract draft is ready to use. Reading résumé records with local AI in the background…' });
+        const sourcePath = join(workspace, 'source.pdf'); const uploadStartedAt = performance.now(); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer())); timings.uploadWrite = Math.round(performance.now() - uploadStartedAt);
+        const extractedText = (await extractDoclingMarkdown(sourcePath, workspace, (message) => emit({ type: 'progress', message }), timings)).trim();
+        if (extractedText.length < 30) throw new Error('Docling could not find readable résumé content in this PDF.');
+        emit({ type: 'progress', message: 'Building the PDF extract from Docling Markdown…' });
+        const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.markdownParsing = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
+        const photoPromise = (async () => {
+          const photoStartedAt = performance.now();
+          try { return await extractEmbeddedProfilePhoto(sourcePath, workspace); }
+          catch { return ''; }
+          finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
+        })();
+        emit({ type: 'progress', message: 'PDF extract is ready. Checking for a PDF profile image while Ollama prepares PDF extract + AI…' });
+        emit({ type: 'progress', message: 'PDF extract is ready to use. Reading the Docling Markdown with local AI in the background…' });
         let streamedRecords = 0;
         const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
           if (!applyStreamRecord(draft, record)) return false;
@@ -513,9 +504,9 @@ export async function POST(request: Request) {
           const photoDataUrl = await photoPromise;
           if (photoDataUrl) draft = { ...draft, photoDataUrl };
           emit({ type: 'draft', draft, source: 'ai' });
-          emit({ type: 'complete', message: `Ollama cleanup is complete. Option 2 is ready with ${photoDataUrl ? 'the PDF profile image and ' : ''}${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'}.` });
+          emit({ type: 'complete', message: `PDF extract + AI is complete. Option 2 is ready with ${photoDataUrl ? 'the PDF profile image and ' : ''}${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'}.` });
         }
-        catch (error) { await photoPromise; const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The fast PDF/Tesseract extraction remains available to review.` }); emit({ type: 'complete', message: 'Fast PDF/Tesseract extraction is ready to review.' }); }
+        catch (error) { await photoPromise; const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The PDF extract remains available to review.` }); emit({ type: 'complete', message: 'PDF extract is ready to review.' }); }
         finally { timings.ollama = Math.round(performance.now() - ollamaStartedAt); }
         await saveTiming('complete');
       } catch (error) {

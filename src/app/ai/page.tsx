@@ -14,7 +14,7 @@ type AiStatus = {
     status: "running" | "complete" | "failed";
     fileType: string;
     fileSizeBytes: number;
-    timingsMs: Record<"uploadWrite" | "pdfTextExtraction" | "pdfRasterization" | "tesseract" | "deterministicDraft" | "ollama" | "photoExtraction" | "total", number>;
+    timingsMs: Record<"uploadWrite" | "doclingConversion" | "markdownParsing" | "ollama" | "photoExtraction" | "total", number>;
     error?: string;
   } | null;
 };
@@ -137,10 +137,8 @@ export default function AiPage() {
               <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 {[
                   ["Upload/write", status.lastImport.timingsMs.uploadWrite],
-                  ["PDF text extraction", status.lastImport.timingsMs.pdfTextExtraction],
-                  ["PDF rasterization", status.lastImport.timingsMs.pdfRasterization],
-                  ["Tesseract OCR", status.lastImport.timingsMs.tesseract],
-                  ["Quick preview parsing", status.lastImport.timingsMs.deterministicDraft],
+                  ["Docling PDF → Markdown", status.lastImport.timingsMs.doclingConversion],
+                  ["Markdown parser", status.lastImport.timingsMs.markdownParsing],
                   ["Ollama", status.lastImport.timingsMs.ollama],
                   ["Profile photo extraction", status.lastImport.timingsMs.photoExtraction],
                   ["Total", status.lastImport.timingsMs.total],
@@ -150,7 +148,6 @@ export default function AiPage() {
                   </div>
                 ))}
               </dl>
-              {status.lastImport.timingsMs.tesseract === 0 && <p className="mt-3 text-xs opacity-60">Tesseract was not used for this import; the file had directly extractable text.</p>}
               {status.lastImport.error && <p className="ai-status ai-status-error mt-4">Last import error: {status.lastImport.error}</p>}
             </>
           )}
