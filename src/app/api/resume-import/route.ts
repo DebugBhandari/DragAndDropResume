@@ -88,15 +88,40 @@ function sectionHeading(line: string) {
   const heading = normalizeHeading(line);
   const match = (values: string[]) => values.some((value) => heading === value || heading.startsWith(value));
   if (match(['experience', 'workexperience', 'employment', 'professionalexperience', 'careersummary', 'workhistory'])) return 'experience';
-  if (match(['projects', 'projectexperience', 'selectedprojects', 'personalprojects', 'keyprojects'])) return 'projects';
+  if (match(['projects', 'projectexperience', 'selectedprojects', 'personalprojects', 'keyprojects', 'notableprojects', 'relevantprojects', 'portfolio'])) return 'projects';
   if (match(['education', 'academicbackground', 'qualifications', 'academicqualifications', 'educationandtraining'])) return 'education';
-  if (match(['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox', 'keyskills', 'skillsandtools'])) return 'skills';
+  if (match(['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox', 'keyskills', 'skillsandtools', 'itskills', 'computerskills', 'programmingskills', 'technicalproficiencies', 'skillset', 'expertise'])) return 'skills';
   if (match(['languages', 'language', 'languageskills'])) return 'languages';
   if (match(['certificates', 'certifications', 'licenses', 'licences', 'credentials', 'certificatesandcertifications'])) return 'certificates';
   if (match(['summary', 'professionalsummary', 'summaryofqualifications', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective', 'professionalobjective'])) return 'summary';
   return '';
 }
 function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
+function isSectionTerminator(line: string) { return /^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?|interests?|hobbies|volunteer(?:ing)?|awards?|publications?|additional\s+(?:information|details))\s*:?[\s]*$/i.test(line); }
+function languageProficiency(value: string) {
+  const normalized = value.toLowerCase();
+  if (/native|bilingual/.test(normalized)) return 'Native' as const;
+  if (/full professional|professional working|fluent/.test(normalized)) return 'Fluent' as const;
+  if (/advanced/.test(normalized)) return 'Advanced' as const;
+  if (/intermediate/.test(normalized)) return 'Intermediate' as const;
+  if (/beginner|elementary|limited working/.test(normalized)) return 'Beginner' as const;
+  return null;
+}
+function isProficiencyOnly(value: string) { return /^(?:native(?:\s+or\s+bilingual)?|bilingual|full professional proficiency|professional working proficiency|fluent|advanced|intermediate|beginner|elementary|limited working)(?:\s+proficiency)?$/i.test(value.trim()); }
+function parseLanguages(lines: string[]) {
+  const languages: Array<{ name: string; proficiency: 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' }> = [];
+  for (const value of splitSectionItems(lines)) {
+    const proficiency = languageProficiency(value);
+    const name = value.replace(/\s*[-–—:]\s*(native|bilingual|full professional proficiency|professional working proficiency|fluent|advanced|intermediate|beginner|elementary|limited working).*$/i, '').trim();
+    if (!name && proficiency && languages.length) { languages[languages.length - 1].proficiency = proficiency; continue; }
+    if (proficiency && isProficiencyOnly(value)) { if (languages.length) languages[languages.length - 1].proficiency = proficiency; continue; }
+    if (name.length >= 2 && name.length <= 80) languages.push({ name, proficiency: proficiency ?? 'Intermediate' });
+  }
+  return languages.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 15);
+}
+function parseCertificates(lines: string[]) {
+  return splitSectionItems(lines).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => value.length <= 180 && !/[.!?]$/.test(value)).map((name) => ({ name, issuer: '', date: '', link: '' })).filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 20);
+}
 function inlineSectionContent(line: string) {
   const match = line.match(/^(.{2,80}?)[\s:–—-]+(.{2,})$/);
   if (!match) return { section: '', content: '' };
@@ -129,6 +154,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   const sections: Record<string, string[]> = { experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], summary: [] };
   let current = '';
   for (const line of lines) {
+    if (isSectionTerminator(line)) { current = ''; continue; }
     const inline = inlineSectionContent(line);
     if (inline.section) {
       current = inline.section;
@@ -147,8 +173,8 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
   }
   draft.skills = [...new Set(splitSectionItems(sections.skills).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
-  draft.languages = [...new Set(splitSectionItems(sections.languages).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 15).map((value) => ({ name: value.replace(/\s*[-–—:]\s*(native|fluent|advanced|intermediate|beginner).*$/i, ''), proficiency: (value.match(/native|fluent|advanced|intermediate|beginner/i)?.[0] ?? 'Intermediate').replace(/^./, (letter) => letter.toUpperCase()) as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' }));
-  draft.certificates = splitSectionItems(sections.certificates).slice(0, 20).map((name) => ({ name, issuer: '', date: '', link: '' }));
+  draft.languages = parseLanguages(sections.languages);
+  draft.certificates = parseCertificates(sections.certificates);
   draft.education = parseEducation(sections.education);
   draft.warnings.push('Personal details, summary, education, skills, languages, and certificates are extracted directly from text. AI is structuring detailed work history and projects.');
   return draft;
@@ -269,7 +295,7 @@ async function streamDraftWithAi(extractedText: string, onRecord: (record: Strea
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
       body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1350 }, messages: [
-        { role: 'system', content: 'Extract only work experience and projects from this résumé. Output JSON objects only; no explanation or markdown. Experience: {company,position,startDate,endDate,descriptionBullets}. Project: {name,completionDate,technologies,link,descriptionBullets}. One object per entry in source order. Split each paragraph into 2–5 short factual bullets. Never invent or merge facts.' },
+        { role: 'system', content: 'Extract only work experience and projects. JSON objects only. Every object MUST include type: "experience" or "projects". Experience: {"type":"experience","item":{"company":"","position":"","startDate":"","endDate":"","descriptionBullets":[]}}. Project: {"type":"projects","item":{"name":"","completionDate":"","technologies":"","link":"","descriptionBullets":[]}}. One object per source entry. Use projects only for explicitly named project/portfolio entries; never classify a project as experience. Split each paragraph into 2–5 short factual bullets. Do not invent facts.' },
         { role: 'user', content: compactTextForAi(extractedText) },
       ] }),
     });
