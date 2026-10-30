@@ -117,9 +117,9 @@ function compactTextForAi(rawText: string) {
     if (line === previous) continue;
     previous = line;
     compactLines.push(line.slice(0, 500));
-    if (compactLines.join('\n').length >= 12_000) break;
+    if (compactLines.join('\n').length >= 8_000) break;
   }
-  return compactLines.join('\n').slice(0, 12_000);
+  return compactLines.join('\n').slice(0, 8_000);
 }
 type StreamRecordType = 'personalInfo' | 'experience' | 'projects' | 'education' | 'skills' | 'languages' | 'certificates' | 'warning';
 type StreamRecord = { type?: StreamRecordType; item?: unknown; message?: unknown };
@@ -183,8 +183,8 @@ async function streamDraftWithAi(extractedText: string, onRecord: (record: Strea
   try {
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
-      body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1800 }, messages: [
-        { role: 'system', content: 'Extract résumé facts exactly. Output JSON objects only, one object at a time, no prose or markdown. FIRST output exactly one {"type":"personalInfo","item":{...}} object. Its item MUST include fullName, email, phone, location, linkedin, website, and summary. Copy the entire professional summary/introduction/profile/about-me/objective text into summary, preserving factual wording; use an empty string only if no such section exists. Then output one object per experience/project/etc. Never merge separate entries, dates, employers, titles, bullets, or technologies; keep source order. Experience item: company, position, startDate, endDate, descriptionBullets. Projects item: name, completionDate, technologies, link, descriptionBullets. For every experience/project, split paragraph text into detailed factual action/result bullets: one sentence or independent clause per bullet, 4–10 bullets when the source supports it, no bullet longer than 280 characters. Education item: institution, degree, field, startDate, endDate, description. Skills item: name, level. Languages item: name, proficiency. Certificates item: name, issuer, date, link. Never invent facts.' },
+      body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1350 }, messages: [
+        { role: 'system', content: 'Extract only résumé facts. Output JSON objects only. First: {"type":"personalInfo","item":{"fullName":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":""}}. Put the source profile/summary/introduction/objective in summary. Then one object per item: experience {company,position,startDate,endDate,descriptionBullets}; projects {name,completionDate,technologies,link,descriptionBullets}; education {institution,degree,field,startDate,endDate,description}; skills {name,level}; languages {name,proficiency}; certificates {name,issuer,date,link}. Keep source order. Split work/project paragraphs into 3–6 short factual bullets when supported. Do not invent or merge facts.' },
         { role: 'user', content: compactTextForAi(extractedText) },
       ] }),
     });
@@ -269,14 +269,6 @@ export async function POST(request: Request) {
         const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg';
         const sourcePath = join(workspace, `source.${extension}`); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
         logStage('upload write');
-        const photoPromise = file.type === 'application/pdf'
-          ? (() => {
-            emit({ type: 'progress', message: 'Looking for an embedded profile photo while text is extracted…' });
-            return extractEmbeddedProfilePhoto(sourcePath, workspace)
-              .then((photo) => { logStage('photo extraction'); emit({ type: 'progress', message: photo ? 'Profile photo downloaded and ready to review.' : 'No embedded profile photo was found.' }); return photo; })
-              .catch(() => { logStage('photo extraction unavailable'); emit({ type: 'progress', message: 'Profile photo could not be extracted; continuing with text import.' }); return ''; });
-          })()
-          : Promise.resolve('');
         const extractedText = (await extractDocument(sourcePath, file.type, workspace, (message) => emit({ type: 'progress', message }))).trim();
         logStage('text extraction');
         if (extractedText.length < 30) throw new Error('No readable résumé text was found in this file.');
@@ -291,11 +283,6 @@ export async function POST(request: Request) {
           emit({ type: 'progress', message: `Detected ${label}${record.type === 'personalInfo' ? '' : ` ${streamedRecords}`}…` });
           emit({ type: 'draft', draft: { ...draft }, source: 'ai-partial' });
         });
-        const photoUpdatePromise = photoPromise.then((photoDataUrl) => {
-          if (!photoDataUrl) return;
-          draft = { ...draft, photoDataUrl };
-          emit({ type: 'draft', draft, source: 'photo' });
-        });
         try {
           await aiDraftPromise;
           logStage('AI normalization and sanitization');
@@ -303,7 +290,21 @@ export async function POST(request: Request) {
           emit({ type: 'complete', message: `AI cleanup is complete. ${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'} arrived progressively for review.` });
         }
         catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
-        await photoUpdatePromise;
+        if (file.type === 'application/pdf') {
+          emit({ type: 'progress', message: 'Text import is complete. Looking for an embedded profile photo…' });
+          try {
+            const photoDataUrl = await extractEmbeddedProfilePhoto(sourcePath, workspace);
+            logStage('photo extraction');
+            if (photoDataUrl) {
+              draft = { ...draft, photoDataUrl };
+              emit({ type: 'progress', message: 'Profile photo downloaded and ready to review.' });
+              emit({ type: 'draft', draft, source: 'photo' });
+            } else emit({ type: 'progress', message: 'No embedded profile photo was found.' });
+          } catch {
+            logStage('photo extraction unavailable');
+            emit({ type: 'progress', message: 'Profile photo could not be extracted.' });
+          }
+        }
       } catch (error) { emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to import this résumé right now.' }); }
       finally { if (workspace) await rm(workspace, { recursive: true, force: true }); logStage('complete'); controller.close(); }
     },
