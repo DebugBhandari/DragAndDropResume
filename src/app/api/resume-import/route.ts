@@ -100,7 +100,31 @@ function sectionHeading(line: string) {
 function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
 const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
 const WORK_TITLE_PATTERN = /\b(?:engineer(?:ing)?|developer|intern(?:ship)?|cashier|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|attendant|clerk|salesperson|bartender|barista|waiter|waitress|chef|cook|driver|mechanic|nurse|accountant|recruiter|marketer|editor|writer|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
+const QUALIFICATION_PATTERN = /\b(?:b\.?\s?(?:sc|a|eng|tech|com)|m\.?\s?(?:sc|a|eng|tech|com)|ph\.?d|mba|diploma|associate(?:'s)?|bachelor(?:'s)?|master(?:'s)?|doctorate|postgraduate|undergraduate|higher\s+national\s+diploma|qualification)\b/i;
+const DATE_RANGE_PATTERN = /((?:19|20)\d{2}|present|current)\s*(?:[-–—]|to)\s*((?:19|20)\d{2}|present|current)/i;
 const TECHNICAL_SKILLS = ['AWS', 'Azure', 'C#', 'C++', 'CSS', 'Docker', 'Figma', 'Firebase', 'Git', 'GitHub', 'GraphQL', 'HTML', 'Java', 'JavaScript', 'Jenkins', 'Kotlin', 'Kubernetes', 'MongoDB', 'MySQL', 'Next.js', 'Node.js', 'OpenAI', 'PHP', 'PostgreSQL', 'Python', 'React', 'Redux', 'Ruby', 'Rust', 'SQL', 'Swift', 'Tailwind CSS', 'TensorFlow', 'TypeScript', 'Vue.js'];
+function isBulletLine(value: string) { return /^[•·▪◦*\-–—]\s+/.test(value.trim()); }
+function isTitleLike(value: string) {
+  const line = value.trim();
+  const words = line.split(/\s+/).filter(Boolean);
+  return line.length >= 2 && line.length <= 160 && words.length <= 18 && !isBulletLine(line) && !/[.!?]$/.test(line) && !/^https?:\/\//i.test(line);
+}
+function isSubheading(value: string) {
+  if (!isTitleLike(value)) return false;
+  if (/[|]|\s+[–—]\s+|\s+-\s+/.test(value)) return true;
+  const words = value.match(/[A-Za-z][A-Za-z'.-]*/g) ?? [];
+  if (!words.length || words.length > 12) return false;
+  const titleWords = words.filter((word) => /^(?:[A-Z]{2,}|[A-Z][a-z]|[A-Z][A-Z'.-]*)$/.test(word));
+  return titleWords.length / words.length >= 0.6;
+}
+function dateRange(value: string) {
+  const match = value.match(DATE_RANGE_PATTERN);
+  return { startDate: match?.[1] ?? '', endDate: match?.[2] ?? '' };
+}
+function descriptionLines(lines: string[]) {
+  return lines.filter((line) => isBulletLine(line) || (!isTitleLike(line) && line.length >= 20)).map((line) => line.replace(/^[•·▪◦*\-–—]\s*/, '').trim()).filter(Boolean).slice(0, 8);
+}
+function titleParts(value: string) { return value.split(/\s*[|]\s*|\s+[–—]\s+|\s+-\s+/).map((part) => part.trim()).filter(Boolean); }
 function languageProficiency(value: string) {
   const normalized = value.toLowerCase();
   if (/native|bilingual/.test(normalized)) return 'Native' as const;
@@ -124,7 +148,7 @@ function parseLanguages(lines: string[]) {
 }
 function parseCertificates(lines: string[]) {
   const provider = (name: string) => /\baws\b/i.test(name) ? 'Amazon Web Services (AWS)' : /\bkaggle\b/i.test(name) ? 'Kaggle' : /\bgoogle\b/i.test(name) ? 'Google' : /\bmicrosoft\b/i.test(name) ? 'Microsoft' : /\bcoursera\b/i.test(name) ? 'Coursera' : '';
-  return splitSectionItems(lines).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => value.length <= 180 && !/[.!?]$/.test(value) && !WORK_TITLE_PATTERN.test(value)).map((value) => {
+  return lines.map((line) => line.trim()).filter(isSubheading).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => !WORK_TITLE_PATTERN.test(value) && !QUALIFICATION_PATTERN.test(value)).map((value) => {
     const date = value.match(/\(([^)]*(?:19|20)\d{2}[^)]*)\)/)?.[1] ?? '';
     const withoutDate = value.replace(/\s*\([^)]*(?:19|20)\d{2}[^)]*\)\s*/, '').trim();
     const issuerMatch = withoutDate.match(/^(.*?)\s+(?:[-–—|]|by|from)\s+(.+)$/i);
@@ -139,16 +163,46 @@ function inlineSectionContent(line: string) {
 }
 function parseEducation(lines: string[]) {
   const entries: Array<{ institution: string; degree: string; field: string; startDate: string; endDate: string; description: string }> = [];
-  for (const line of lines) {
-    const parts = line.split(/[|•·▪◦]/).map((value) => value.trim()).filter(Boolean);
-    const dateMatch = line.match(/((?:19|20)\d{2}|present|current)\s*(?:[-–—]|to)\s*((?:19|20)\d{2}|present|current)/i);
-    const withoutDates = line.replace(dateMatch?.[0] ?? '', '').replace(/\s{2,}/g, ' ').trim();
-    const degree = parts.find((value) => /\b(b\.?\s?(?:sc|a|eng)|m\.?\s?(?:sc|a|ba)|ph\.?d|mba|diploma|certificate|associate|bachelor|master)\b/i.test(value)) ?? '';
-    const institution = parts.find((value) => value !== degree && /\b(university|college|school|institute|academy|polytechnic)\b/i.test(value)) ?? parts.find((value) => value !== degree) ?? '';
-    if (!institution && !degree) continue;
-    entries.push({ institution, degree, field: '', startDate: dateMatch?.[1] ?? '', endDate: dateMatch?.[2] ?? '', description: withoutDates === institution || withoutDates === degree ? '' : withoutDates });
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!QUALIFICATION_PATTERN.test(line)) continue;
+    const context = [lines[index - 1], line, lines[index + 1]].filter(Boolean).map((value) => value.trim()).filter((value) => isTitleLike(value) || DATE_RANGE_PATTERN.test(value));
+    const combined = context.join(' | ');
+    const parts = titleParts(combined);
+    const degree = parts.find((value) => QUALIFICATION_PATTERN.test(value)) ?? line;
+    const institution = parts.find((value) => value !== degree && /\b(university|college|school|institute|academy|polytechnic)\b/i.test(value)) ?? parts.find((value) => value !== degree && !DATE_RANGE_PATTERN.test(value)) ?? '';
+    const dates = dateRange(combined);
+    entries.push({ institution, degree, field: '', ...dates, description: '' });
   }
-  return entries.slice(0, 10);
+  return entries.filter((item, index, items) => items.findIndex((candidate) => `${candidate.institution}|${candidate.degree}`.toLowerCase() === `${item.institution}|${item.degree}`.toLowerCase()) === index).slice(0, 10);
+}
+function parseExperience(lines: string[]) {
+  const entries: Array<{ company: string; position: string; startDate: string; endDate: string; description: string; descriptionBullets: string[] }> = [];
+  const roleIndexes = lines.map((line, index) => isSubheading(line) && WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
+  for (let roleIndex = 0; roleIndex < roleIndexes.length; roleIndex += 1) {
+    const start = roleIndexes[roleIndex]; const end = roleIndexes[roleIndex + 1] ?? lines.length;
+    const titleLine = lines[start]; const parts = titleParts(titleLine); const position = parts.find((part) => WORK_TITLE_PATTERN.test(part)) ?? titleLine;
+    const before = lines.slice(Math.max(0, start - 2), start).reverse().find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
+    const after = lines.slice(start + 1, Math.min(end, start + 3)).find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
+    const company = parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? before ?? after ?? '';
+    const dates = dateRange(lines.slice(start, end).join(' '));
+    const bullets = descriptionLines(lines.slice(start + 1, end));
+    entries.push({ company, position, ...dates, description: '', descriptionBullets: bullets.filter((line) => line.length > 2) });
+  }
+  return entries.filter((item, index, items) => item.position && items.findIndex((candidate) => `${candidate.company}|${candidate.position}|${candidate.startDate}`.toLowerCase() === `${item.company}|${item.position}|${item.startDate}`.toLowerCase()) === index).slice(0, 12);
+}
+function parseProjects(lines: string[]) {
+  const entries: Array<{ name: string; description: string; descriptionBullets: string[]; completionDate: string; technologies: string; link: string }> = [];
+  const titleIndexes = lines.map((line, index) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line) && !/^(?:technologies|tech(?:nology)? stack|tools|features|responsibilities|achievements?)[:\s]*$/i.test(line) ? index : -1).filter((index) => index >= 0);
+  for (let titleIndex = 0; titleIndex < titleIndexes.length; titleIndex += 1) {
+    const start = titleIndexes[titleIndex]; const end = titleIndexes[titleIndex + 1] ?? lines.length;
+    const name = lines[start].trim(); const block = lines.slice(start + 1, end); const bullets = descriptionLines(block);
+    const source = block.join(' '); const dates = dateRange(source); const link = source.match(/https?:\/\/[^\s|]+/i)?.[0] ?? '';
+    const technologies = block.find((line) => /^(?:technologies|tech(?:nology)? stack|tools)\s*:/i.test(line))?.replace(/^(?:technologies|tech(?:nology)? stack|tools)\s*:/i, '').trim() ?? '';
+    if (!bullets.length && !technologies && !link && !dates.startDate && !dates.endDate) continue;
+    entries.push({ name, description: '', descriptionBullets: bullets, completionDate: dates.endDate || dates.startDate, technologies, link });
+  }
+  return entries.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 12);
 }
 function inferTechnicalSkills(rawText: string) {
   const found = TECHNICAL_SKILLS.filter((skill) => new RegExp(`(^|[^a-z0-9])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9])`, 'i').test(rawText));
@@ -188,8 +242,10 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   if (!draft.skills.length) draft.skills = inferTechnicalSkills(rawText).slice(0, 40);
   draft.languages = parseLanguages(sections.languages);
   draft.certificates = parseCertificates(sections.certificates);
-  draft.education = parseEducation(sections.education);
-  draft.warnings.push('Personal details, summary, education, skills, languages, and certificates are extracted directly from text. AI is structuring detailed work history and projects.');
+  draft.education = parseEducation([...sections.education, ...lines.filter((line) => QUALIFICATION_PATTERN.test(line))]);
+  draft.experience = parseExperience(sections.experience);
+  draft.projects = parseProjects(sections.projects);
+  draft.warnings.push('Fast extraction uses PDF/Tesseract text, headings, and subheadings. Review titles and dates before exporting; Ollama can provide a second, enhanced option.');
   return draft;
 }
 function compactTextForAi(rawText: string) {
