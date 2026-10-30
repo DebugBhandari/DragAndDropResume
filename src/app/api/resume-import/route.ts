@@ -33,7 +33,7 @@ function splitDescriptionIntoBullets(values: unknown[], description: unknown) {
     if (!cleaned) return [];
     const sentences = cleaned.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).flatMap((sentence) => sentence.split(/\s*;\s*/));
     return sentences.map((sentence) => sentence.trim()).filter(Boolean);
-  }).filter((bullet, index, bullets) => bullet.length >= 3 && bullets.indexOf(bullet) === index).slice(0, 12).map((bullet) => bullet.slice(0, 360));
+  }).filter((bullet, index, bullets) => bullet.length >= 3 && bullets.indexOf(bullet) === index).map((bullet) => bullet.slice(0, 360));
 }
 function descriptionValues(row: Record<string, unknown>) { return [...array(row.descriptionBullets), ...array(row.bullets), ...array(row.highlights), ...array(row.responsibilities), ...array(row.achievements)]; }
 function textList(value: unknown, max = 400) { return Array.isArray(value) ? value.map((item) => text(item, 100)).filter(Boolean).join(', ').slice(0, max) : text(value, max); }
@@ -98,6 +98,9 @@ function sectionHeading(line: string) {
 }
 function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
 function isSectionTerminator(line: string) { return /^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?|interests?|hobbies|volunteer(?:ing)?|awards?|publications?|additional\s+(?:information|details))\s*:?[\s]*$/i.test(line); }
+const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
+const WORK_TITLE_PATTERN = /\b(?:engineer|developer|intern|cashier|architect|designer|manager|director|consultant|analyst|administrator|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
+const TECHNICAL_SKILLS = ['AWS', 'Azure', 'C#', 'C++', 'CSS', 'Docker', 'Figma', 'Firebase', 'Git', 'GitHub', 'GraphQL', 'HTML', 'Java', 'JavaScript', 'Jenkins', 'Kotlin', 'Kubernetes', 'MongoDB', 'MySQL', 'Next.js', 'Node.js', 'OpenAI', 'PHP', 'PostgreSQL', 'Python', 'React', 'Redux', 'Ruby', 'Rust', 'SQL', 'Swift', 'Tailwind CSS', 'TensorFlow', 'TypeScript', 'Vue.js'];
 function languageProficiency(value: string) {
   const normalized = value.toLowerCase();
   if (/native|bilingual/.test(normalized)) return 'Native' as const;
@@ -115,12 +118,18 @@ function parseLanguages(lines: string[]) {
     const name = value.replace(/\s*[-–—:]\s*(native|bilingual|full professional proficiency|professional working proficiency|fluent|advanced|intermediate|beginner|elementary|limited working).*$/i, '').trim();
     if (!name && proficiency && languages.length) { languages[languages.length - 1].proficiency = proficiency; continue; }
     if (proficiency && isProficiencyOnly(value)) { if (languages.length) languages[languages.length - 1].proficiency = proficiency; continue; }
-    if (name.length >= 2 && name.length <= 80) languages.push({ name, proficiency: proficiency ?? 'Intermediate' });
+    if (name.length >= 2 && name.length <= 80 && KNOWN_LANGUAGES.has(name.toLowerCase())) languages.push({ name, proficiency: proficiency ?? 'Intermediate' });
   }
   return languages.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 15);
 }
 function parseCertificates(lines: string[]) {
-  return splitSectionItems(lines).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => value.length <= 180 && !/[.!?]$/.test(value)).map((name) => ({ name, issuer: '', date: '', link: '' })).filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 20);
+  const provider = (name: string) => /\baws\b/i.test(name) ? 'Amazon Web Services (AWS)' : /\bkaggle\b/i.test(name) ? 'Kaggle' : /\bgoogle\b/i.test(name) ? 'Google' : /\bmicrosoft\b/i.test(name) ? 'Microsoft' : /\bcoursera\b/i.test(name) ? 'Coursera' : '';
+  return splitSectionItems(lines).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => value.length <= 180 && !/[.!?]$/.test(value) && !WORK_TITLE_PATTERN.test(value)).map((value) => {
+    const date = value.match(/\(([^)]*(?:19|20)\d{2}[^)]*)\)/)?.[1] ?? '';
+    const withoutDate = value.replace(/\s*\([^)]*(?:19|20)\d{2}[^)]*\)\s*/, '').trim();
+    const issuerMatch = withoutDate.match(/^(.*?)\s+(?:[-–—|]|by|from)\s+(.+)$/i);
+    return { name: (issuerMatch?.[1] ?? withoutDate).trim(), issuer: (issuerMatch?.[2] ?? provider(withoutDate)).trim(), date, link: '' };
+  }).filter((item) => item.name).filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 20);
 }
 function inlineSectionContent(line: string) {
   const match = line.match(/^(.{2,80}?)[\s:–—-]+(.{2,})$/);
@@ -140,6 +149,10 @@ function parseEducation(lines: string[]) {
     entries.push({ institution, degree, field: '', startDate: dateMatch?.[1] ?? '', endDate: dateMatch?.[2] ?? '', description: withoutDates === institution || withoutDates === degree ? '' : withoutDates });
   }
   return entries.slice(0, 10);
+}
+function inferTechnicalSkills(rawText: string) {
+  const found = TECHNICAL_SKILLS.filter((skill) => new RegExp(`(^|[^a-z0-9])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9])`, 'i').test(rawText));
+  return [...new Set(found.map((skill) => skill.replace(/^./, (letter) => letter.toUpperCase())))].map((name) => ({ name, level: 'Intermediate' as const }));
 }
 function inferDraftFromText(rawText: string): ResumeImportDraft {
   const draft = emptyDraft();
@@ -173,6 +186,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
   }
   draft.skills = [...new Set(splitSectionItems(sections.skills).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
+  if (!draft.skills.length) draft.skills = inferTechnicalSkills(rawText).slice(0, 40);
   draft.languages = parseLanguages(sections.languages);
   draft.certificates = parseCertificates(sections.certificates);
   draft.education = parseEducation(sections.education);
@@ -218,21 +232,33 @@ function inferStreamRecordType(value: Record<string, unknown>): StreamRecordType
   if ('level' in value || 'skill' in value) return 'skills';
   return undefined;
 }
+function isWorkExperienceItem(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = canonicalizeStreamItem(value) as Record<string, unknown>;
+  return WORK_TITLE_PATTERN.test([row.position, row.jobTitle, row.role, row.title, row.name, row.projectName].map((item) => text(item, 180)).join(' '));
+}
 function normalizeStreamRecord(value: unknown): StreamRecord[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   const raw = value as Record<string, unknown>;
   const row = canonicalizeStreamItem(raw) as Record<string, unknown>;
   const declaredType = text(raw.type ?? raw.section ?? raw.category, 40).toLowerCase().replace(/[^a-z]/g, '');
   const typeAliases: Record<string, StreamRecordType> = { experience: 'experience', workexperience: 'experience', workhistory: 'experience', employment: 'experience', project: 'projects', projects: 'projects', education: 'education', skill: 'skills', skills: 'skills', language: 'languages', languages: 'languages', certificate: 'certificates', certificates: 'certificates', certification: 'certificates', certifications: 'certificates' };
-  if (typeAliases[declaredType]) return [{ type: typeAliases[declaredType], item: canonicalizeStreamItem(raw.item ?? raw.data ?? raw) }];
+  if (typeAliases[declaredType]) {
+    const item = canonicalizeStreamItem(raw.item ?? raw.data ?? raw);
+    return [{ type: typeAliases[declaredType] === 'projects' && isWorkExperienceItem(item) ? 'experience' : typeAliases[declaredType], item }];
+  }
   const wrapped = streamSections.flatMap((section) => {
     const wrapperAliases = section === 'experience' ? ['experience', 'workexperience', 'workhistory', 'employment'] : section === 'projects' ? ['projects', 'project'] : section === 'certificates' ? ['certificates', 'certificate', 'certifications', 'certification'] : [section];
     const items = Object.entries(raw).find(([key]) => wrapperAliases.includes(normalizedKey(key)))?.[1];
-    return Array.isArray(items) ? items.map((item) => ({ type: section, item: canonicalizeStreamItem(item) })) : items && typeof items === 'object' ? [{ type: section, item: canonicalizeStreamItem(items) }] : [];
+    return Array.isArray(items)
+      ? items.map((item) => { const normalized = canonicalizeStreamItem(item); return { type: section === 'projects' && isWorkExperienceItem(normalized) ? 'experience' : section, item: normalized }; })
+      : items && typeof items === 'object'
+        ? (() => { const normalized = canonicalizeStreamItem(items); return [{ type: section === 'projects' && isWorkExperienceItem(normalized) ? 'experience' : section, item: normalized }]; })()
+        : [];
   });
   if (wrapped.length) return wrapped;
   const type = inferStreamRecordType(row);
-  return type ? [{ type, item: row }] : [];
+  return type ? [{ type: type === 'projects' && isWorkExperienceItem(row) ? 'experience' : type, item: row }] : [];
 }
 function recordKey(type: Exclude<StreamRecordType, 'personalInfo' | 'warning'>, item: Record<string, unknown>) {
   if (type === 'experience') return [item.company, item.position, item.startDate, item.endDate].map(String).join('|').toLowerCase();
