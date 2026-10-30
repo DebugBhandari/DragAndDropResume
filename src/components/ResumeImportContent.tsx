@@ -28,7 +28,7 @@ function itemKey(section: keyof Omit<AppliedImportItems, 'personalInfo' | 'photo
 }
 
 export default function ResumeImportContent() {
-  const { applyImportDraft } = useResumeStore();
+  const { applyImportDraft, updatePersonalInfo } = useResumeStore();
   const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
   const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
@@ -86,9 +86,17 @@ export default function ResumeImportContent() {
         if (update.type === 'draft' && update.draft) {
           receivedDraft = true;
           setDraft(update.draft);
+          const personalInfoKey = JSON.stringify(update.draft.personalInfo);
+          const populatedPersonalInfo = Object.fromEntries(
+            Object.entries(update.draft.personalInfo).filter(([, value]) => Boolean(value)),
+          );
+          if (Object.keys(populatedPersonalInfo).length && personalInfoKey !== appliedItemsRef.current.personalInfo) {
+            updatePersonalInfo(populatedPersonalInfo);
+            appliedItemsRef.current.personalInfo = personalInfoKey;
+          }
           if (update.source === 'extracted') {
-            setMessage('Quick preview is ready. AI cleanup is continuing in the background…');
-            setProgressUpdates((current) => [...current, 'Quick preview is ready to review.'].slice(-6));
+            setMessage('Quick preview is ready. Detected personal details are already in your résumé preview while AI cleanup continues…');
+            setProgressUpdates((current) => [...current, 'Quick preview is ready — detected personal details were added to the preview.'].slice(-6));
             setIsAiRefining(true);
           }
           if (update.source === 'photo') {
@@ -215,7 +223,7 @@ export default function ResumeImportContent() {
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="resume-import-refining-note text-xs">{appliedCount ? 'Previously applied details stay in your résumé. Keep selecting and applying newly detected items while AI cleanup continues.' : 'You can apply selected details now. Importing will continue, and newly detected items can be applied in later steps.'}</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">{appliedCount ? 'Previously applied details stay in your résumé. Detected personal details appear in the preview immediately; keep selecting and applying newly detected sections while AI cleanup continues.' : 'Detected personal details appear in the preview immediately. You can apply selected sections now, and newly detected items can be applied in later steps.'}</p>}
           {draft.photoDataUrl && (
             <div className="resume-import-photo-preview">
               <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />
