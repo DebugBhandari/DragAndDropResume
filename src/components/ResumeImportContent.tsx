@@ -4,6 +4,29 @@ import { useRef, useState } from 'react';
 import { useResumeStore } from '@/store/useResumeStore';
 import type { ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
 
+type AppliedImportItems = {
+  personalInfo: string;
+  photo: string;
+  experience: Set<string>;
+  projects: Set<string>;
+  education: Set<string>;
+  skills: Set<string>;
+  languages: Set<string>;
+  certificates: Set<string>;
+};
+
+function createAppliedImportItems(): AppliedImportItems {
+  return { personalInfo: '', photo: '', experience: new Set(), projects: new Set(), education: new Set(), skills: new Set(), languages: new Set(), certificates: new Set() };
+}
+
+function itemKey(section: keyof Omit<AppliedImportItems, 'personalInfo' | 'photo'>, item: Record<string, string>) {
+  if (section === 'experience') return [item.company, item.position, item.startDate, item.endDate].join('|').toLowerCase();
+  if (section === 'projects') return [item.name, item.completionDate, item.link].join('|').toLowerCase();
+  if (section === 'education') return [item.institution, item.degree, item.startDate, item.endDate].join('|').toLowerCase();
+  if (section === 'skills' || section === 'languages') return item.name.toLowerCase();
+  return [item.name, item.issuer, item.date].join('|').toLowerCase();
+}
+
 export default function ResumeImportContent() {
   const { applyImportDraft } = useResumeStore();
   const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
@@ -12,9 +35,9 @@ export default function ResumeImportContent() {
   const [message, setMessage] = useState('');
   const [progressUpdates, setProgressUpdates] = useState<string[]>([]);
   const [isAiRefining, setIsAiRefining] = useState(false);
-  const [hasAppliedQuickDraft, setHasAppliedQuickDraft] = useState(false);
+  const [appliedCount, setAppliedCount] = useState(0);
   const importRunRef = useRef(0);
-  const appliedSelectionRef = useRef<ResumeImportSelection | null>(null);
+  const appliedItemsRef = useRef<AppliedImportItems>(createAppliedImportItems());
 
   async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -26,8 +49,8 @@ export default function ResumeImportContent() {
     setMessage('Starting private résumé import…');
     setProgressUpdates(['Starting private résumé import…']);
     setIsAiRefining(false);
-    setHasAppliedQuickDraft(false);
-    appliedSelectionRef.current = null;
+    setAppliedCount(0);
+    appliedItemsRef.current = createAppliedImportItems();
     setDraft(null);
     try {
       const formData = new FormData();
@@ -70,22 +93,10 @@ export default function ResumeImportContent() {
           }
           if (update.source === 'photo') {
             setProgressUpdates((current) => [...current, 'Profile photo candidate found.'].slice(-6));
-            const appliedSelection = appliedSelectionRef.current;
-            if (appliedSelection?.photo) {
-              applyImportDraft(update.draft, { personalInfo: false, photo: true, experience: false, projects: false, education: false, skills: false, languages: false, certificates: false });
-              setMessage('Your selected details are applied. Profile photo added while AI cleanup continues…');
-            }
           }
           if (update.source === 'ai') {
-            const appliedSelection = appliedSelectionRef.current;
-            if (appliedSelection) {
-              applyImportDraft(update.draft, { ...appliedSelection, skills: false, languages: false });
-              setMessage('AI cleanup is complete. Structured details from this import were added to your résumé.');
-              setProgressUpdates((current) => [...current, 'AI cleanup complete — structured details added.'].slice(-6));
-            } else {
-              setMessage('AI cleanup is complete. Review the detected details before applying them.');
-              setProgressUpdates((current) => [...current, 'AI cleanup is complete.'].slice(-6));
-            }
+            setMessage('AI cleanup is complete. Review the new structured details and apply the selections you want.');
+            setProgressUpdates((current) => [...current, 'AI cleanup is complete — new details are ready to apply.'].slice(-6));
             setIsAiRefining(false);
           }
         }
@@ -120,6 +131,46 @@ export default function ResumeImportContent() {
       setIsAiRefining(false);
       setMessage(error instanceof Error ? error.message : 'Unable to import this résumé.');
     }
+  }
+
+  function applyNewSelectedItems() {
+    if (!draft) return;
+    const applied = appliedItemsRef.current;
+    const nextSelection: ResumeImportSelection = { personalInfo: false, photo: false, experience: false, projects: false, education: false, skills: false, languages: false, certificates: false };
+    const nextDraft: ResumeImportDraft = { ...draft, personalInfo: {}, photoDataUrl: undefined, experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], warnings: [] };
+    const personalInfoKey = JSON.stringify(draft.personalInfo);
+
+    if (selection.personalInfo && personalInfoKey !== '{}' && personalInfoKey !== applied.personalInfo) {
+      nextSelection.personalInfo = true;
+      nextDraft.personalInfo = draft.personalInfo;
+      applied.personalInfo = personalInfoKey;
+    }
+    if (selection.photo && draft.photoDataUrl && draft.photoDataUrl !== applied.photo) {
+      nextSelection.photo = true;
+      nextDraft.photoDataUrl = draft.photoDataUrl;
+      applied.photo = draft.photoDataUrl;
+    }
+    (['experience', 'projects', 'education', 'skills', 'languages', 'certificates'] as const).forEach((section) => {
+      if (!selection[section]) return;
+      const newItems = draft[section].filter((item) => {
+        const key = itemKey(section, item as Record<string, string>);
+        if (applied[section].has(key)) return false;
+        applied[section].add(key);
+        return true;
+      });
+      if (newItems.length) {
+        nextSelection[section] = true;
+        nextDraft[section] = newItems as never;
+      }
+    });
+    if (!Object.values(nextSelection).some(Boolean)) {
+      setMessage('There are no new selected details to add yet. Keep importing, or change the selected sections.');
+      return;
+    }
+    applyImportDraft(nextDraft, nextSelection);
+    setAppliedCount((count) => count + 1);
+    setMessage(isAiRefining ? 'Selected details added. Importing and AI cleanup continue in the background…' : 'Selected new details were added to your résumé.');
+    setProgressUpdates((current) => [...current, 'Selected new details added.'].slice(-6));
   }
 
   const detected = draft ? [
@@ -159,7 +210,7 @@ export default function ResumeImportContent() {
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="resume-import-refining-note text-xs">{hasAppliedQuickDraft ? 'Your selected quick details are already applied. AI cleanup is still running and will add the structured details automatically.' : 'You can apply this quick draft now; AI cleanup will continue and add structured details automatically.'}</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">{appliedCount ? 'Previously applied details stay in your résumé. Keep selecting and applying newly detected items while AI cleanup continues.' : 'You can apply selected details now. Importing will continue, and newly detected items can be applied in later steps.'}</p>}
           {draft.photoDataUrl && (
             <div className="resume-import-photo-preview">
               <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />
@@ -174,7 +225,7 @@ export default function ResumeImportContent() {
           ))}
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
-            {!hasAppliedQuickDraft && <button type="button" className="resume-import-apply" onClick={() => { applyImportDraft(draft, selection); appliedSelectionRef.current = selection; setHasAppliedQuickDraft(true); setMessage(isAiRefining ? 'Selected details were added. AI cleanup is still running…' : 'Selected details were added to your résumé.'); setProgressUpdates((current) => [...current, 'Selected quick details added.'].slice(-6)); }}>Apply selected</button>}
+            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected{appliedCount ? ' again' : ''}</button>
             <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setDraft(null); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>
