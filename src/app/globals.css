@@ -292,6 +292,11 @@
   .resume-import-cancel { border: 1px solid var(--form-border); color: var(--form-text); background: transparent; }
   .resume-import-button:hover, .resume-import-apply:hover { filter: brightness(1.04); transform: translateY(-1px); }
   .studio-import-button { gap: 0.4rem; box-shadow: 0 8px 20px color-mix(in srgb, var(--yellow-green) 20%, transparent); }
+  .resume-import-status { border: 1px solid color-mix(in srgb, var(--hunter-green) 52%, var(--form-border)); border-radius: 0.7rem; color: var(--ink); background: color-mix(in srgb, var(--yellow-green) 23%, var(--form-surface)); }
+  .resume-import-status-title { color: #173d20; }
+  .resume-import-status-dot { background: var(--hunter-green); }
+  .resume-import-status-list { color: #29452d; }
+  .resume-import-refining-note { color: #234b2a; font-weight: 600; }
   .resume-import-photo-preview { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem; border: 1px solid var(--form-border); border-radius: 0.7rem; background: color-mix(in srgb, var(--form-surface-strong) 50%, transparent); }
   .resume-import-photo-preview img { width: 3.5rem; height: 3.5rem; flex: 0 0 auto; border: 1px solid var(--form-border); border-radius: 0.55rem; object-fit: cover; background: var(--form-surface); }
 

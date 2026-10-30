@@ -235,10 +235,21 @@ export async function POST(request: Request) {
         emit({ type: 'progress', message: 'Building a quick preview from the extracted text…' });
         let draft = inferDraftFromText(extractedText); logStage('deterministic draft'); emit({ type: 'draft', draft, source: 'extracted' });
         emit({ type: 'progress', message: 'Your preview is ready. Improving detected sections with local AI…' });
-        const aiDraftPromise = refineDraftWithAi(extractedText); const photoDataUrl = await photoPromise;
-        if (photoDataUrl) { draft = { ...draft, photoDataUrl }; emit({ type: 'draft', draft, source: 'photo' }); }
-        try { const aiDraft = await aiDraftPromise; logStage('AI normalization and sanitization'); emit({ type: 'draft', draft: { ...mergeDrafts(draft, aiDraft), photoDataUrl: photoDataUrl || undefined }, source: 'ai' }); emit({ type: 'complete', message: 'AI cleanup is complete. Review the detected details before applying them.' }); }
+        const aiDraftPromise = refineDraftWithAi(extractedText);
+        const photoUpdatePromise = photoPromise.then((photoDataUrl) => {
+          if (!photoDataUrl) return;
+          draft = { ...draft, photoDataUrl };
+          emit({ type: 'draft', draft, source: 'photo' });
+        });
+        try {
+          const aiDraft = await aiDraftPromise;
+          logStage('AI normalization and sanitization');
+          draft = mergeDrafts(draft, aiDraft);
+          emit({ type: 'draft', draft, source: 'ai' });
+          emit({ type: 'complete', message: 'AI cleanup is complete. Review the detected details before applying them.' });
+        }
         catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
+        await photoUpdatePromise;
       } catch (error) { emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to import this résumé right now.' }); }
       finally { if (workspace) await rm(workspace, { recursive: true, force: true }); logStage('complete'); controller.close(); }
     },

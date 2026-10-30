@@ -131,19 +131,19 @@ export default function ResumeImportContent() {
       </div>
       {message && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
       {status === 'uploading' && (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs">
-          <div className="flex items-center gap-2 font-semibold text-emerald-900">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
+        <div className="resume-import-status mt-3 p-3 text-xs">
+          <div className="resume-import-status-title flex items-center gap-2 font-semibold">
+            <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
             {isAiRefining && draft ? 'Quick preview available — AI cleanup continues' : 'Import in progress'}
           </div>
-          <ol className="mt-2 space-y-1 opacity-80">
+          <ol className="resume-import-status-list mt-2 space-y-1">
             {progressUpdates.map((update, index) => <li key={`${index}-${update}`}>{index + 1}. {update}</li>)}
           </ol>
         </div>
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="text-xs text-emerald-800">You can review and apply this quick draft now; it will be replaced automatically if AI cleanup finds a better structured result.</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">You can review and apply this quick draft now; it will be replaced automatically if AI cleanup finds a better structured result.</p>}
           {draft.photoDataUrl && (
             <div className="resume-import-photo-preview">
               <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />

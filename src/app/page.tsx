@@ -2296,7 +2296,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={handleClearResume}
-                      className="text-xs font-medium text-red-700/70 underline decoration-red-700/30 underline-offset-4 transition hover:text-red-800 hover:decoration-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2"
+                      className="rounded-md border border-red-400/70 bg-red-50/70 px-2.5 py-1 text-xs font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2"
                     >
                       Clear résumé
                     </button>
