@@ -1173,24 +1173,29 @@ export const useResumeStore = create<ResumeStore>()(
       applyImportDraft: (draft, selection) => set((s) => {
         const importedSectionTypes: SectionType[] = [];
         if (selection.experience && draft.experience.length) importedSectionTypes.push('experience');
+        if (selection.projects && draft.projects.length) importedSectionTypes.push('projects');
         if (selection.education && draft.education.length) importedSectionTypes.push('education');
         if (selection.skills && draft.skills.length) importedSectionTypes.push('skills');
         if (selection.languages && draft.languages.length) importedSectionTypes.push('languages');
+        if (selection.certificates && draft.certificates.length) importedSectionTypes.push('certificates');
         const missingSections = getSectionTemplates(s.activeLocale).filter((section) =>
           importedSectionTypes.includes(section.type) && !s.sectionOrder.some((current) => current.type === section.type),
         );
         const nextExperience = selection.experience
           ? [...s.experience, ...draft.experience.map((item) => ({ ...item, id: uuidv4(), visible: true, descriptionBullets: item.descriptionBullets.length ? item.descriptionBullets : [''] }))]
           : s.experience;
-        const nextProjects = s.projects;
+        const nextProjects = selection.projects
+          ? [...s.projects, ...draft.projects.map((item) => ({ ...item, id: uuidv4(), visible: true, descriptionBullets: item.descriptionBullets.length ? item.descriptionBullets : [''] }))]
+          : s.projects;
         return {
           personalInfo: selection.personalInfo ? { ...s.personalInfo, ...draft.personalInfo } : s.personalInfo,
           photo: selection.photo && draft.photoDataUrl ? { ...s.photo, url: draft.photoDataUrl } : s.photo,
           experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience),
-          projects: nextProjects,
+          projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects),
           education: selection.education ? [...s.education, ...draft.education.map((item) => ({ ...item, id: uuidv4() }))] : s.education,
           skills: selection.skills ? [...s.skills, ...draft.skills.map((item) => ({ ...item, id: uuidv4() }))] : s.skills,
           languages: selection.languages ? [...s.languages, ...draft.languages.map((item) => ({ ...item, id: uuidv4() }))] : s.languages,
+          certificates: selection.certificates ? [...s.certificates, ...draft.certificates.map((item) => ({ ...item, id: uuidv4() }))] : s.certificates,
           sectionOrder: [...s.sectionOrder, ...missingSections],
           removedSections: s.removedSections.filter((type) => !importedSectionTypes.includes(type)),
         };

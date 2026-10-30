@@ -7,7 +7,7 @@ import type { ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
 export default function ResumeImportContent() {
   const { applyImportDraft } = useResumeStore();
   const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
-  const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, photo: true, experience: true, education: true, skills: true, languages: true });
+  const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [progressUpdates, setProgressUpdates] = useState<string[]>([]);
@@ -110,9 +110,11 @@ export default function ResumeImportContent() {
     ['personalInfo', 'Personal details', Object.values(draft.personalInfo).some(Boolean)],
     ['photo', 'Profile photo embedded in the PDF', Boolean(draft.photoDataUrl)],
     ['experience', `${draft.experience.length} work experience${draft.experience.length === 1 ? '' : 's'}`, draft.experience.length > 0],
+    ['projects', `${draft.projects.length} project${draft.projects.length === 1 ? '' : 's'}`, draft.projects.length > 0],
     ['education', `${draft.education.length} education item${draft.education.length === 1 ? '' : 's'}`, draft.education.length > 0],
     ['skills', `${draft.skills.length} skill${draft.skills.length === 1 ? '' : 's'}`, draft.skills.length > 0],
     ['languages', `${draft.languages.length} language${draft.languages.length === 1 ? '' : 's'}`, draft.languages.length > 0],
+    ['certificates', `${draft.certificates.length} certificate${draft.certificates.length === 1 ? '' : 's'}`, draft.certificates.length > 0],
   ] as const : [];
 
   return (

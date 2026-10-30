@@ -31,7 +31,7 @@ function namedRows(value: unknown) {
   return [];
 }
 function emptyDraft(): ResumeImportDraft {
-  return { personalInfo: { fullName: '', email: '', phone: '', location: '', linkedin: '', website: '', summary: '' }, experience: [], education: [], skills: [], languages: [], warnings: [] };
+  return { personalInfo: { fullName: '', email: '', phone: '', location: '', linkedin: '', website: '', summary: '' }, experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], warnings: [] };
 }
 function sanitizeDraft(value: unknown): ResumeImportDraft {
   const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
@@ -44,6 +44,12 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
       const description = text(row.description, 1200);
       return { company: text(row.company, 180), position: text(row.position, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description, descriptionBullets: bullets.length ? bullets : description ? [description] : [] };
     }).filter((item) => item.company || item.position),
+    projects: array(raw.projects).slice(0, 12).map((item) => {
+      const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const bullets = array(row.descriptionBullets).map((bullet) => text(bullet, 360)).filter(Boolean).slice(0, 10);
+      const description = text(row.description, 1200);
+      return { name: text(row.name, 180), description, descriptionBullets: bullets.length ? bullets : description ? [description] : [], completionDate: text(row.completionDate, 60), technologies: text(row.technologies, 400), link: text(row.link, 240) };
+    }).filter((item) => item.name || item.descriptionBullets.length),
     education: array(raw.education).slice(0, 10).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       return { institution: text(row.institution, 180), degree: text(row.degree, 180), field: text(row.field, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description: text(row.description, 800) };
@@ -56,12 +62,30 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
       const row: Record<string, unknown> = item && typeof item === 'object' ? item as Record<string, unknown> : { name: item };
       return { name: text(row.name, 80), proficiency: validLevel(text(row.proficiency ?? row.detail, 20), ['Native', 'Fluent', 'Advanced', 'Intermediate', 'Beginner'], 'Intermediate') as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' };
     }).filter((item) => item.name),
+    certificates: array(raw.certificates).slice(0, 20).map((item) => {
+      const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      return { name: text(row.name, 180), issuer: text(row.issuer, 180), date: text(row.date, 60), link: text(row.link, 240) };
+    }).filter((item) => item.name),
     warnings: array(raw.warnings).map((warning) => text(warning, 240)).filter(Boolean).slice(0, 8),
   };
 }
 
 function normalizeHeading(value: string) { return value.toLowerCase().replace(/[^a-z]/g, ''); }
 function isHeading(value: string, candidates: string[]) { const heading = normalizeHeading(value); return candidates.some((candidate) => heading === candidate || heading.startsWith(candidate)); }
+function linesToBullets(lines: string[]) {
+  return lines.map((line) => line.replace(/^[•·▪◦*-]\s*/, '').trim()).filter(Boolean).slice(0, 10);
+}
+function splitSectionEntries(lines: string[]) {
+  const entries: string[][] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    const startsEntry = current.length > 0 && (/\b(?:19|20)\d{2}\b/.test(line) || (/^[A-Z][^.!?]{2,90}$/.test(line) && !/^[•·▪◦*-]/.test(line)));
+    if (startsEntry) { entries.push(current); current = [line]; }
+    else current.push(line);
+  }
+  if (current.length) entries.push(current);
+  return entries.filter((entry) => entry.some(Boolean));
+}
 function inferDraftFromText(rawText: string): ResumeImportDraft {
   const draft = emptyDraft();
   const lines = rawText.replace(/\r/g, '').split('\n').map((line) => line.trim()).filter(Boolean);
@@ -72,19 +96,44 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   const phone = joined.match(/(?:\+?\d[\d().\s-]{7,}\d)/)?.[0] ?? '';
   const fullName = lines.find((line) => line.length >= 3 && line.length <= 80 && !/@/.test(line) && !/https?:\/\//i.test(line) && !isHeading(line, ['experience', 'education', 'skills', 'languages', 'summary'])) ?? '';
   draft.personalInfo = { fullName, email, phone: phone.replace(/\s+/g, ' ').trim(), location: '', linkedin: linkedIn, website, summary: '' };
-  const sections: Record<string, string[]> = { experience: [], education: [], skills: [], languages: [], summary: [] };
+  const sections: Record<string, string[]> = { experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], summary: [] };
   let current = '';
   for (const line of lines) {
-    if (isHeading(line, ['experience', 'workexperience', 'employment', 'professionalexperience'])) current = 'experience';
-    else if (isHeading(line, ['education', 'academicbackground'])) current = 'education';
-    else if (isHeading(line, ['skills', 'technicalskills', 'corecompetencies'])) current = 'skills';
+    if (isHeading(line, ['experience', 'workexperience', 'employment', 'professionalexperience', 'careersummary', 'workhistory'])) current = 'experience';
+    else if (isHeading(line, ['projects', 'projectexperience', 'selectedprojects', 'personalprojects', 'keyprojects'])) current = 'projects';
+    else if (isHeading(line, ['education', 'academicbackground', 'qualifications'])) current = 'education';
+    else if (isHeading(line, ['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox'])) current = 'skills';
     else if (isHeading(line, ['languages', 'language'])) current = 'languages';
-    else if (isHeading(line, ['summary', 'profile', 'professionalprofile', 'aboutme'])) current = 'summary';
+    else if (isHeading(line, ['certificates', 'certifications', 'licenses', 'licences', 'credentials'])) current = 'certificates';
+    else if (isHeading(line, ['summary', 'profile', 'professionalprofile', 'aboutme', 'objective'])) current = 'summary';
     else if (current) sections[current].push(line);
   }
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
   draft.skills = [...new Set(sections.skills.join(' ').split(/[|,;•·]+/).map((value) => value.replace(/^[-–—]\s*/, '').trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
   draft.languages = [...new Set(sections.languages.join(' ').split(/[|,;•·]+/).map((value) => value.replace(/^[-–—]\s*/, '').trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 15).map((value) => ({ name: value.replace(/\s*[-–—:]\s*(native|fluent|advanced|intermediate|beginner).*$/i, ''), proficiency: (value.match(/native|fluent|advanced|intermediate|beginner/i)?.[0] ?? 'Intermediate').replace(/^./, (letter) => letter.toUpperCase()) as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' }));
+  const dateRange = /((?:[A-Z][a-z]{2,8}\.?\s*)?\d{4}|\d{1,2}[\/.]\d{4})\s*(?:-|–|—|to)\s*((?:[A-Z][a-z]{2,8}\.?\s*)?\d{4}|\d{1,2}[\/.]\d{4}|present|current)/i;
+  draft.experience = splitSectionEntries(sections.experience).slice(0, 12).map((entry) => {
+    const dates = entry.find((line) => dateRange.test(line))?.match(dateRange);
+    const headline = entry.find((line) => !dateRange.test(line)) ?? '';
+    const [position, company] = headline.split(/\s+(?:at|\||[-–—])\s+/i).map((value) => value.trim());
+    return { company: company || '', position: position || headline, startDate: dates?.[1] ?? '', endDate: dates?.[2] ?? '', description: '', descriptionBullets: linesToBullets(entry.filter((line) => line !== headline && !dateRange.test(line))) };
+  }).filter((item) => item.position || item.company || item.descriptionBullets.length);
+  draft.projects = splitSectionEntries(sections.projects).slice(0, 12).map((entry) => {
+    const [name = '', ...details] = entry;
+    const link = entry.find((line) => /(?:https?:\/\/|www\.)/i.test(line)) ?? '';
+    const technologies = entry.find((line) => /^(?:tech(?:nologies)?|stack|tools?)\s*:/i.test(line))?.replace(/^[^:]+:\s*/, '') ?? '';
+    return { name, description: '', descriptionBullets: linesToBullets(details.filter((line) => line !== link && !/^(?:tech(?:nologies)?|stack|tools?)\s*:/i.test(line))), completionDate: entry.find((line) => /\b(?:19|20)\d{2}\b/.test(line))?.match(/\b(?:19|20)\d{2}\b/)?.[0] ?? '', technologies, link };
+  }).filter((item) => item.name || item.descriptionBullets.length);
+  draft.education = splitSectionEntries(sections.education).slice(0, 10).map((entry) => {
+    const dates = entry.find((line) => dateRange.test(line))?.match(dateRange);
+    const [institution = '', degree = '', ...details] = entry.filter((line) => !dateRange.test(line));
+    return { institution, degree, field: '', startDate: dates?.[1] ?? '', endDate: dates?.[2] ?? '', description: details.join(' ').slice(0, 800) };
+  }).filter((item) => item.institution || item.degree);
+  draft.certificates = splitSectionEntries(sections.certificates).slice(0, 20).map((entry) => {
+    const [name = '', issuer = '', ...details] = entry;
+    const link = entry.find((line) => /(?:https?:\/\/|www\.)/i.test(line)) ?? '';
+    return { name, issuer: issuer === link ? '' : issuer, date: entry.find((line) => /\b(?:19|20)\d{2}\b/.test(line))?.match(/\b(?:19|20)\d{2}\b/)?.[0] ?? details.join(' ').match(/\b(?:19|20)\d{2}\b/)?.[0] ?? '', link };
+  }).filter((item) => item.name);
   draft.warnings.push('Quick extraction is ready. AI cleanup is still running; review all dates and names before applying.');
   return draft;
 }
@@ -99,11 +148,23 @@ function compactTextForAi(rawText: string) {
   }
   return compactLines.join('\n').slice(0, 12_000);
 }
+function mergeDrafts(fallback: ResumeImportDraft, refined: ResumeImportDraft): ResumeImportDraft {
+  return {
+    personalInfo: { ...fallback.personalInfo, ...Object.fromEntries(Object.entries(refined.personalInfo).filter(([, value]) => Boolean(value))) },
+    experience: refined.experience.length >= fallback.experience.length ? refined.experience : fallback.experience,
+    projects: refined.projects.length >= fallback.projects.length ? refined.projects : fallback.projects,
+    education: refined.education.length >= fallback.education.length ? refined.education : fallback.education,
+    skills: refined.skills.length >= fallback.skills.length ? refined.skills : fallback.skills,
+    languages: refined.languages.length >= fallback.languages.length ? refined.languages : fallback.languages,
+    certificates: refined.certificates.length >= fallback.certificates.length ? refined.certificates : fallback.certificates,
+    warnings: refined.warnings.length ? refined.warnings : fallback.warnings,
+  };
+}
 async function refineDraftWithAi(extractedText: string) {
   const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(210_000),
-    body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b', stream: false, format: 'json', options: { temperature: 0, num_predict: 2200 }, messages: [
-      { role: 'system', content: 'Extract factual résumé data from the source text. Return one JSON object only with exactly personalInfo, experience, education, skills, languages, warnings. Do not invent facts. personalInfo fields: fullName, email, phone, location, linkedin, website, summary. skills and languages are arrays of objects. Experience fields: company, position, startDate, endDate, descriptionBullets. Education fields: institution, degree, field, startDate, endDate, description. Omit uncertain details rather than guessing.' },
+    body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b', stream: false, format: 'json', options: { temperature: 0, num_predict: 900 }, messages: [
+      { role: 'system', content: 'Extract factual résumé data. Return one compact JSON object only with exactly personalInfo, experience, projects, education, skills, languages, certificates, warnings. Never invent facts. personalInfo fields: fullName, email, phone, location, linkedin, website, summary. Experience: company, position, startDate, endDate, descriptionBullets. Projects: name, completionDate, technologies, link, descriptionBullets. Education: institution, degree, field, startDate, endDate, description. Certificates: name, issuer, date, link. Keep each descriptionBullets array to at most 3 factual bullets. Omit uncertain details.' },
       { role: 'user', content: compactTextForAi(extractedText) },
     ] }),
   });
@@ -176,7 +237,7 @@ export async function POST(request: Request) {
         emit({ type: 'progress', message: 'Your preview is ready. Improving detected sections with local AI…' });
         const aiDraftPromise = refineDraftWithAi(extractedText); const photoDataUrl = await photoPromise;
         if (photoDataUrl) { draft = { ...draft, photoDataUrl }; emit({ type: 'draft', draft, source: 'photo' }); }
-        try { const aiDraft = await aiDraftPromise; logStage('AI normalization and sanitization'); emit({ type: 'draft', draft: { ...aiDraft, photoDataUrl: photoDataUrl || undefined }, source: 'ai' }); emit({ type: 'complete', message: 'AI cleanup is complete. Review the detected details before applying them.' }); }
+        try { const aiDraft = await aiDraftPromise; logStage('AI normalization and sanitization'); emit({ type: 'draft', draft: { ...mergeDrafts(draft, aiDraft), photoDataUrl: photoDataUrl || undefined }, source: 'ai' }); emit({ type: 'complete', message: 'AI cleanup is complete. Review the detected details before applying them.' }); }
         catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
       } catch (error) { emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to import this résumé right now.' }); }
       finally { if (workspace) await rm(workspace, { recursive: true, force: true }); logStage('complete'); controller.close(); }
