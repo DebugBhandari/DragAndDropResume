@@ -35,6 +35,8 @@ function splitDescriptionIntoBullets(values: unknown[], description: unknown) {
     return sentences.map((sentence) => sentence.trim()).filter(Boolean);
   }).filter((bullet, index, bullets) => bullet.length >= 3 && bullets.indexOf(bullet) === index).slice(0, 12).map((bullet) => bullet.slice(0, 360));
 }
+function descriptionValues(row: Record<string, unknown>) { return [...array(row.descriptionBullets), ...array(row.bullets), ...array(row.highlights), ...array(row.responsibilities), ...array(row.achievements)]; }
+function textList(value: unknown, max = 400) { return Array.isArray(value) ? value.map((item) => text(item, 100)).filter(Boolean).join(', ').slice(0, max) : text(value, max); }
 function namedRows(value: unknown) {
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([name, detail]) => detail && typeof detail === 'object' ? { name, ...(detail as Record<string, unknown>) } : { name, detail });
@@ -50,31 +52,31 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
     personalInfo: { fullName: text(personal.fullName ?? personal.name, 120), email: text(personal.email, 160), phone: text(personal.phone, 80), location: text(personal.location, 160), linkedin: text(personal.linkedin, 240), website: text(personal.website, 240), summary: text(personal.summary, 1200) },
     experience: array(raw.experience).slice(0, 12).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const description = text(row.description, 1200);
-      const bullets = splitDescriptionIntoBullets(array(row.descriptionBullets), description);
-      return { company: text(row.company, 180), position: text(row.position, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description, descriptionBullets: bullets };
+      const description = text(row.description ?? row.summary, 1200);
+      const bullets = splitDescriptionIntoBullets(descriptionValues(row), description);
+      return { company: text(row.company ?? row.employer ?? row.organization, 180), position: text(row.position ?? row.jobTitle ?? row.title ?? row.role, 180), startDate: text(row.startDate ?? row.start ?? row.from, 60), endDate: text(row.endDate ?? row.end ?? row.to, 60), description, descriptionBullets: bullets };
     }).filter((item) => item.company || item.position),
     projects: array(raw.projects).slice(0, 12).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const description = text(row.description, 1200);
-      const bullets = splitDescriptionIntoBullets(array(row.descriptionBullets), description);
-      return { name: text(row.name, 180), description, descriptionBullets: bullets, completionDate: text(row.completionDate, 60), technologies: text(row.technologies, 400), link: text(row.link, 240) };
+      const description = text(row.description ?? row.summary, 1200);
+      const bullets = splitDescriptionIntoBullets(descriptionValues(row), description);
+      return { name: text(row.name ?? row.projectName ?? row.project ?? row.title, 180), description, descriptionBullets: bullets, completionDate: text(row.completionDate ?? row.date, 60), technologies: textList(row.technologies ?? row.techStack ?? row.stack), link: text(row.link ?? row.url ?? row.github, 240) };
     }).filter((item) => item.name || item.descriptionBullets.length),
     education: array(raw.education).slice(0, 10).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      return { institution: text(row.institution, 180), degree: text(row.degree, 180), field: text(row.field, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description: text(row.description, 800) };
+      return { institution: text(row.institution ?? row.university ?? row.school, 180), degree: text(row.degree ?? row.qualification, 180), field: text(row.field ?? row.major ?? row.specialization, 180), startDate: text(row.startDate ?? row.start ?? row.from, 60), endDate: text(row.endDate ?? row.end ?? row.to, 60), description: text(row.description, 800) };
     }).filter((item) => item.institution || item.degree),
     skills: namedRows(raw.skills).slice(0, 40).map((item) => {
       const row: Record<string, unknown> = item && typeof item === 'object' ? item as Record<string, unknown> : { name: item };
-      return { name: text(row.name, 80), level: validLevel(text(row.level ?? row.detail, 20), ['Expert', 'Advanced', 'Intermediate', 'Beginner'], 'Intermediate') as 'Expert' | 'Advanced' | 'Intermediate' | 'Beginner' };
+      return { name: text(row.name ?? row.skill, 80), level: validLevel(text(row.level ?? row.detail, 20), ['Expert', 'Advanced', 'Intermediate', 'Beginner'], 'Intermediate') as 'Expert' | 'Advanced' | 'Intermediate' | 'Beginner' };
     }).filter((item) => item.name),
     languages: namedRows(raw.languages).slice(0, 15).map((item) => {
       const row: Record<string, unknown> = item && typeof item === 'object' ? item as Record<string, unknown> : { name: item };
-      return { name: text(row.name, 80), proficiency: validLevel(text(row.proficiency ?? row.detail, 20), ['Native', 'Fluent', 'Advanced', 'Intermediate', 'Beginner'], 'Intermediate') as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' };
+      return { name: text(row.name ?? row.language, 80), proficiency: validLevel(text(row.proficiency ?? row.level ?? row.detail, 20), ['Native', 'Fluent', 'Advanced', 'Intermediate', 'Beginner'], 'Intermediate') as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' };
     }).filter((item) => item.name),
     certificates: array(raw.certificates).slice(0, 20).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      return { name: text(row.name, 180), issuer: text(row.issuer, 180), date: text(row.date, 60), link: text(row.link, 240) };
+      return { name: text(row.name ?? row.certificate ?? row.credential, 180), issuer: text(row.issuer ?? row.organization, 180), date: text(row.date ?? row.issueDate, 60), link: text(row.link ?? row.url, 240) };
     }).filter((item) => item.name),
     warnings: array(raw.warnings).map((warning) => text(warning, 240)).filter(Boolean).slice(0, 8),
   };
@@ -101,7 +103,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     else if (isHeading(line, ['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox'])) current = 'skills';
     else if (isHeading(line, ['languages', 'language'])) current = 'languages';
     else if (isHeading(line, ['certificates', 'certifications', 'licenses', 'licences', 'credentials'])) current = 'certificates';
-    else if (isHeading(line, ['summary', 'professionalsummary', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective'])) current = 'summary';
+    else if (isHeading(line, ['summary', 'professionalsummary', 'summaryofqualifications', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective', 'professionalobjective'])) current = 'summary';
     else if (current) sections[current].push(line);
   }
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
@@ -123,6 +125,48 @@ function compactTextForAi(rawText: string) {
 }
 type StreamRecordType = 'personalInfo' | 'experience' | 'projects' | 'education' | 'skills' | 'languages' | 'certificates' | 'warning';
 type StreamRecord = { type?: StreamRecordType; item?: unknown; message?: unknown };
+const streamSections: Exclude<StreamRecordType, 'personalInfo' | 'warning'>[] = ['experience', 'projects', 'education', 'skills', 'languages', 'certificates'];
+function normalizedKey(value: string) { return value.toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function canonicalizeStreamItem(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const aliases: Record<string, string> = {
+    company: 'company', employer: 'company', organization: 'company', jobtitle: 'position', position: 'position', role: 'position', title: 'title',
+    startdate: 'startDate', start: 'startDate', from: 'startDate', enddate: 'endDate', end: 'endDate', to: 'endDate',
+    description: 'description', summary: 'summary', descriptionbullets: 'descriptionBullets', bullets: 'bullets', highlights: 'highlights', responsibilities: 'responsibilities', achievements: 'achievements',
+    name: 'name', project: 'project', projectname: 'projectName', completiondate: 'completionDate', technologies: 'technologies', techstack: 'techStack', stack: 'stack', link: 'link', url: 'url', github: 'github',
+    institution: 'institution', university: 'university', school: 'school', degree: 'degree', qualification: 'qualification', field: 'field', major: 'major', specialization: 'specialization',
+    skill: 'skill', level: 'level', language: 'language', proficiency: 'proficiency', certificate: 'certificate', credential: 'credential', issuer: 'issuer', issuedate: 'issueDate', date: 'date',
+  };
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((result, [key, item]) => {
+    result[aliases[normalizedKey(key)] ?? key] = item;
+    return result;
+  }, {});
+}
+function inferStreamRecordType(value: Record<string, unknown>): StreamRecordType | undefined {
+  if ('company' in value || 'position' in value || 'jobTitle' in value || 'employer' in value) return 'experience';
+  if ('institution' in value || 'degree' in value || 'field' in value || 'university' in value) return 'education';
+  if ('technologies' in value || 'completionDate' in value || 'projectName' in value || ('link' in value && ('description' in value || 'descriptionBullets' in value))) return 'projects';
+  if ('proficiency' in value || 'language' in value) return 'languages';
+  if ('issuer' in value || 'credential' in value || 'certificate' in value) return 'certificates';
+  if ('level' in value || 'skill' in value) return 'skills';
+  return undefined;
+}
+function normalizeStreamRecord(value: unknown): StreamRecord[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const raw = value as Record<string, unknown>;
+  const row = canonicalizeStreamItem(raw) as Record<string, unknown>;
+  const declaredType = text(raw.type ?? raw.section ?? raw.category, 40).toLowerCase().replace(/[^a-z]/g, '');
+  const typeAliases: Record<string, StreamRecordType> = { experience: 'experience', workexperience: 'experience', workhistory: 'experience', employment: 'experience', project: 'projects', projects: 'projects', education: 'education', skill: 'skills', skills: 'skills', language: 'languages', languages: 'languages', certificate: 'certificates', certificates: 'certificates', certification: 'certificates', certifications: 'certificates' };
+  if (typeAliases[declaredType]) return [{ type: typeAliases[declaredType], item: canonicalizeStreamItem(raw.item ?? raw.data ?? raw) }];
+  const wrapped = streamSections.flatMap((section) => {
+    const wrapperAliases = section === 'experience' ? ['experience', 'workexperience', 'workhistory', 'employment'] : section === 'projects' ? ['projects', 'project'] : section === 'certificates' ? ['certificates', 'certificate', 'certifications', 'certification'] : [section];
+    const items = Object.entries(raw).find(([key]) => wrapperAliases.includes(normalizedKey(key)))?.[1];
+    return Array.isArray(items) ? items.map((item) => ({ type: section, item: canonicalizeStreamItem(item) })) : items && typeof items === 'object' ? [{ type: section, item: canonicalizeStreamItem(items) }] : [];
+  });
+  if (wrapped.length) return wrapped;
+  const type = inferStreamRecordType(row);
+  return type ? [{ type, item: row }] : [];
+}
 function recordKey(type: Exclude<StreamRecordType, 'personalInfo' | 'warning'>, item: Record<string, unknown>) {
   if (type === 'experience') return [item.company, item.position, item.startDate, item.endDate].map(String).join('|').toLowerCase();
   if (type === 'projects') return [item.name, item.completionDate, item.link].map(String).join('|').toLowerCase();
@@ -171,7 +215,7 @@ function takeCompleteStreamRecords(buffer: string) {
     if (character === '{') depth += 1;
     if (character === '}') depth -= 1;
     if (depth === 0) {
-      try { records.push(JSON.parse(buffer.slice(start, index + 1)) as StreamRecord); } catch { /* Ignore an invalid model record and continue. */ }
+      try { records.push(...normalizeStreamRecord(JSON.parse(buffer.slice(start, index + 1)))); } catch { /* Ignore an invalid model record and continue. */ }
       consumed = index + 1; start = -1;
     }
   }
