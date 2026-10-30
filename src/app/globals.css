@@ -297,6 +297,10 @@
   .resume-import-status-dot { background: var(--hunter-green); }
   .resume-import-status-list { color: #29452d; }
   .resume-import-refining-note { color: #234b2a; font-weight: 600; }
+  .resume-import-source-picker { padding: 0.65rem; border: 1px solid var(--form-border); border-radius: 0.7rem; background: color-mix(in srgb, var(--form-surface-strong) 42%, transparent); }
+  .resume-import-source { border: 1px solid var(--form-border); border-radius: 0.55rem; padding: 0.45rem 0.6rem; color: var(--form-text); background: transparent; font-size: 0.7rem; font-weight: 800; transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease; }
+  .resume-import-source:hover { border-color: var(--sage-green); background: color-mix(in srgb, var(--yellow-green) 16%, transparent); transform: translateY(-1px); }
+  .resume-import-source-active { border-color: var(--hunter-green); color: #18351f; background: var(--yellow-green); }
   .resume-import-photo-preview { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem; border: 1px solid var(--form-border); border-radius: 0.7rem; background: color-mix(in srgb, var(--form-surface-strong) 50%, transparent); }
   .resume-import-photo-preview img { width: 3.5rem; height: 3.5rem; flex: 0 0 auto; border: 1px solid var(--form-border); border-radius: 0.55rem; object-fit: cover; background: var(--form-surface); }
   .resume-reset-card { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.7rem 0.75rem; border: 1px solid color-mix(in srgb, var(--blushed-brick) 36%, var(--studio-line)); border-radius: 0.8rem; background: linear-gradient(135deg, color-mix(in srgb, var(--blushed-brick) 8%, var(--studio-surface)), color-mix(in srgb, var(--studio-surface-strong) 78%, transparent)); }

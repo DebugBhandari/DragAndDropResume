@@ -29,7 +29,9 @@ function itemKey(section: keyof Omit<AppliedImportItems, 'personalInfo' | 'photo
 
 export default function ResumeImportContent() {
   const { applyImportDraft, updatePersonalInfo } = useResumeStore();
-  const [draft, setDraft] = useState<ResumeImportDraft | null>(null);
+  const [extractedDraft, setExtractedDraft] = useState<ResumeImportDraft | null>(null);
+  const [enhancedDraft, setEnhancedDraft] = useState<ResumeImportDraft | null>(null);
+  const [selectedDraftSource, setSelectedDraftSource] = useState<'extracted' | 'enhanced'>('extracted');
   const [selection, setSelection] = useState<ResumeImportSelection>({ personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -51,7 +53,9 @@ export default function ResumeImportContent() {
     setIsAiRefining(false);
     setAppliedCount(0);
     appliedItemsRef.current = createAppliedImportItems();
-    setDraft(null);
+    setExtractedDraft(null);
+    setEnhancedDraft(null);
+    setSelectedDraftSource('extracted');
     try {
       const formData = new FormData();
       formData.set('file', file);
@@ -85,7 +89,15 @@ export default function ResumeImportContent() {
         }
         if (update.type === 'draft' && update.draft) {
           receivedDraft = true;
-          setDraft(update.draft);
+          if (update.source === 'extracted') {
+            setExtractedDraft(update.draft);
+            setSelectedDraftSource('extracted');
+          } else if (update.source === 'photo') {
+            setExtractedDraft((current) => current ? { ...current, photoDataUrl: update.draft!.photoDataUrl } : current);
+            setEnhancedDraft((current) => current ? { ...current, photoDataUrl: update.draft!.photoDataUrl } : update.draft!);
+          } else {
+            setEnhancedDraft(update.draft);
+          }
           const personalInfoKey = JSON.stringify(update.draft.personalInfo);
           const populatedPersonalInfo = Object.fromEntries(
             Object.entries(update.draft.personalInfo).filter(([, value]) => Boolean(value)),
@@ -103,12 +115,12 @@ export default function ResumeImportContent() {
             setProgressUpdates((current) => [...current, 'Profile photo candidate found.'].slice(-6));
           }
           if (update.source === 'ai-partial') {
-            setMessage('AI is streaming structured résumé details. Review and apply new selected items whenever they appear.');
+            setMessage('PDF/Tesseract extraction is ready to use now. Ollama is preparing an enhanced alternative in the background.');
             setIsAiRefining(true);
           }
           if (update.source === 'ai') {
-            setMessage('AI cleanup is complete. Review the new structured details and apply the selections you want.');
-            setProgressUpdates((current) => [...current, 'AI cleanup is complete — new details are ready to apply.'].slice(-6));
+            setMessage('Ollama cleanup is complete. Choose PDF/Tesseract extraction only or PDF/Tesseract + Ollama before applying selected details.');
+            setProgressUpdates((current) => [...current, 'Ollama cleanup is complete — both import options are ready.'].slice(-6));
             setIsAiRefining(false);
           }
         }
@@ -146,6 +158,7 @@ export default function ResumeImportContent() {
   }
 
   function applyNewSelectedItems() {
+    const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
     if (!draft) return;
     const applied = appliedItemsRef.current;
     const nextSelection: ResumeImportSelection = { personalInfo: false, photo: false, experience: false, projects: false, education: false, skills: false, languages: false, certificates: false };
@@ -181,10 +194,11 @@ export default function ResumeImportContent() {
     }
     applyImportDraft(nextDraft, nextSelection);
     setAppliedCount((count) => count + 1);
-    setMessage(isAiRefining ? 'Selected details added. Importing and AI cleanup continue in the background…' : 'Selected new details were added to your résumé.');
+    setMessage(isAiRefining ? 'Selected PDF/Tesseract details added. Ollama cleanup continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF/Tesseract + Ollama' : 'PDF/Tesseract'} details were added to your résumé.`);
     setProgressUpdates((current) => [...current, 'Selected new details added.'].slice(-6));
   }
 
+  const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
   const detected = draft ? [
     ['personalInfo', 'Personal details', Object.values(draft.personalInfo).some(Boolean)],
     ['photo', 'Profile photo embedded in the PDF', Boolean(draft.photoDataUrl)],
@@ -201,7 +215,7 @@ export default function ResumeImportContent() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em]">Private AI import</p>
-          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. You will see text extraction progress and a quick review draft before optional AI cleanup finishes. Files are deleted after extraction.</p>
+          <p className="mt-1 text-xs opacity-75">Import a PDF, PNG, or JPG. Use the fast PDF/Tesseract extraction immediately, then optionally choose the Ollama-enhanced result when it is ready. Files are deleted after extraction.</p>
         </div>
         <label className={`resume-import-button shrink-0 ${status === 'uploading' ? 'pointer-events-none opacity-60' : ''}`}>
           {status === 'uploading' ? 'Importing…' : 'Import résumé'}
@@ -213,7 +227,7 @@ export default function ResumeImportContent() {
         <div className="resume-import-status mt-3 p-3 text-xs">
           <div className="resume-import-status-title flex items-center gap-2 font-semibold">
             <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
-            {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'Quick preview available — AI cleanup continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
+            {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF/Tesseract draft available — Ollama cleanup continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
           </div>
           {draft?.personalInfo.fullName && <p className="mt-1 opacity-80">Detected résumé: <strong>{draft.personalInfo.fullName}</strong>. The remaining details are loading now.</p>}
           <ol className="resume-import-status-list mt-2 space-y-1">
@@ -223,7 +237,17 @@ export default function ResumeImportContent() {
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="resume-import-refining-note text-xs">{appliedCount ? 'Previously applied details stay in your résumé. Detected personal details appear in the preview immediately; keep selecting and applying newly detected sections while AI cleanup continues.' : 'Detected personal details appear in the preview immediately. You can apply selected sections now, and newly detected items can be applied in later steps.'}</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">The fast PDF/Tesseract draft is selected and ready to apply now. Detected personal details already appear in the preview while Ollama prepares its enhanced alternative.</p>}
+          {enhancedDraft && !isAiRefining && (
+            <div className="resume-import-source-picker" role="group" aria-label="Choose import data source">
+              <p className="text-xs font-semibold">Choose the data to review and apply</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF/Tesseract extraction</button>
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF/Tesseract + Ollama</button>
+              </div>
+              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the extracted data with Ollama’s structured work and project details.' : 'Using only the fast PDF text extraction or Tesseract OCR result.'}</p>
+            </div>
+          )}
           {draft.photoDataUrl && (
             <div className="resume-import-photo-preview">
               <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />
@@ -238,8 +262,8 @@ export default function ResumeImportContent() {
           ))}
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected{appliedCount ? ' again' : ''}</button>
-            <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setDraft(null); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
+            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected {selectedDraftSource === 'enhanced' ? 'PDF + Ollama' : 'PDF/Tesseract'} data{appliedCount ? ' again' : ''}</button>
+            <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setExtractedDraft(null); setEnhancedDraft(null); setSelectedDraftSource('extracted'); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>
       )}
