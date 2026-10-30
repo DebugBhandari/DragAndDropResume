@@ -85,6 +85,16 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
 
 function normalizeHeading(value: string) { return value.toLowerCase().replace(/[^a-z]/g, ''); }
 function isHeading(value: string, candidates: string[]) { const heading = normalizeHeading(value); return candidates.some((candidate) => heading === candidate || heading.startsWith(candidate)); }
+function normalizeDoclingMarkdown(markdown: string) {
+  return markdown
+    .replace(/!\[[^\]]*\]\(data:image\/[^;\s)]+;base64,[\s\S]*?\)/gi, '')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm, '$1')
+    .replace(/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, '')
+    .replace(/^\s*[-*+]\s+/, '- ')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\r/g, '');
+}
 function sectionHeading(line: string) {
   const heading = normalizeHeading(line);
   const match = (values: string[]) => values.some((value) => heading === value || heading.startsWith(value));
@@ -98,6 +108,15 @@ function sectionHeading(line: string) {
   return '';
 }
 function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
+function skillNames(lines: string[]) {
+  return [...new Set(
+    splitSectionItems(lines)
+      .flatMap((value) => value.replace(/^\s*(?:tools?|technologies|tech(?:nology)?\s*stack|frameworks?|libraries|platforms?|databases?)\s*:\s*/i, '').split(/[,;|]/))
+      .map((value) => value.replace(/^[-–—*]\s*/, '').replace(/\s+\([^)]{1,30}\)$/, '').trim())
+      .filter((value) => value.length >= 2 && value.length <= 80)
+      .filter((value) => !/^(?:tools?|technologies|tech(?:nology)?\s*stack|frameworks?|libraries|platforms?|databases?)$/i.test(value)),
+  )].slice(0, 40).map((name) => ({ name, level: 'Intermediate' as const }));
+}
 const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
 const WORK_TITLE_PATTERN = /\b(?:engineer(?:ing)?|developer|intern(?:ship)?|cashier|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|attendant|clerk|salesperson|bartender|barista|waiter|waitress|chef|cook|driver|mechanic|nurse|accountant|recruiter|marketer|editor|writer|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
 const QUALIFICATION_PATTERN = /\b(?:b\.?\s?(?:sc|a|eng|tech|com)|m\.?\s?(?:sc|a|eng|tech|com)|ph\.?d|mba|diploma|associate(?:'s)?|bachelor(?:'s)?|master(?:'s)?|doctorate|postgraduate|undergraduate|higher\s+national\s+diploma|qualification)\b/i;
@@ -210,7 +229,8 @@ function inferTechnicalSkills(rawText: string) {
 }
 function inferDraftFromText(rawText: string): ResumeImportDraft {
   const draft = emptyDraft();
-  const lines = rawText.replace(/\r/g, '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const normalizedText = normalizeDoclingMarkdown(rawText);
+  const lines = normalizedText.split('\n').map((line) => line.trim()).filter(Boolean);
   const joined = lines.join('\n');
   const email = joined.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '';
   const linkedIn = joined.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s|]+/i)?.[0] ?? '';
@@ -238,8 +258,10 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     const openingNarrative = lines.slice(0, firstMainSection < 0 ? 12 : firstMainSection).filter((line) => line.length >= 100 && !/@/.test(line) && !/https?:\/\//i.test(line));
     draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
   }
-  draft.skills = [...new Set(splitSectionItems(sections.skills).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
-  if (!draft.skills.length) draft.skills = inferTechnicalSkills(rawText).slice(0, 40);
+  const toolLines = lines.filter((line) => /^\s*(?:[-*]\s*)?(?:tools?|technologies|tech(?:nology)?\s*stack|frameworks?|libraries|platforms?|databases?)\s*:/i.test(line));
+  draft.skills = [...skillNames([...sections.skills, ...toolLines]), ...inferTechnicalSkills(normalizedText)]
+    .filter((skill, index, skills) => skills.findIndex((candidate) => candidate.name.toLowerCase() === skill.name.toLowerCase()) === index)
+    .slice(0, 40);
   draft.languages = parseLanguages(sections.languages);
   draft.certificates = parseCertificates(sections.certificates);
   draft.education = parseEducation([...sections.education, ...lines.filter((line) => QUALIFICATION_PATTERN.test(line))]);
@@ -251,7 +273,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
 function compactTextForAi(rawText: string) {
   const compactLines: string[] = [];
   let previous = '';
-  for (const line of rawText.replace(/\r/g, '').split('\n').map((item) => item.trim()).filter(Boolean)) {
+  for (const line of normalizeDoclingMarkdown(rawText).split('\n').map((item) => item.trim()).filter(Boolean)) {
     if (line === previous) continue;
     previous = line;
     compactLines.push(line.slice(0, 500));
@@ -445,11 +467,11 @@ async function extractDoclingMarkdown(pdfPath: string, workspace: string, progre
   }
   const markdownPath = join(outputDirectory, 'source.md');
   try {
-    return await readFile(markdownPath, 'utf8');
+    return normalizeDoclingMarkdown(await readFile(markdownPath, 'utf8'));
   } catch {
     const files = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
     if (!files[0]) throw new Error('Docling did not produce Markdown for this PDF.');
-    return readFile(join(outputDirectory, files[0]), 'utf8');
+    return normalizeDoclingMarkdown(await readFile(join(outputDirectory, files[0]), 'utf8'));
   }
 }
 

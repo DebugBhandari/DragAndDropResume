@@ -1015,6 +1015,12 @@ const isEffectivelyEmptyResume = (state: ResumeStore) => {
 const isLocaleCode = (value: unknown): value is LocaleCode =>
   typeof value === 'string' && SUPPORTED_LOCALES.includes(value as LocaleCode);
 
+export type ResumeImportPreviewSnapshot = ResumeData & {
+  removedSections: SectionType[];
+  experienceManualOrder: boolean;
+  projectsManualOrder: boolean;
+};
+
 interface ResumeStore extends ResumeData {
   activeLocale: LocaleCode;
   clearResume: () => void;
@@ -1024,6 +1030,8 @@ interface ResumeStore extends ResumeData {
   setPhoto: (photo: Partial<PhotoConfig>) => void;
   updatePersonalInfo: (info: Partial<PersonalInfo>) => void;
   applyImportDraft: (draft: ResumeImportDraft, selection: ResumeImportSelection) => void;
+  captureImportPreviewSnapshot: () => ResumeImportPreviewSnapshot;
+  restoreImportPreviewSnapshot: (snapshot: ResumeImportPreviewSnapshot) => void;
   addEducation: () => void;
   updateEducation: (id: string, data: Partial<Education>) => void;
   removeEducation: (id: string) => void;
@@ -1170,6 +1178,30 @@ export const useResumeStore = create<ResumeStore>()(
       setStyle: (s: Partial<StyleConfig>) => set((state) => ({ style: { ...state.style, ...s } })),
       setPhoto: (p: Partial<PhotoConfig>) => set((state) => ({ photo: { ...state.photo, ...p } })),
       updatePersonalInfo: (info: Partial<PersonalInfo>) => set((s) => ({ personalInfo: { ...s.personalInfo, ...info } })),
+      captureImportPreviewSnapshot: () => {
+        const state = useResumeStore.getState();
+        return structuredClone({
+          personalInfo: state.personalInfo,
+          education: state.education,
+          experience: state.experience,
+          projects: state.projects,
+          languages: state.languages,
+          skills: state.skills,
+          certificates: state.certificates,
+          awards: state.awards,
+          volunteer: state.volunteer,
+          references: state.references,
+          interests: state.interests,
+          sectionOrder: state.sectionOrder,
+          layout: state.layout,
+          style: state.style,
+          photo: state.photo,
+          removedSections: state.removedSections,
+          experienceManualOrder: state.experienceManualOrder,
+          projectsManualOrder: state.projectsManualOrder,
+        });
+      },
+      restoreImportPreviewSnapshot: (snapshot) => set(() => structuredClone(snapshot)),
       applyImportDraft: (draft, selection) => set((s) => {
         const importedSectionTypes: SectionType[] = [];
         if (selection.experience && draft.experience.length) importedSectionTypes.push('experience');

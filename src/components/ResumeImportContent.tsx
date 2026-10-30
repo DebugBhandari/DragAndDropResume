@@ -1,34 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useResumeStore } from '@/store/useResumeStore';
+import { type ResumeImportPreviewSnapshot, useResumeStore } from '@/store/useResumeStore';
 import type { ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
 
-type AppliedImportItems = {
-  personalInfo: string;
-  photo: string;
-  experience: Set<string>;
-  projects: Set<string>;
-  education: Set<string>;
-  skills: Set<string>;
-  languages: Set<string>;
-  certificates: Set<string>;
-};
-
-function createAppliedImportItems(): AppliedImportItems {
-  return { personalInfo: '', photo: '', experience: new Set(), projects: new Set(), education: new Set(), skills: new Set(), languages: new Set(), certificates: new Set() };
-}
-
-function itemKey(section: keyof Omit<AppliedImportItems, 'personalInfo' | 'photo'>, item: Record<string, string>) {
-  if (section === 'experience') return [item.company, item.position, item.startDate, item.endDate].join('|').toLowerCase();
-  if (section === 'projects') return [item.name, item.completionDate, item.link].join('|').toLowerCase();
-  if (section === 'education') return [item.institution, item.degree, item.startDate, item.endDate].join('|').toLowerCase();
-  if (section === 'skills' || section === 'languages') return item.name.toLowerCase();
-  return [item.name, item.issuer, item.date].join('|').toLowerCase();
-}
-
 export default function ResumeImportContent() {
-  const { applyImportDraft, updatePersonalInfo } = useResumeStore();
+  const { applyImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot } = useResumeStore();
   const [extractedDraft, setExtractedDraft] = useState<ResumeImportDraft | null>(null);
   const [enhancedDraft, setEnhancedDraft] = useState<ResumeImportDraft | null>(null);
   const [isEnhancedDraftReady, setIsEnhancedDraftReady] = useState(false);
@@ -40,7 +17,26 @@ export default function ResumeImportContent() {
   const [isAiRefining, setIsAiRefining] = useState(false);
   const [appliedCount, setAppliedCount] = useState(0);
   const importRunRef = useRef(0);
-  const appliedItemsRef = useRef<AppliedImportItems>(createAppliedImportItems());
+  const previewSnapshotRef = useRef<ResumeImportPreviewSnapshot | null>(null);
+
+  function restoreImportPreview() {
+    if (!previewSnapshotRef.current) return;
+    restoreImportPreviewSnapshot(previewSnapshotRef.current);
+  }
+
+  function previewDraft(draft: ResumeImportDraft | null) {
+    if (!draft || !previewSnapshotRef.current) return;
+    restoreImportPreviewSnapshot(previewSnapshotRef.current);
+    applyImportDraft(draft, { personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
+  }
+
+  function selectDraftSource(source: 'extracted' | 'enhanced') {
+    const nextDraft = source === 'enhanced' ? enhancedDraft : extractedDraft;
+    if (!nextDraft) return;
+    setSelectedDraftSource(source);
+    previewDraft(nextDraft);
+    setMessage(source === 'enhanced' ? 'Previewing PDF extract + AI data.' : 'Previewing PDF extract data.');
+  }
 
   async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -48,12 +44,13 @@ export default function ResumeImportContent() {
     if (!file) return;
     const importRun = importRunRef.current + 1;
     importRunRef.current = importRun;
+    restoreImportPreview();
     setStatus('uploading');
     setMessage('Starting private résumé import…');
     setProgressUpdates(['Starting private résumé import…']);
     setIsAiRefining(false);
     setAppliedCount(0);
-    appliedItemsRef.current = createAppliedImportItems();
+    previewSnapshotRef.current = captureImportPreviewSnapshot();
     setExtractedDraft(null);
     setEnhancedDraft(null);
     setIsEnhancedDraftReady(false);
@@ -94,17 +91,10 @@ export default function ResumeImportContent() {
           if (update.source === 'extracted') {
             setExtractedDraft(update.draft);
             setSelectedDraftSource('extracted');
+            previewDraft(update.draft);
           } else {
             setEnhancedDraft(update.draft);
             if (update.source === 'ai') setIsEnhancedDraftReady(true);
-          }
-          const personalInfoKey = JSON.stringify(update.draft.personalInfo);
-          const populatedPersonalInfo = Object.fromEntries(
-            Object.entries(update.draft.personalInfo).filter(([, value]) => Boolean(value)),
-          );
-          if (Object.keys(populatedPersonalInfo).length && personalInfoKey !== appliedItemsRef.current.personalInfo) {
-            updatePersonalInfo(populatedPersonalInfo);
-            appliedItemsRef.current.personalInfo = personalInfoKey;
           }
           if (update.source === 'extracted') {
             setMessage('PDF extract is ready. Detected personal details are already in your résumé preview while AI continues…');
@@ -148,6 +138,7 @@ export default function ResumeImportContent() {
       if (importRunRef.current === importRun) setStatus('idle');
     } catch (error) {
       if (importRunRef.current !== importRun) return;
+      restoreImportPreview();
       setStatus('error');
       setIsAiRefining(false);
       setMessage(error instanceof Error ? error.message : 'Unable to import this résumé.');
@@ -157,42 +148,12 @@ export default function ResumeImportContent() {
   function applyNewSelectedItems() {
     const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
     if (!draft) return;
-    const applied = appliedItemsRef.current;
-    const nextSelection: ResumeImportSelection = { personalInfo: false, photo: false, experience: false, projects: false, education: false, skills: false, languages: false, certificates: false };
-    const nextDraft: ResumeImportDraft = { ...draft, personalInfo: {}, photoDataUrl: undefined, experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], warnings: [] };
-    const personalInfoKey = JSON.stringify(draft.personalInfo);
-
-    if (selection.personalInfo && personalInfoKey !== '{}' && personalInfoKey !== applied.personalInfo) {
-      nextSelection.personalInfo = true;
-      nextDraft.personalInfo = draft.personalInfo;
-      applied.personalInfo = personalInfoKey;
-    }
-    if (selection.photo && draft.photoDataUrl && draft.photoDataUrl !== applied.photo) {
-      nextSelection.photo = true;
-      nextDraft.photoDataUrl = draft.photoDataUrl;
-      applied.photo = draft.photoDataUrl;
-    }
-    (['experience', 'projects', 'education', 'skills', 'languages', 'certificates'] as const).forEach((section) => {
-      if (!selection[section]) return;
-      const newItems = draft[section].filter((item) => {
-        const key = itemKey(section, item as Record<string, string>);
-        if (applied[section].has(key)) return false;
-        applied[section].add(key);
-        return true;
-      });
-      if (newItems.length) {
-        nextSelection[section] = true;
-        nextDraft[section] = newItems as never;
-      }
-    });
-    if (!Object.values(nextSelection).some(Boolean)) {
-      setMessage('There are no new selected details to add yet. Keep importing, or change the selected sections.');
-      return;
-    }
-    applyImportDraft(nextDraft, nextSelection);
+    restoreImportPreview();
+    applyImportDraft(draft, selection);
+    previewSnapshotRef.current = null;
     setAppliedCount((count) => count + 1);
     setMessage(isAiRefining ? 'Selected PDF extract details added. Ollama continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details were added to your résumé.`);
-    setProgressUpdates((current) => [...current, 'Selected new details added.'].slice(-6));
+    setProgressUpdates((current) => [...current, 'Selected details applied to your résumé.'].slice(-6));
   }
 
   const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
@@ -239,8 +200,8 @@ export default function ResumeImportContent() {
             <div className="resume-import-source-picker" role="group" aria-label="Choose import data source">
               <p className="text-xs font-semibold">Choose the data to review and apply</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => setSelectedDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
+                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
               </div>
               <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the Docling PDF extract with local Ollama’s structured work and project details, plus a PDF profile-image candidate when found.' : 'Using only the Docling PDF-to-Markdown extract and local TypeScript parser — no LLM parsing or profile image.'}</p>
             </div>
@@ -260,7 +221,7 @@ export default function ResumeImportContent() {
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected {selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} data{appliedCount ? ' again' : ''}</button>
-            <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setExtractedDraft(null); setEnhancedDraft(null); setIsEnhancedDraftReady(false); setSelectedDraftSource('extracted'); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
+            <button type="button" className="resume-import-cancel" onClick={() => { restoreImportPreview(); previewSnapshotRef.current = null; importRunRef.current += 1; setExtractedDraft(null); setEnhancedDraft(null); setIsEnhancedDraftReady(false); setSelectedDraftSource('extracted'); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>
       )}
