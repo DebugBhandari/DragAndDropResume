@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { ResumeImportDraft } from '@/types/resume';
+import { type LastImportTiming, writeLastImportTiming } from '@/utils/importTiming';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -373,19 +374,31 @@ async function extractEmbeddedProfilePhoto(pdfPath: string, workspace: string) {
   const imagePath = join(workspace, fileName); const info = await stat(imagePath);
   return info.size > 0 && info.size <= MAX_IMPORTED_PHOTO_BYTES ? `data:image/png;base64,${(await readFile(imagePath)).toString('base64')}` : '';
 }
-async function ocrImage(path: string) { const { stdout } = await execFileAsync('tesseract', [path, 'stdout', '--oem', '1', '--psm', '3', '-l', 'eng'], { timeout: 60_000, maxBuffer: 2_000_000 }); return stdout; }
-async function extractDocument(path: string, type: string, workspace: string, progress: (message: string) => void) {
-  if (type !== 'application/pdf') { progress('Scanning the image with OCR…'); return ocrImage(path); }
+async function ocrImage(path: string, timings: LastImportTiming['timingsMs']) {
+  const startedAt = performance.now();
+  try {
+    const { stdout } = await execFileAsync('tesseract', [path, 'stdout', '--oem', '1', '--psm', '3', '-l', 'eng'], { timeout: 60_000, maxBuffer: 2_000_000 });
+    return stdout;
+  } finally {
+    timings.tesseract += Math.round(performance.now() - startedAt);
+  }
+}
+async function extractDocument(path: string, type: string, workspace: string, progress: (message: string) => void, timings: LastImportTiming['timingsMs']) {
+  if (type !== 'application/pdf') { progress('Scanning the image with OCR…'); return ocrImage(path, timings); }
   progress('Extracting text from the PDF…');
+  const textStartedAt = performance.now();
   const { stdout } = await execFileAsync('pdftotext', ['-layout', path, '-'], { timeout: 30_000, maxBuffer: 2_000_000 });
+  timings.pdfTextExtraction = Math.round(performance.now() - textStartedAt);
   if (stdout.replace(/\s/g, '').length >= 100) return stdout;
   progress('This looks like a scanned PDF. Preparing OCR…');
   const prefix = join(workspace, 'page');
+  const rasterStartedAt = performance.now();
   await execFileAsync('pdftoppm', ['-png', '-r', '150', '-f', '1', '-l', String(MAX_PDF_PAGES), path, prefix], { timeout: 60_000 });
+  timings.pdfRasterization = Math.round(performance.now() - rasterStartedAt);
   const pages: string[] = [];
   for (let index = 1; index <= MAX_PDF_PAGES; index += 1) {
     progress(`Reading scanned page ${index} of ${MAX_PDF_PAGES}…`);
-    try { const page = await ocrImage(`${prefix}-${index}.png`); if (page.trim()) pages.push(page); if (pages.join('').replace(/\s/g, '').length >= 1_500) break; } catch { /* Continue with the remaining pages. */ }
+    try { const page = await ocrImage(`${prefix}-${index}.png`, timings); if (page.trim()) pages.push(page); if (pages.join('').replace(/\s/g, '').length >= 1_500) break; } catch { /* Continue with the remaining pages. */ }
   }
   return pages.join('\n\n--- Page break ---\n\n');
 }
@@ -399,19 +412,26 @@ export async function POST(request: Request) {
     async start(controller) {
       const emit = (event: ImportEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       const startedAt = performance.now();
-      const logStage = (stage: string) => console.info(`[resume-import] ${stage}: ${Math.round(performance.now() - startedAt)}ms`);
+      const timings: LastImportTiming['timingsMs'] = { uploadWrite: 0, pdfTextExtraction: 0, pdfRasterization: 0, tesseract: 0, deterministicDraft: 0, ollama: 0, photoExtraction: 0, total: 0 };
+      const timing: LastImportTiming = { startedAt: new Date().toISOString(), status: 'running', fileType: file.type, fileSizeBytes: file.size, timingsMs: timings };
+      const saveTiming = async (status: LastImportTiming['status'], error?: string) => {
+        timings.total = Math.round(performance.now() - startedAt);
+        timing.status = status;
+        timing.completedAt = status === 'running' ? undefined : new Date().toISOString();
+        timing.error = error;
+        await writeLastImportTiming(timing);
+      };
       let workspace = '';
       try {
+        await saveTiming('running');
         emit({ type: 'progress', message: 'Saving your file securely for processing…' });
         workspace = await mkdtemp(join(tmpdir(), 'resume-import-')); await mkdir(workspace, { recursive: true });
         const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg';
-        const sourcePath = join(workspace, `source.${extension}`); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
-        logStage('upload write');
-        const extractedText = (await extractDocument(sourcePath, file.type, workspace, (message) => emit({ type: 'progress', message }))).trim();
-        logStage('text extraction');
+        const sourcePath = join(workspace, `source.${extension}`); const uploadStartedAt = performance.now(); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer())); timings.uploadWrite = Math.round(performance.now() - uploadStartedAt);
+        const extractedText = (await extractDocument(sourcePath, file.type, workspace, (message) => emit({ type: 'progress', message }), timings)).trim();
         if (extractedText.length < 30) throw new Error('No readable résumé text was found in this file.');
         emit({ type: 'progress', message: 'Building a quick preview from the extracted text…' });
-        let draft = inferDraftFromText(extractedText); logStage('deterministic draft'); emit({ type: 'draft', draft, source: 'extracted' });
+        const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.deterministicDraft = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
         emit({ type: 'progress', message: 'Your preview is ready. Reading résumé records with local AI…' });
         let streamedRecords = 0;
         const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
@@ -422,30 +442,35 @@ export async function POST(request: Request) {
           emit({ type: 'draft', draft: { ...draft }, source: 'ai-partial' });
           return true;
         });
+        const ollamaStartedAt = performance.now();
         try {
           await aiDraftPromise;
-          logStage('AI normalization and sanitization');
           emit({ type: 'draft', draft, source: 'ai' });
           emit({ type: 'complete', message: `AI cleanup is complete. ${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'} arrived progressively for review.` });
         }
         catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
+        finally { timings.ollama = Math.round(performance.now() - ollamaStartedAt); }
         if (file.type === 'application/pdf') {
           emit({ type: 'progress', message: 'Text import is complete. Looking for an embedded profile photo…' });
+          const photoStartedAt = performance.now();
           try {
             const photoDataUrl = await extractEmbeddedProfilePhoto(sourcePath, workspace);
-            logStage('photo extraction');
             if (photoDataUrl) {
               draft = { ...draft, photoDataUrl };
               emit({ type: 'progress', message: 'Profile photo downloaded and ready to review.' });
               emit({ type: 'draft', draft, source: 'photo' });
             } else emit({ type: 'progress', message: 'No embedded profile photo was found.' });
           } catch {
-            logStage('photo extraction unavailable');
             emit({ type: 'progress', message: 'Profile photo could not be extracted.' });
-          }
+          } finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
         }
-      } catch (error) { emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to import this résumé right now.' }); }
-      finally { if (workspace) await rm(workspace, { recursive: true, force: true }); logStage('complete'); controller.close(); }
+        await saveTiming('complete');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to import this résumé right now.';
+        await saveTiming('failed', message);
+        emit({ type: 'error', message });
+      }
+      finally { if (workspace) await rm(workspace, { recursive: true, force: true }); controller.close(); }
     },
   });
   return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' } });

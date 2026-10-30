@@ -1,3 +1,5 @@
+import { readLastImportTiming } from '@/utils/importTiming';
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -9,6 +11,7 @@ type OllamaTagsResponse = {
 };
 
 export async function GET() {
+  const lastImport = await readLastImportTiming();
   try {
     const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
       cache: "no-store",
@@ -18,7 +21,7 @@ export async function GET() {
 
     if (!response.ok) {
       return Response.json(
-        { ok: false, model, installed: false, error: `Ollama returned HTTP ${response.status}.` },
+        { ok: false, model, installed: false, lastImport, error: `Ollama returned HTTP ${response.status}.` },
         { status: 503 },
       );
     }
@@ -28,15 +31,15 @@ export async function GET() {
       data = JSON.parse(body) as OllamaTagsResponse;
     } catch {
       return Response.json(
-        { ok: false, model, installed: false, error: "Ollama returned an invalid response." },
+        { ok: false, model, installed: false, lastImport, error: "Ollama returned an invalid response." },
         { status: 503 },
       );
     }
 
     const installed = (data.models ?? []).some((item) => item.name === model || item.model === model);
-    return Response.json({ ok: true, model, installed });
+    return Response.json({ ok: true, model, installed, lastImport });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to reach local Ollama.";
-    return Response.json({ ok: false, model, installed: false, error: message }, { status: 503 });
+    return Response.json({ ok: false, model, installed: false, lastImport, error: message }, { status: 503 });
   }
 }
