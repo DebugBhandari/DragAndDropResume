@@ -134,7 +134,7 @@ export default function ResumeImportContent() {
         <div className="resume-import-status mt-3 p-3 text-xs">
           <div className="resume-import-status-title flex items-center gap-2 font-semibold">
             <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
-            {isAiRefining && draft ? 'Quick preview available — AI cleanup continues' : 'Import in progress'}
+            {isAiRefining && draft ? 'Quick preview available — AI cleanup continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
           </div>
           <ol className="resume-import-status-list mt-2 space-y-1">
             {progressUpdates.map((update, index) => <li key={`${index}-${update}`}>{index + 1}. {update}</li>)}

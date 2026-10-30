@@ -2292,12 +2292,17 @@ export default function Home() {
                       <StyleEditor />
                     </CollapsiblePanel>
                   </div>
-                  <div className="border-t border-[var(--studio-line)] pt-3 text-center">
+                  <div className="resume-reset-card">
+                    <div>
+                      <p className="resume-reset-card-title">Start over</p>
+                      <p className="resume-reset-card-copy">Remove all content saved in this browser.</p>
+                    </div>
                     <button
                       type="button"
                       onClick={handleClearResume}
-                      className="rounded-md border border-red-400/70 bg-red-50/70 px-2.5 py-1 text-xs font-semibold text-red-800 transition hover:border-red-500 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2"
+                      className="resume-reset-button"
                     >
+                      <span aria-hidden="true">⌫</span>
                       Clear résumé
                     </button>
                   </div>
