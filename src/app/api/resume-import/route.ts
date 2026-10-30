@@ -177,26 +177,27 @@ function takeCompleteStreamRecords(buffer: string) {
   }
   return { records, remainder: start >= 0 ? buffer.slice(start) : buffer.slice(consumed) };
 }
-async function streamDraftWithAi(extractedText: string, onRecord: (record: StreamRecord) => void) {
+async function streamDraftWithAi(extractedText: string, onRecord: (record: StreamRecord) => boolean) {
   if (aiRefinementInFlight) throw new Error('AI cleanup is already processing another résumé. Your quick preview is ready; retry this import after that cleanup finishes.');
   aiRefinementInFlight = true;
   try {
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
       body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1350 }, messages: [
-        { role: 'system', content: 'Extract only résumé facts. Output JSON objects only. First: {"type":"personalInfo","item":{"fullName":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":""}}. Put the source profile/summary/introduction/objective in summary. Then one object per item: experience {company,position,startDate,endDate,descriptionBullets}; projects {name,completionDate,technologies,link,descriptionBullets}; education {institution,degree,field,startDate,endDate,description}; skills {name,level}; languages {name,proficiency}; certificates {name,issuer,date,link}. Keep source order. Split work/project paragraphs into 3–6 short factual bullets when supported. Do not invent or merge facts.' },
+        { role: 'system', content: 'Extract the résumé sections below. Output JSON objects only; no explanation, markdown, or personalInfo object. Start with an experience or projects object. Types: experience {company,position,startDate,endDate,descriptionBullets}; projects {name,completionDate,technologies,link,descriptionBullets}; education {institution,degree,field,startDate,endDate,description}; skills {name,level}; languages {name,proficiency}; certificates {name,issuer,date,link}. One object per entry, source order. Split each work/project paragraph into 2–5 short factual bullets. Continue until all available entries are emitted. Never invent or merge facts.' },
         { role: 'user', content: compactTextForAi(extractedText) },
       ] }),
     });
     if (!response.ok) throw new Error('The local résumé model is unavailable.');
     if (!response.body) throw new Error('The local résumé model did not return a stream.');
     const reader = response.body.getReader(); const decoder = new TextDecoder();
-    let ollamaBuffer = ''; let recordBuffer = ''; let records = 0;
+    let ollamaBuffer = ''; let recordBuffer = ''; let records = 0; let appliedRecords = 0;
+    const receivedTypes: Record<string, number> = {};
     const processContent = (content: string) => {
       recordBuffer += content;
       const extracted = takeCompleteStreamRecords(recordBuffer);
       recordBuffer = extracted.remainder;
-      for (const record of extracted.records) { onRecord(record); records += 1; }
+      for (const record of extracted.records) { records += 1; if (record.type) receivedTypes[record.type] = (receivedTypes[record.type] ?? 0) + 1; if (onRecord(record)) appliedRecords += 1; }
     };
     while (true) {
       const { value, done } = await reader.read();
@@ -209,7 +210,8 @@ async function streamDraftWithAi(extractedText: string, onRecord: (record: Strea
     }
     if (ollamaBuffer.trim()) { try { const chunk = JSON.parse(ollamaBuffer) as { message?: { content?: string } }; if (chunk.message?.content) processContent(chunk.message.content); } catch { /* Ignore malformed final transport chunk. */ } }
     const finalRecords = takeCompleteStreamRecords(recordBuffer).records;
-    for (const record of finalRecords) { onRecord(record); records += 1; }
+    for (const record of finalRecords) { records += 1; if (record.type) receivedTypes[record.type] = (receivedTypes[record.type] ?? 0) + 1; if (onRecord(record)) appliedRecords += 1; }
+    console.info(`[resume-import] AI records received=${records} applied=${appliedRecords} types=${JSON.stringify(receivedTypes)}`);
     if (!records) throw new Error('The local résumé model did not return readable structured details.');
   } finally {
     aiRefinementInFlight = false;
@@ -277,11 +279,12 @@ export async function POST(request: Request) {
         emit({ type: 'progress', message: 'Your preview is ready. Reading résumé records with local AI…' });
         let streamedRecords = 0;
         const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
-          if (!applyStreamRecord(draft, record)) return;
+          if (!applyStreamRecord(draft, record)) return false;
           streamedRecords += 1;
           const label = record.type === 'projects' ? 'project' : record.type === 'skills' ? 'skill' : record.type === 'languages' ? 'language' : record.type === 'certificates' ? 'certificate' : record.type === 'personalInfo' ? 'personal details' : record.type ?? 'detail';
           emit({ type: 'progress', message: `Detected ${label}${record.type === 'personalInfo' ? '' : ` ${streamedRecords}`}…` });
           emit({ type: 'draft', draft: { ...draft }, source: 'ai-partial' });
+          return true;
         });
         try {
           await aiDraftPromise;
