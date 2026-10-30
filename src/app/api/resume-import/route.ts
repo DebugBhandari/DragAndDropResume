@@ -26,6 +26,15 @@ type ImportEvent =
 function text(value: unknown, max = 500) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function array(value: unknown) { return Array.isArray(value) ? value : []; }
 function validLevel(value: string, levels: readonly string[], fallback: string) { return levels.includes(value) ? value : fallback; }
+function splitDescriptionIntoBullets(values: unknown[], description: unknown) {
+  const source = [...values, description].flatMap((value) => text(value, 1400).split(/\n+|(?=[•·▪◦])\s*/));
+  return source.flatMap((value) => {
+    const cleaned = value.replace(/^[•·▪◦*-]\s*/, '').trim();
+    if (!cleaned) return [];
+    const sentences = cleaned.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).flatMap((sentence) => sentence.split(/\s*;\s*/));
+    return sentences.map((sentence) => sentence.trim()).filter(Boolean);
+  }).filter((bullet, index, bullets) => bullet.length >= 3 && bullets.indexOf(bullet) === index).slice(0, 12).map((bullet) => bullet.slice(0, 360));
+}
 function namedRows(value: unknown) {
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([name, detail]) => detail && typeof detail === 'object' ? { name, ...(detail as Record<string, unknown>) } : { name, detail });
@@ -41,15 +50,15 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
     personalInfo: { fullName: text(personal.fullName ?? personal.name, 120), email: text(personal.email, 160), phone: text(personal.phone, 80), location: text(personal.location, 160), linkedin: text(personal.linkedin, 240), website: text(personal.website, 240), summary: text(personal.summary, 1200) },
     experience: array(raw.experience).slice(0, 12).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const bullets = array(row.descriptionBullets).map((bullet) => text(bullet, 360)).filter(Boolean).slice(0, 10);
       const description = text(row.description, 1200);
-      return { company: text(row.company, 180), position: text(row.position, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description, descriptionBullets: bullets.length ? bullets : description ? [description] : [] };
+      const bullets = splitDescriptionIntoBullets(array(row.descriptionBullets), description);
+      return { company: text(row.company, 180), position: text(row.position, 180), startDate: text(row.startDate, 60), endDate: text(row.endDate, 60), description, descriptionBullets: bullets };
     }).filter((item) => item.company || item.position),
     projects: array(raw.projects).slice(0, 12).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const bullets = array(row.descriptionBullets).map((bullet) => text(bullet, 360)).filter(Boolean).slice(0, 10);
       const description = text(row.description, 1200);
-      return { name: text(row.name, 180), description, descriptionBullets: bullets.length ? bullets : description ? [description] : [], completionDate: text(row.completionDate, 60), technologies: text(row.technologies, 400), link: text(row.link, 240) };
+      const bullets = splitDescriptionIntoBullets(array(row.descriptionBullets), description);
+      return { name: text(row.name, 180), description, descriptionBullets: bullets, completionDate: text(row.completionDate, 60), technologies: text(row.technologies, 400), link: text(row.link, 240) };
     }).filter((item) => item.name || item.descriptionBullets.length),
     education: array(raw.education).slice(0, 10).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
@@ -92,7 +101,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     else if (isHeading(line, ['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox'])) current = 'skills';
     else if (isHeading(line, ['languages', 'language'])) current = 'languages';
     else if (isHeading(line, ['certificates', 'certifications', 'licenses', 'licences', 'credentials'])) current = 'certificates';
-    else if (isHeading(line, ['summary', 'profile', 'professionalprofile', 'aboutme', 'objective'])) current = 'summary';
+    else if (isHeading(line, ['summary', 'professionalsummary', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective'])) current = 'summary';
     else if (current) sections[current].push(line);
   }
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
@@ -175,7 +184,7 @@ async function streamDraftWithAi(extractedText: string, onRecord: (record: Strea
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
       body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1800 }, messages: [
-        { role: 'system', content: 'Extract résumé facts exactly. Output newline-delimited JSON only: one complete object per line, no markdown. Each object must use exactly one type: personalInfo, experience, projects, education, skills, languages, certificates, warning. Use {"type":"personalInfo","item":{...}} once when possible. Use one object per work role/project/etc. Never merge separate entries, dates, employers, titles, bullets, or technologies. Keep source order. Experience item: company, position, startDate, endDate, descriptionBullets. Projects item: name, completionDate, technologies, link, descriptionBullets. Education item: institution, degree, field, startDate, endDate, description. Skills item: name, level. Languages item: name, proficiency. Certificates item: name, issuer, date, link. Never invent facts.' },
+        { role: 'system', content: 'Extract résumé facts exactly. Output JSON objects only, one object at a time, no prose or markdown. FIRST output exactly one {"type":"personalInfo","item":{...}} object. Its item MUST include fullName, email, phone, location, linkedin, website, and summary. Copy the entire professional summary/introduction/profile/about-me/objective text into summary, preserving factual wording; use an empty string only if no such section exists. Then output one object per experience/project/etc. Never merge separate entries, dates, employers, titles, bullets, or technologies; keep source order. Experience item: company, position, startDate, endDate, descriptionBullets. Projects item: name, completionDate, technologies, link, descriptionBullets. For every experience/project, split paragraph text into detailed factual action/result bullets: one sentence or independent clause per bullet, 4–10 bullets when the source supports it, no bullet longer than 280 characters. Education item: institution, degree, field, startDate, endDate, description. Skills item: name, level. Languages item: name, proficiency. Certificates item: name, issuer, date, link. Never invent facts.' },
         { role: 'user', content: compactTextForAi(extractedText) },
       ] }),
     });
