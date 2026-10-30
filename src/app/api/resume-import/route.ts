@@ -432,7 +432,16 @@ export async function POST(request: Request) {
         if (extractedText.length < 30) throw new Error('No readable résumé text was found in this file.');
         emit({ type: 'progress', message: 'Building a quick preview from the extracted text…' });
         const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.deterministicDraft = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
-        emit({ type: 'progress', message: 'Your preview is ready. Reading résumé records with local AI…' });
+        const photoPromise = file.type === 'application/pdf'
+          ? (async () => {
+            const photoStartedAt = performance.now();
+            try { return await extractEmbeddedProfilePhoto(sourcePath, workspace); }
+            catch { return ''; }
+            finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
+          })()
+          : Promise.resolve('');
+        if (file.type === 'application/pdf') emit({ type: 'progress', message: 'Fast PDF/Tesseract draft is ready. Extracting the PDF profile image while Ollama works…' });
+        emit({ type: 'progress', message: 'Fast PDF/Tesseract draft is ready to use. Reading résumé records with local AI in the background…' });
         let streamedRecords = 0;
         const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
           if (!applyStreamRecord(draft, record)) return false;
@@ -445,25 +454,13 @@ export async function POST(request: Request) {
         const ollamaStartedAt = performance.now();
         try {
           await aiDraftPromise;
+          const photoDataUrl = await photoPromise;
+          if (photoDataUrl) draft = { ...draft, photoDataUrl };
           emit({ type: 'draft', draft, source: 'ai' });
-          emit({ type: 'complete', message: `AI cleanup is complete. ${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'} arrived progressively for review.` });
+          emit({ type: 'complete', message: `Ollama cleanup is complete. Option 2 is ready with ${photoDataUrl ? 'the PDF profile image and ' : ''}${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'}.` });
         }
-        catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
+        catch (error) { await photoPromise; const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The fast PDF/Tesseract extraction remains available to review.` }); emit({ type: 'complete', message: 'Fast PDF/Tesseract extraction is ready to review.' }); }
         finally { timings.ollama = Math.round(performance.now() - ollamaStartedAt); }
-        if (file.type === 'application/pdf') {
-          emit({ type: 'progress', message: 'Text import is complete. Looking for an embedded profile photo…' });
-          const photoStartedAt = performance.now();
-          try {
-            const photoDataUrl = await extractEmbeddedProfilePhoto(sourcePath, workspace);
-            if (photoDataUrl) {
-              draft = { ...draft, photoDataUrl };
-              emit({ type: 'progress', message: 'Profile photo downloaded and ready to review.' });
-              emit({ type: 'draft', draft, source: 'photo' });
-            } else emit({ type: 'progress', message: 'No embedded profile photo was found.' });
-          } catch {
-            emit({ type: 'progress', message: 'Profile photo could not be extracted.' });
-          } finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
-        }
         await saveTiming('complete');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to import this résumé right now.';
