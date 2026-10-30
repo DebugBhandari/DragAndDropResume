@@ -84,6 +84,38 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
 
 function normalizeHeading(value: string) { return value.toLowerCase().replace(/[^a-z]/g, ''); }
 function isHeading(value: string, candidates: string[]) { const heading = normalizeHeading(value); return candidates.some((candidate) => heading === candidate || heading.startsWith(candidate)); }
+function sectionHeading(line: string) {
+  const heading = normalizeHeading(line);
+  const match = (values: string[]) => values.some((value) => heading === value || heading.startsWith(value));
+  if (match(['experience', 'workexperience', 'employment', 'professionalexperience', 'careersummary', 'workhistory'])) return 'experience';
+  if (match(['projects', 'projectexperience', 'selectedprojects', 'personalprojects', 'keyprojects'])) return 'projects';
+  if (match(['education', 'academicbackground', 'qualifications', 'academicqualifications', 'educationandtraining'])) return 'education';
+  if (match(['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox', 'keyskills', 'skillsandtools'])) return 'skills';
+  if (match(['languages', 'language', 'languageskills'])) return 'languages';
+  if (match(['certificates', 'certifications', 'licenses', 'licences', 'credentials', 'certificatesandcertifications'])) return 'certificates';
+  if (match(['summary', 'professionalsummary', 'summaryofqualifications', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective', 'professionalobjective'])) return 'summary';
+  return '';
+}
+function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
+function inlineSectionContent(line: string) {
+  const match = line.match(/^(.{2,80}?)[\s:–—-]+(.{2,})$/);
+  if (!match) return { section: '', content: '' };
+  const section = sectionHeading(match[1]);
+  return { section, content: section ? match[2].trim() : '' };
+}
+function parseEducation(lines: string[]) {
+  const entries: Array<{ institution: string; degree: string; field: string; startDate: string; endDate: string; description: string }> = [];
+  for (const line of lines) {
+    const parts = line.split(/[|•·▪◦]/).map((value) => value.trim()).filter(Boolean);
+    const dateMatch = line.match(/((?:19|20)\d{2}|present|current)\s*(?:[-–—]|to)\s*((?:19|20)\d{2}|present|current)/i);
+    const withoutDates = line.replace(dateMatch?.[0] ?? '', '').replace(/\s{2,}/g, ' ').trim();
+    const degree = parts.find((value) => /\b(b\.?\s?(?:sc|a|eng)|m\.?\s?(?:sc|a|ba)|ph\.?d|mba|diploma|certificate|associate|bachelor|master)\b/i.test(value)) ?? '';
+    const institution = parts.find((value) => value !== degree && /\b(university|college|school|institute|academy|polytechnic)\b/i.test(value)) ?? parts.find((value) => value !== degree) ?? '';
+    if (!institution && !degree) continue;
+    entries.push({ institution, degree, field: '', startDate: dateMatch?.[1] ?? '', endDate: dateMatch?.[2] ?? '', description: withoutDates === institution || withoutDates === degree ? '' : withoutDates });
+  }
+  return entries.slice(0, 10);
+}
 function inferDraftFromText(rawText: string): ResumeImportDraft {
   const draft = emptyDraft();
   const lines = rawText.replace(/\r/g, '').split('\n').map((line) => line.trim()).filter(Boolean);
@@ -97,19 +129,28 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   const sections: Record<string, string[]> = { experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], summary: [] };
   let current = '';
   for (const line of lines) {
-    if (isHeading(line, ['experience', 'workexperience', 'employment', 'professionalexperience', 'careersummary', 'workhistory'])) current = 'experience';
-    else if (isHeading(line, ['projects', 'projectexperience', 'selectedprojects', 'personalprojects', 'keyprojects'])) current = 'projects';
-    else if (isHeading(line, ['education', 'academicbackground', 'qualifications'])) current = 'education';
-    else if (isHeading(line, ['skills', 'technicalskills', 'corecompetencies', 'competencies', 'technologies', 'toolbox'])) current = 'skills';
-    else if (isHeading(line, ['languages', 'language'])) current = 'languages';
-    else if (isHeading(line, ['certificates', 'certifications', 'licenses', 'licences', 'credentials'])) current = 'certificates';
-    else if (isHeading(line, ['summary', 'professionalsummary', 'summaryofqualifications', 'profile', 'professionalprofile', 'executiveprofile', 'aboutme', 'introduction', 'careerobjective', 'objective', 'professionalobjective'])) current = 'summary';
-    else if (current) sections[current].push(line);
+    const inline = inlineSectionContent(line);
+    if (inline.section) {
+      current = inline.section;
+      sections[current].push(inline.content);
+    }
+    else {
+      const heading = sectionHeading(line);
+      if (heading) current = heading;
+      else if (current) sections[current].push(line);
+    }
   }
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
-  draft.skills = [...new Set(sections.skills.join(' ').split(/[|,;•·]+/).map((value) => value.replace(/^[-–—]\s*/, '').trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
-  draft.languages = [...new Set(sections.languages.join(' ').split(/[|,;•·]+/).map((value) => value.replace(/^[-–—]\s*/, '').trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 15).map((value) => ({ name: value.replace(/\s*[-–—:]\s*(native|fluent|advanced|intermediate|beginner).*$/i, ''), proficiency: (value.match(/native|fluent|advanced|intermediate|beginner/i)?.[0] ?? 'Intermediate').replace(/^./, (letter) => letter.toUpperCase()) as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' }));
-  draft.warnings.push('Contact details, skills, and languages are ready. Work history, projects, education, and certificates are being structured by AI to avoid mixing PDF columns or entries.');
+  if (!draft.personalInfo.summary) {
+    const firstMainSection = lines.findIndex((line) => ['experience', 'projects', 'education', 'skills', 'languages', 'certificates'].includes(sectionHeading(line) || inlineSectionContent(line).section));
+    const openingNarrative = lines.slice(0, firstMainSection < 0 ? 12 : firstMainSection).filter((line) => line.length >= 100 && !/@/.test(line) && !/https?:\/\//i.test(line));
+    draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
+  }
+  draft.skills = [...new Set(splitSectionItems(sections.skills).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 40).map((name) => ({ name, level: 'Intermediate' }));
+  draft.languages = [...new Set(splitSectionItems(sections.languages).flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 15).map((value) => ({ name: value.replace(/\s*[-–—:]\s*(native|fluent|advanced|intermediate|beginner).*$/i, ''), proficiency: (value.match(/native|fluent|advanced|intermediate|beginner/i)?.[0] ?? 'Intermediate').replace(/^./, (letter) => letter.toUpperCase()) as 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner' }));
+  draft.certificates = splitSectionItems(sections.certificates).slice(0, 20).map((name) => ({ name, issuer: '', date: '', link: '' }));
+  draft.education = parseEducation(sections.education);
+  draft.warnings.push('Personal details, summary, education, skills, languages, and certificates are extracted directly from text. AI is structuring detailed work history and projects.');
   return draft;
 }
 function compactTextForAi(rawText: string) {
@@ -228,7 +269,7 @@ async function streamDraftWithAi(extractedText: string, onRecord: (record: Strea
     const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
       body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1350 }, messages: [
-        { role: 'system', content: 'Extract the résumé sections below. Output JSON objects only; no explanation, markdown, or personalInfo object. Start with an experience or projects object. Types: experience {company,position,startDate,endDate,descriptionBullets}; projects {name,completionDate,technologies,link,descriptionBullets}; education {institution,degree,field,startDate,endDate,description}; skills {name,level}; languages {name,proficiency}; certificates {name,issuer,date,link}. One object per entry, source order. Split each work/project paragraph into 2–5 short factual bullets. Continue until all available entries are emitted. Never invent or merge facts.' },
+        { role: 'system', content: 'Extract only work experience and projects from this résumé. Output JSON objects only; no explanation or markdown. Experience: {company,position,startDate,endDate,descriptionBullets}. Project: {name,completionDate,technologies,link,descriptionBullets}. One object per entry in source order. Split each paragraph into 2–5 short factual bullets. Never invent or merge facts.' },
         { role: 'user', content: compactTextForAi(extractedText) },
       ] }),
     });
