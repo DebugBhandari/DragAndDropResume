@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import type { ResumeImportDraft } from '@/types/resume';
 
 export const runtime = 'nodejs';
-export const maxDuration = 240;
+export const maxDuration = 300;
 
 const execFileAsync = promisify(execFile);
 const encoder = new TextEncoder();
@@ -14,10 +14,11 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_PAGES = 3;
 const MAX_IMPORTED_PHOTO_BYTES = 1_000_000;
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+let aiRefinementInFlight = false;
 
 type ImportEvent =
   | { type: 'progress'; message: string }
-  | { type: 'draft'; draft: ResumeImportDraft; source: 'extracted' | 'ai' | 'photo' }
+  | { type: 'draft'; draft: ResumeImportDraft; source: 'extracted' | 'ai-partial' | 'ai' | 'photo' }
   | { type: 'complete'; message: string }
   | { type: 'warning'; message: string }
   | { type: 'error'; message: string };
@@ -111,29 +112,99 @@ function compactTextForAi(rawText: string) {
   }
   return compactLines.join('\n').slice(0, 12_000);
 }
-function mergeDrafts(fallback: ResumeImportDraft, refined: ResumeImportDraft): ResumeImportDraft {
-  return {
-    personalInfo: { ...fallback.personalInfo, ...Object.fromEntries(Object.entries(refined.personalInfo).filter(([, value]) => Boolean(value))) },
-    experience: refined.experience.length >= fallback.experience.length ? refined.experience : fallback.experience,
-    projects: refined.projects.length >= fallback.projects.length ? refined.projects : fallback.projects,
-    education: refined.education.length >= fallback.education.length ? refined.education : fallback.education,
-    skills: refined.skills.length >= fallback.skills.length ? refined.skills : fallback.skills,
-    languages: refined.languages.length >= fallback.languages.length ? refined.languages : fallback.languages,
-    certificates: refined.certificates.length >= fallback.certificates.length ? refined.certificates : fallback.certificates,
-    warnings: refined.warnings.length ? refined.warnings : fallback.warnings,
-  };
+type StreamRecordType = 'personalInfo' | 'experience' | 'projects' | 'education' | 'skills' | 'languages' | 'certificates' | 'warning';
+type StreamRecord = { type?: StreamRecordType; item?: unknown; message?: unknown };
+function recordKey(type: Exclude<StreamRecordType, 'personalInfo' | 'warning'>, item: Record<string, unknown>) {
+  if (type === 'experience') return [item.company, item.position, item.startDate, item.endDate].map(String).join('|').toLowerCase();
+  if (type === 'projects') return [item.name, item.completionDate, item.link].map(String).join('|').toLowerCase();
+  if (type === 'education') return [item.institution, item.degree, item.startDate, item.endDate].map(String).join('|').toLowerCase();
+  if (type === 'skills' || type === 'languages') return String(item.name ?? '').toLowerCase();
+  return [item.name, item.issuer, item.date].map(String).join('|').toLowerCase();
 }
-async function refineDraftWithAi(extractedText: string) {
-  const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(235_000),
-    body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b', stream: false, format: 'json', options: { temperature: 0, num_predict: 2200 }, messages: [
-      { role: 'system', content: 'Extract factual résumé data from this single source. Return exactly one valid JSON object with exactly personalInfo, experience, projects, education, skills, languages, certificates, warnings. Accuracy is more important than brevity: preserve EVERY distinct work role and EVERY distinct project in source order; never combine bullet points, dates, employers, technologies, or titles from separate entries. Do not infer or rewrite facts. For unclear fields use an empty string, but retain the entry when its title or bullets are present. personalInfo: fullName, email, phone, location, linkedin, website, summary. Experience: company, position, startDate, endDate, descriptionBullets. Projects: name, completionDate, technologies, link, descriptionBullets. Education: institution, degree, field, startDate, endDate, description. Certificates: name, issuer, date, link. Preserve up to 10 factual bullets per experience/project. Return no markdown and no explanation.' },
-      { role: 'user', content: compactTextForAi(extractedText) },
-    ] }),
-  });
-  if (!response.ok) throw new Error('The local résumé model is unavailable.');
-  const result = await response.json() as { message?: { content?: string } };
-  return sanitizeDraft(JSON.parse(result.message?.content ?? '{}'));
+function applyStreamRecord(draft: ResumeImportDraft, record: StreamRecord) {
+  if (!record.type) return false;
+  if (record.type === 'warning') {
+    const warning = text(record.message, 240);
+    if (!warning || draft.warnings.includes(warning)) return false;
+    draft.warnings = [...draft.warnings, warning].slice(0, 8);
+    return true;
+  }
+  if (record.type === 'personalInfo') {
+    const partial = sanitizeDraft({ personalInfo: record.item }).personalInfo;
+    const populated = Object.fromEntries(Object.entries(partial).filter(([, value]) => Boolean(value)));
+    if (!Object.keys(populated).length) return false;
+    const changed = Object.entries(populated).some(([key, value]) => draft.personalInfo[key as keyof typeof draft.personalInfo] !== value);
+    draft.personalInfo = { ...draft.personalInfo, ...populated };
+    return changed;
+  }
+  const section = record.type as Exclude<StreamRecordType, 'personalInfo' | 'warning'>;
+  const parsed = sanitizeDraft({ [section]: [record.item] })[section];
+  const item = parsed[0];
+  if (!item) return false;
+  const key = recordKey(section, item as Record<string, unknown>);
+  if (!key || draft[section].some((existing) => recordKey(section, existing as Record<string, unknown>) === key)) return false;
+  draft[section] = [...draft[section], item] as never;
+  return true;
+}
+function takeCompleteStreamRecords(buffer: string) {
+  const records: StreamRecord[] = [];
+  let start = -1; let depth = 0; let inString = false; let escaped = false; let consumed = 0;
+  for (let index = 0; index < buffer.length; index += 1) {
+    const character = buffer[index];
+    if (start < 0) { if (character === '{') { start = index; depth = 1; } else consumed = index + 1; continue; }
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') { inString = true; continue; }
+    if (character === '{') depth += 1;
+    if (character === '}') depth -= 1;
+    if (depth === 0) {
+      try { records.push(JSON.parse(buffer.slice(start, index + 1)) as StreamRecord); } catch { /* Ignore an invalid model record and continue. */ }
+      consumed = index + 1; start = -1;
+    }
+  }
+  return { records, remainder: start >= 0 ? buffer.slice(start) : buffer.slice(consumed) };
+}
+async function streamDraftWithAi(extractedText: string, onRecord: (record: StreamRecord) => void) {
+  if (aiRefinementInFlight) throw new Error('AI cleanup is already processing another résumé. Your quick preview is ready; retry this import after that cleanup finishes.');
+  aiRefinementInFlight = true;
+  try {
+    const response = await fetch(`${process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'}/api/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(285_000),
+      body: JSON.stringify({ model: process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:1.5b', stream: true, think: false, options: { temperature: 0, num_ctx: 8192, num_predict: 1800 }, messages: [
+        { role: 'system', content: 'Extract résumé facts exactly. Output newline-delimited JSON only: one complete object per line, no markdown. Each object must use exactly one type: personalInfo, experience, projects, education, skills, languages, certificates, warning. Use {"type":"personalInfo","item":{...}} once when possible. Use one object per work role/project/etc. Never merge separate entries, dates, employers, titles, bullets, or technologies. Keep source order. Experience item: company, position, startDate, endDate, descriptionBullets. Projects item: name, completionDate, technologies, link, descriptionBullets. Education item: institution, degree, field, startDate, endDate, description. Skills item: name, level. Languages item: name, proficiency. Certificates item: name, issuer, date, link. Never invent facts.' },
+        { role: 'user', content: compactTextForAi(extractedText) },
+      ] }),
+    });
+    if (!response.ok) throw new Error('The local résumé model is unavailable.');
+    if (!response.body) throw new Error('The local résumé model did not return a stream.');
+    const reader = response.body.getReader(); const decoder = new TextDecoder();
+    let ollamaBuffer = ''; let recordBuffer = ''; let records = 0;
+    const processContent = (content: string) => {
+      recordBuffer += content;
+      const extracted = takeCompleteStreamRecords(recordBuffer);
+      recordBuffer = extracted.remainder;
+      for (const record of extracted.records) { onRecord(record); records += 1; }
+    };
+    while (true) {
+      const { value, done } = await reader.read();
+      ollamaBuffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = ollamaBuffer.split('\n'); ollamaBuffer = lines.pop() ?? '';
+      for (const line of lines) {
+        try { const chunk = JSON.parse(line) as { message?: { content?: string } }; if (chunk.message?.content) processContent(chunk.message.content); } catch { /* Ignore malformed transport chunks. */ }
+      }
+      if (done) break;
+    }
+    if (ollamaBuffer.trim()) { try { const chunk = JSON.parse(ollamaBuffer) as { message?: { content?: string } }; if (chunk.message?.content) processContent(chunk.message.content); } catch { /* Ignore malformed final transport chunk. */ } }
+    const finalRecords = takeCompleteStreamRecords(recordBuffer).records;
+    for (const record of finalRecords) { onRecord(record); records += 1; }
+    if (!records) throw new Error('The local résumé model did not return readable structured details.');
+  } finally {
+    aiRefinementInFlight = false;
+  }
 }
 
 type EmbeddedPdfImage = { page: number; index: number; width: number; height: number };
@@ -202,19 +273,25 @@ export async function POST(request: Request) {
         if (extractedText.length < 30) throw new Error('No readable résumé text was found in this file.');
         emit({ type: 'progress', message: 'Building a quick preview from the extracted text…' });
         let draft = inferDraftFromText(extractedText); logStage('deterministic draft'); emit({ type: 'draft', draft, source: 'extracted' });
-        emit({ type: 'progress', message: 'Your preview is ready. Improving detected sections with local AI…' });
-        const aiDraftPromise = refineDraftWithAi(extractedText);
+        emit({ type: 'progress', message: 'Your preview is ready. Reading résumé records with local AI…' });
+        let streamedRecords = 0;
+        const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
+          if (!applyStreamRecord(draft, record)) return;
+          streamedRecords += 1;
+          const label = record.type === 'projects' ? 'project' : record.type === 'skills' ? 'skill' : record.type === 'languages' ? 'language' : record.type === 'certificates' ? 'certificate' : record.type === 'personalInfo' ? 'personal details' : record.type ?? 'detail';
+          emit({ type: 'progress', message: `Detected ${label}${record.type === 'personalInfo' ? '' : ` ${streamedRecords}`}…` });
+          emit({ type: 'draft', draft: { ...draft }, source: 'ai-partial' });
+        });
         const photoUpdatePromise = photoPromise.then((photoDataUrl) => {
           if (!photoDataUrl) return;
           draft = { ...draft, photoDataUrl };
           emit({ type: 'draft', draft, source: 'photo' });
         });
         try {
-          const aiDraft = await aiDraftPromise;
+          await aiDraftPromise;
           logStage('AI normalization and sanitization');
-          draft = mergeDrafts(draft, aiDraft);
           emit({ type: 'draft', draft, source: 'ai' });
-          emit({ type: 'complete', message: 'AI cleanup is complete. Review the detected details before applying them.' });
+          emit({ type: 'complete', message: `AI cleanup is complete. ${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'} arrived progressively for review.` });
         }
         catch (error) { const message = error instanceof Error ? error.message : 'AI cleanup could not finish.'; emit({ type: 'warning', message: `${message} The quick extraction remains available to review.` }); emit({ type: 'complete', message: 'Quick extraction is ready to review.' }); }
         await photoUpdatePromise;

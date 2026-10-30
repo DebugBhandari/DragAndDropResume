@@ -94,6 +94,10 @@ export default function ResumeImportContent() {
           if (update.source === 'photo') {
             setProgressUpdates((current) => [...current, 'Profile photo candidate found.'].slice(-6));
           }
+          if (update.source === 'ai-partial') {
+            setMessage('AI is streaming structured résumé details. Review and apply new selected items whenever they appear.');
+            setIsAiRefining(true);
+          }
           if (update.source === 'ai') {
             setMessage('AI cleanup is complete. Review the new structured details and apply the selections you want.');
             setProgressUpdates((current) => [...current, 'AI cleanup is complete — new details are ready to apply.'].slice(-6));
