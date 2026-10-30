@@ -12,7 +12,9 @@ export default function ResumeImportContent() {
   const [message, setMessage] = useState('');
   const [progressUpdates, setProgressUpdates] = useState<string[]>([]);
   const [isAiRefining, setIsAiRefining] = useState(false);
+  const [hasAppliedQuickDraft, setHasAppliedQuickDraft] = useState(false);
   const importRunRef = useRef(0);
+  const appliedSelectionRef = useRef<ResumeImportSelection | null>(null);
 
   async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -24,6 +26,8 @@ export default function ResumeImportContent() {
     setMessage('Starting private résumé import…');
     setProgressUpdates(['Starting private résumé import…']);
     setIsAiRefining(false);
+    setHasAppliedQuickDraft(false);
+    appliedSelectionRef.current = null;
     setDraft(null);
     try {
       const formData = new FormData();
@@ -66,10 +70,22 @@ export default function ResumeImportContent() {
           }
           if (update.source === 'photo') {
             setProgressUpdates((current) => [...current, 'Profile photo candidate found.'].slice(-6));
+            const appliedSelection = appliedSelectionRef.current;
+            if (appliedSelection?.photo) {
+              applyImportDraft(update.draft, { personalInfo: false, photo: true, experience: false, projects: false, education: false, skills: false, languages: false, certificates: false });
+              setMessage('Your selected details are applied. Profile photo added while AI cleanup continues…');
+            }
           }
           if (update.source === 'ai') {
-            setMessage('AI cleanup is complete. Review the detected details before applying them.');
-            setProgressUpdates((current) => [...current, 'AI cleanup is complete.'].slice(-6));
+            const appliedSelection = appliedSelectionRef.current;
+            if (appliedSelection) {
+              applyImportDraft(update.draft, { ...appliedSelection, skills: false, languages: false });
+              setMessage('AI cleanup is complete. Structured details from this import were added to your résumé.');
+              setProgressUpdates((current) => [...current, 'AI cleanup complete — structured details added.'].slice(-6));
+            } else {
+              setMessage('AI cleanup is complete. Review the detected details before applying them.');
+              setProgressUpdates((current) => [...current, 'AI cleanup is complete.'].slice(-6));
+            }
             setIsAiRefining(false);
           }
         }
@@ -143,7 +159,7 @@ export default function ResumeImportContent() {
       )}
       {draft && (
         <div className="mt-3 space-y-2 border-t pt-3">
-          {isAiRefining && <p className="resume-import-refining-note text-xs">You can review and apply this quick draft now; it will be replaced automatically if AI cleanup finds a better structured result.</p>}
+          {isAiRefining && <p className="resume-import-refining-note text-xs">{hasAppliedQuickDraft ? 'Your selected quick details are already applied. AI cleanup is still running and will add the structured details automatically.' : 'You can apply this quick draft now; AI cleanup will continue and add structured details automatically.'}</p>}
           {draft.photoDataUrl && (
             <div className="resume-import-photo-preview">
               <img src={draft.photoDataUrl} alt="Extracted profile photo candidate" />
@@ -158,7 +174,7 @@ export default function ResumeImportContent() {
           ))}
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" className="resume-import-apply" onClick={() => { importRunRef.current += 1; applyImportDraft(draft, selection); setDraft(null); setMessage('Selected details were added to your résumé.'); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Apply selected</button>
+            {!hasAppliedQuickDraft && <button type="button" className="resume-import-apply" onClick={() => { applyImportDraft(draft, selection); appliedSelectionRef.current = selection; setHasAppliedQuickDraft(true); setMessage(isAiRefining ? 'Selected details were added. AI cleanup is still running…' : 'Selected details were added to your résumé.'); setProgressUpdates((current) => [...current, 'Selected quick details added.'].slice(-6)); }}>Apply selected</button>}
             <button type="button" className="resume-import-cancel" onClick={() => { importRunRef.current += 1; setDraft(null); setMessage(''); setProgressUpdates([]); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>
