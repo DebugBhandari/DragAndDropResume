@@ -283,7 +283,7 @@ function SectionContent({
           </p>
         );
       return (
-        <div className="space-y-1">
+        <div className="flex flex-wrap gap-1.5">
           {skillList.map((sk) => (
             <div
               key={sk.id}

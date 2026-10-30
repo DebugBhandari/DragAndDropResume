@@ -97,9 +97,8 @@ function sectionHeading(line: string) {
   return '';
 }
 function splitSectionItems(lines: string[]) { return lines.flatMap((line) => line.split(/[|,;•·▪◦]|\s{2,}/)).map((item) => item.replace(/^[-–—*]\s*/, '').trim()).filter((item) => item.length >= 2); }
-function isSectionTerminator(line: string) { return /^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?|interests?|hobbies|volunteer(?:ing)?|awards?|publications?|additional\s+(?:information|details))\s*:?[\s]*$/i.test(line); }
 const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
-const WORK_TITLE_PATTERN = /\b(?:engineer|developer|intern|cashier|architect|designer|manager|director|consultant|analyst|administrator|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
+const WORK_TITLE_PATTERN = /\b(?:engineer(?:ing)?|developer|intern(?:ship)?|cashier|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|attendant|clerk|salesperson|bartender|barista|waiter|waitress|chef|cook|driver|mechanic|nurse|accountant|recruiter|marketer|editor|writer|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
 const TECHNICAL_SKILLS = ['AWS', 'Azure', 'C#', 'C++', 'CSS', 'Docker', 'Figma', 'Firebase', 'Git', 'GitHub', 'GraphQL', 'HTML', 'Java', 'JavaScript', 'Jenkins', 'Kotlin', 'Kubernetes', 'MongoDB', 'MySQL', 'Next.js', 'Node.js', 'OpenAI', 'PHP', 'PostgreSQL', 'Python', 'React', 'Redux', 'Ruby', 'Rust', 'SQL', 'Swift', 'Tailwind CSS', 'TensorFlow', 'TypeScript', 'Vue.js'];
 function languageProficiency(value: string) {
   const normalized = value.toLowerCase();
@@ -167,7 +166,6 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   const sections: Record<string, string[]> = { experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], summary: [] };
   let current = '';
   for (const line of lines) {
-    if (isSectionTerminator(line)) { current = ''; continue; }
     const inline = inlineSectionContent(line);
     if (inline.section) {
       current = inline.section;
@@ -235,7 +233,8 @@ function inferStreamRecordType(value: Record<string, unknown>): StreamRecordType
 function isWorkExperienceItem(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = canonicalizeStreamItem(value) as Record<string, unknown>;
-  return WORK_TITLE_PATTERN.test([row.position, row.jobTitle, row.role, row.title, row.name, row.projectName].map((item) => text(item, 180)).join(' '));
+  const itemText = JSON.stringify(row).replace(/["{}\[\],:_-]+/g, ' ');
+  return WORK_TITLE_PATTERN.test(itemText);
 }
 function normalizeStreamRecord(value: unknown): StreamRecord[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
