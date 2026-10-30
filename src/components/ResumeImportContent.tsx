@@ -188,6 +188,7 @@ export default function ResumeImportContent() {
             {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
           </div>
           {draft?.personalInfo.fullName && <p className="mt-1 opacity-80">Detected résumé: <strong>{draft.personalInfo.fullName}</strong>. The remaining details are loading now.</p>}
+          <p className="mt-1 opacity-80">The PDF extract appears first when ready. The optional PDF extract + AI result can take 2–3 minutes for a detailed résumé.</p>
           <ol className="resume-import-status-list mt-2 space-y-1">
             {progressUpdates.map((update, index) => <li key={`${index}-${update}`}>{index + 1}. {update}</li>)}
           </ol>
