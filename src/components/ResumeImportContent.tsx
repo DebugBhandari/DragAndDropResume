@@ -12,7 +12,7 @@ function formatElapsedTime(milliseconds: number) {
 }
 
 export default function ResumeImportContent() {
-  const { applyImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot } = useResumeStore();
+  const { replaceImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot } = useResumeStore();
   const [extractedDraft, setExtractedDraft] = useState<ResumeImportDraft | null>(null);
   const [enhancedDraft, setEnhancedDraft] = useState<ResumeImportDraft | null>(null);
   const [isEnhancedDraftReady, setIsEnhancedDraftReady] = useState(false);
@@ -21,7 +21,6 @@ export default function ResumeImportContent() {
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [isAiRefining, setIsAiRefining] = useState(false);
-  const [appliedCount, setAppliedCount] = useState(0);
   const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
   const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0);
   const [backendStageName, setBackendStageName] = useState('Preparing import');
@@ -42,9 +41,9 @@ export default function ResumeImportContent() {
   }
 
   function previewDraft(draft: ResumeImportDraft | null) {
-    if (!draft || !previewSnapshotRef.current) return;
-    restoreImportPreviewSnapshot(previewSnapshotRef.current);
-    applyImportDraft(draft, { personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
+    if (!draft) return;
+    if (previewSnapshotRef.current) restoreImportPreviewSnapshot(previewSnapshotRef.current);
+    replaceImportDraft(draft, { personalInfo: true, photo: true, experience: true, projects: true, education: true, skills: true, languages: true, certificates: true });
   }
 
   function selectDraftSource(source: 'extracted' | 'enhanced') {
@@ -68,7 +67,6 @@ export default function ResumeImportContent() {
     setBackendStageName('Uploading PDF');
     setMessage('Starting private résumé import…');
     setIsAiRefining(false);
-    setAppliedCount(0);
     previewSnapshotRef.current = captureImportPreviewSnapshot();
     setExtractedDraft(null);
     setEnhancedDraft(null);
@@ -168,10 +166,9 @@ export default function ResumeImportContent() {
     const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
     if (!draft) return;
     restoreImportPreview();
-    applyImportDraft(draft, selection);
+    replaceImportDraft(draft, selection);
     previewSnapshotRef.current = null;
-    setAppliedCount((count) => count + 1);
-    setMessage(isAiRefining ? 'Selected PDF extract details added. Ollama continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details were added to your résumé.`);
+    setMessage(isAiRefining ? 'Selected PDF extract details replaced. Ollama continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details replaced the selected résumé data.`);
   }
 
   const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
@@ -240,7 +237,7 @@ export default function ResumeImportContent() {
           ))}
           {draft.warnings.length > 0 && <p className="text-xs text-amber-700">Check dates and names before exporting: {draft.warnings.join(' ')}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Apply selected {selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} data{appliedCount ? ' again' : ''}</button>
+            <button type="button" className="resume-import-apply" onClick={applyNewSelectedItems}>Replace selected data with {selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'}</button>
             <button type="button" className="resume-import-cancel" onClick={() => { restoreImportPreview(); previewSnapshotRef.current = null; importRunRef.current += 1; setExtractedDraft(null); setEnhancedDraft(null); setIsEnhancedDraftReady(false); setSelectedDraftSource('extracted'); setMessage(''); setIsAiRefining(false); setStatus('idle'); }}>Discard</button>
           </div>
         </div>
