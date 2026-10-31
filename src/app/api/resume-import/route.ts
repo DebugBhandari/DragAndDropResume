@@ -189,8 +189,7 @@ function skillNames(lines: string[]) {
 const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
 const WORK_TITLE_PATTERN = /\b(?:engineer(?:ing)?|developer|intern(?:ship)?|cashier|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|attendant|clerk|salesperson|bartender|barista|waiter|waitress|chef|cook|driver|mechanic|nurse|accountant|recruiter|marketer|editor|writer|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
 const QUALIFICATION_PATTERN = /\b(?:b\.?\s?(?:sc|a|eng|tech|com)|m\.?\s?(?:sc|a|eng|tech|com)|ph\.?d|mba|diploma|associate(?:'s)?|bachelor(?:'s)?|master(?:'s)?|doctorate|postgraduate|undergraduate|higher\s+national\s+diploma|qualification)\b/i;
-const DATE_VALUE_PATTERN = '(?:(?:0?[1-9]|1[0-2])\s*\/\s*)?(?:19|20)\d{2}|present|current';
-const DATE_RANGE_PATTERN = new RegExp(`(${DATE_VALUE_PATTERN})\\s*(?:[-–—]|to)\\s*(${DATE_VALUE_PATTERN})`, 'i');
+const DATE_RANGE_PATTERN = /((?:(?:0?[1-9]|1[0-2])\s*\/\s*)?(?:19|20)\d{2}|present|current)\s*(?:[-–—]|to)\s*((?:(?:0?[1-9]|1[0-2])\s*\/\s*)?(?:19|20)\d{2}|present|current)/i;
 const TECHNICAL_SKILLS = ['AWS', 'Azure', 'C#', 'C++', 'CSS', 'Docker', 'Figma', 'Firebase', 'Git', 'GitHub', 'GraphQL', 'HTML', 'Java', 'JavaScript', 'Jenkins', 'Kotlin', 'Kubernetes', 'MongoDB', 'MySQL', 'Next.js', 'Node.js', 'OpenAI', 'PHP', 'PostgreSQL', 'Python', 'React', 'Redux', 'Ruby', 'Rust', 'SQL', 'Swift', 'Tailwind CSS', 'TensorFlow', 'TypeScript', 'Vue.js'];
 function isBulletLine(value: string) { return /^[•·▪◦*\-–—]\s+/.test(value.trim()); }
 function isTitleLike(value: string) {
@@ -282,7 +281,7 @@ function parseEducation(lines: string[]) {
 }
 function parseExperience(lines: string[]) {
   const entries: Array<{ company: string; position: string; startDate: string; endDate: string; description: string; descriptionBullets: string[] }> = [];
-  const roleIndexes = lines.map((line, index) => isSubheading(line) && WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
+  const roleIndexes = lines.map((line, index) => isSubheading(line) && WORK_TITLE_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
   for (let roleIndex = 0; roleIndex < roleIndexes.length; roleIndex += 1) {
     const start = roleIndexes[roleIndex]; const end = roleIndexes[roleIndex + 1] ?? lines.length;
     const titleLine = lines[start]; const parts = titleParts(titleLine);
