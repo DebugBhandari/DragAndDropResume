@@ -35,6 +35,8 @@ export default function ResumeImportContent() {
   const [appliedCount, setAppliedCount] = useState(0);
   const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
   const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0);
+  const [backendStageName, setBackendStageName] = useState('Preparing import');
+  const [backendStageDetail, setBackendStageDetail] = useState('Waiting for the private import to begin.');
   const importRunRef = useRef(0);
   const previewSnapshotRef = useRef<ResumeImportPreviewSnapshot | null>(null);
 
@@ -75,6 +77,8 @@ export default function ResumeImportContent() {
     setStatus('uploading');
     setImportStartedAt(Date.now());
     setElapsedMilliseconds(0);
+    setBackendStageName('Uploading PDF');
+    setBackendStageDetail('Sending the selected PDF to the private processing workspace.');
     setMessage('Starting private résumé import…');
     setProgressUpdates(['Starting private résumé import…']);
     setIsAiRefining(false);
@@ -103,7 +107,7 @@ export default function ResumeImportContent() {
       const processEvent = (line: string) => {
         if (importRunRef.current !== importRun) return;
         if (!line.trim()) return;
-        let update: { type?: string; message?: string; draft?: ResumeImportDraft; source?: string };
+        let update: { type?: string; message?: string; stage?: string; detail?: string; draft?: ResumeImportDraft; source?: string };
         try {
           update = JSON.parse(line) as { type?: string; message?: string; draft?: ResumeImportDraft; source?: string };
         } catch {
@@ -114,6 +118,15 @@ export default function ResumeImportContent() {
           setMessage(update.message);
           setProgressUpdates((current) => current[current.length - 1] === progressMessage ? current : [...current, progressMessage].slice(-6));
           setIsAiRefining(/AI|Improving/i.test(progressMessage));
+        }
+        if (update.type === 'stage' && update.stage && update.detail) {
+          const detail = update.detail;
+          const labels: Record<string, string> = { upload: 'Uploading PDF', docling: 'Docling PDF → Markdown', parsing: 'Building PDF extract', ollama: 'Ollama AI parsing', finalizing: 'Finalizing AI draft' };
+          setBackendStageName(labels[update.stage] ?? 'Processing import');
+          setBackendStageDetail(detail);
+          setMessage(detail);
+          setProgressUpdates((current) => current[current.length - 1] === detail ? current : [...current, detail].slice(-6));
+          setIsAiRefining(update.stage === 'ollama' || update.stage === 'finalizing');
         }
         if (update.type === 'draft' && update.draft) {
           receivedDraft = true;
@@ -221,8 +234,8 @@ export default function ResumeImportContent() {
             <span className="resume-import-elapsed" aria-label={`Elapsed import time ${formatElapsedTime(elapsedMilliseconds)}`}>Elapsed {formatElapsedTime(elapsedMilliseconds)}</span>
           </div>
           <div className="resume-import-stage mt-2">
-            <p className="font-semibold">Backend: {activeBackendStage.label}</p>
-            <p className="mt-0.5 opacity-80">{activeBackendStage.detail}</p>
+            <p className="font-semibold">Backend: {backendStageName || activeBackendStage.label}</p>
+            <p className="mt-0.5 opacity-80">{backendStageDetail || activeBackendStage.detail}</p>
           </div>
           {draft?.personalInfo.fullName && <p className="mt-1 opacity-80">Detected résumé: <strong>{draft.personalInfo.fullName}</strong>. The remaining details are loading now.</p>}
           <p className="mt-1 opacity-80">The PDF extract appears first when ready. The optional PDF extract + AI result can take 2–3 minutes for a detailed résumé.</p>

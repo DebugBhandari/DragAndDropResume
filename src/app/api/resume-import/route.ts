@@ -19,10 +19,25 @@ let aiRefinementInFlight = false;
 
 type ImportEvent =
   | { type: 'progress'; message: string }
+  | { type: 'stage'; stage: 'upload' | 'docling' | 'parsing' | 'ollama' | 'finalizing'; detail: string }
   | { type: 'draft'; draft: ResumeImportDraft; source: 'extracted' | 'ai-partial' | 'ai' | 'photo' }
   | { type: 'complete'; message: string }
   | { type: 'warning'; message: string }
   | { type: 'error'; message: string };
+
+async function withStageHeartbeat<T>(stage: Extract<ImportEvent, { type: 'stage' }>['stage'], detail: string, run: () => Promise<T>, emitStage: (stage: Extract<ImportEvent, { type: 'stage' }>['stage'], detail: string) => void) {
+  const startedAt = Date.now();
+  emitStage(stage, detail);
+  const heartbeat = setInterval(() => {
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1_000);
+    emitStage(stage, `${detail} Still working (${elapsedSeconds}s elapsed)…`);
+  }, 5_000);
+  try {
+    return await run();
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
 
 function text(value: unknown, max = 500) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function array(value: unknown) { return Array.isArray(value) ? value : []; }
@@ -483,6 +498,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const emit = (event: ImportEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const emitStage = (stage: Extract<ImportEvent, { type: 'stage' }>['stage'], detail: string) => emit({ type: 'stage', stage, detail });
       const startedAt = performance.now();
       const timings: LastImportTiming['timingsMs'] = { uploadWrite: 0, doclingConversion: 0, markdownParsing: 0, ollama: 0, photoExtraction: 0, total: 0 };
       const timing: LastImportTiming = { startedAt: new Date().toISOString(), status: 'running', fileType: file.type, fileSizeBytes: file.size, timingsMs: timings };
@@ -496,12 +512,12 @@ export async function POST(request: Request) {
       let workspace = '';
       try {
         await saveTiming('running');
-        emit({ type: 'progress', message: 'Saving your file securely for processing…' });
+        emitStage('upload', 'Saving the PDF in the private processing workspace…');
         workspace = await mkdtemp(join(tmpdir(), 'resume-import-')); await mkdir(workspace, { recursive: true });
         const sourcePath = join(workspace, 'source.pdf'); const uploadStartedAt = performance.now(); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer())); timings.uploadWrite = Math.round(performance.now() - uploadStartedAt);
-        const extractedText = (await extractDoclingMarkdown(sourcePath, workspace, (message) => emit({ type: 'progress', message }), timings)).trim();
+        const extractedText = (await withStageHeartbeat('docling', 'Docling is converting the PDF into structured Markdown…', () => extractDoclingMarkdown(sourcePath, workspace, () => {}, timings), emitStage)).trim();
         if (extractedText.length < 30) throw new Error('Docling could not find readable résumé content in this PDF.');
-        emit({ type: 'progress', message: 'Building the PDF extract from Docling Markdown…' });
+        emitStage('parsing', 'TypeScript is detecting sections and building the fast PDF extract…');
         const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.markdownParsing = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
         const photoPromise = (async () => {
           const photoStartedAt = performance.now();
@@ -509,20 +525,20 @@ export async function POST(request: Request) {
           catch { return ''; }
           finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
         })();
-        emit({ type: 'progress', message: 'PDF extract is ready. Checking for a PDF profile image while Ollama prepares PDF extract + AI…' });
-        emit({ type: 'progress', message: 'PDF extract is ready to use. Reading the Docling Markdown with local AI in the background…' });
+        emitStage('ollama', 'The PDF extract is ready. Ollama is structuring résumé details while the PDF profile image is checked…');
         let streamedRecords = 0;
-        const aiDraftPromise = streamDraftWithAi(extractedText, (record) => {
+        const aiDraftPromise = withStageHeartbeat('ollama', 'Ollama is reading the Docling Markdown and structuring résumé details…', () => streamDraftWithAi(extractedText, (record) => {
           if (!applyStreamRecord(draft, record)) return false;
           streamedRecords += 1;
           const label = record.type === 'projects' ? 'project' : record.type === 'skills' ? 'skill' : record.type === 'languages' ? 'language' : record.type === 'certificates' ? 'certificate' : record.type === 'personalInfo' ? 'personal details' : record.type ?? 'detail';
           emit({ type: 'progress', message: `Detected ${label}${record.type === 'personalInfo' ? '' : ` ${streamedRecords}`}…` });
           emit({ type: 'draft', draft: { ...draft }, source: 'ai-partial' });
           return true;
-        });
+        }), emitStage);
         const ollamaStartedAt = performance.now();
         try {
           await aiDraftPromise;
+          emitStage('finalizing', 'Combining the AI records and PDF profile-image result…');
           const photoDataUrl = await photoPromise;
           if (photoDataUrl) draft = { ...draft, photoDataUrl };
           emit({ type: 'draft', draft, source: 'ai' });
@@ -539,5 +555,5 @@ export async function POST(request: Request) {
       finally { if (workspace) await rm(workspace, { recursive: true, force: true }); controller.close(); }
     },
   });
-  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' } });
+  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' } });
 }
