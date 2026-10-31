@@ -218,7 +218,7 @@ export default function ResumeImportContent() {
                 <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
                 <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
               </div>
-              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the Docling PDF extract with local Ollama’s structured work and project details, plus a PDF profile-image candidate when found.' : 'Using only the Docling PDF-to-Markdown extract and local TypeScript parser — no LLM parsing or profile image.'}</p>
+              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the fast PDF extract enriched by local Ollama for additional work and project structure.' : 'Using the fast local Docling PDF extract, TypeScript section parser, and embedded PDF profile-image extraction — no LLM enrichment.'}</p>
             </div>
           )}
           {draft.photoDataUrl && (
