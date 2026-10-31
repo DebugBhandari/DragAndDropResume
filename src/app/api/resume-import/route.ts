@@ -189,7 +189,8 @@ function skillNames(lines: string[]) {
 const KNOWN_LANGUAGES = new Set(['afrikaans', 'albanian', 'amharic', 'arabic', 'armenian', 'azerbaijani', 'bengali', 'bosnian', 'bulgarian', 'burmese', 'cantonese', 'catalan', 'chinese', 'croatian', 'czech', 'danish', 'dari', 'dutch', 'english', 'estonian', 'farsi', 'filipino', 'finnish', 'french', 'georgian', 'german', 'greek', 'gujarati', 'hebrew', 'hindi', 'hungarian', 'icelandic', 'indonesian', 'italian', 'japanese', 'kannada', 'kazakh', 'khmer', 'korean', 'kurdish', 'lao', 'latvian', 'lithuanian', 'malay', 'malayalam', 'mandarin', 'marathi', 'mongolian', 'nepali', 'norwegian', 'oriya', 'pashto', 'persian', 'polish', 'portuguese', 'punjabi', 'romanian', 'russian', 'serbian', 'sinhala', 'slovak', 'slovenian', 'somali', 'spanish', 'swahili', 'swedish', 'tagalog', 'tamil', 'telugu', 'thai', 'tigrinya', 'turkish', 'ukrainian', 'urdu', 'uzbek', 'vietnamese', 'welsh', 'yoruba', 'zulu']);
 const WORK_TITLE_PATTERN = /\b(?:engineer(?:ing)?|developer|intern(?:ship)?|cashier|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|attendant|clerk|salesperson|bartender|barista|waiter|waitress|chef|cook|driver|mechanic|nurse|accountant|recruiter|marketer|editor|writer|full\s*stack|frontend|front\s*end|backend|back\s*end|software|web|mobile|data\s+scientist)\b/i;
 const QUALIFICATION_PATTERN = /\b(?:b\.?\s?(?:sc|a|eng|tech|com)|m\.?\s?(?:sc|a|eng|tech|com)|ph\.?d|mba|diploma|associate(?:'s)?|bachelor(?:'s)?|master(?:'s)?|doctorate|postgraduate|undergraduate|higher\s+national\s+diploma|qualification)\b/i;
-const DATE_RANGE_PATTERN = /((?:19|20)\d{2}|present|current)\s*(?:[-–—]|to)\s*((?:19|20)\d{2}|present|current)/i;
+const DATE_VALUE_PATTERN = '(?:(?:0?[1-9]|1[0-2])\s*\/\s*)?(?:19|20)\d{2}|present|current';
+const DATE_RANGE_PATTERN = new RegExp(`(${DATE_VALUE_PATTERN})\\s*(?:[-–—]|to)\\s*(${DATE_VALUE_PATTERN})`, 'i');
 const TECHNICAL_SKILLS = ['AWS', 'Azure', 'C#', 'C++', 'CSS', 'Docker', 'Figma', 'Firebase', 'Git', 'GitHub', 'GraphQL', 'HTML', 'Java', 'JavaScript', 'Jenkins', 'Kotlin', 'Kubernetes', 'MongoDB', 'MySQL', 'Next.js', 'Node.js', 'OpenAI', 'PHP', 'PostgreSQL', 'Python', 'React', 'Redux', 'Ruby', 'Rust', 'SQL', 'Swift', 'Tailwind CSS', 'TensorFlow', 'TypeScript', 'Vue.js'];
 function isBulletLine(value: string) { return /^[•·▪◦*\-–—]\s+/.test(value.trim()); }
 function isTitleLike(value: string) {
@@ -284,10 +285,12 @@ function parseExperience(lines: string[]) {
   const roleIndexes = lines.map((line, index) => isSubheading(line) && WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
   for (let roleIndex = 0; roleIndex < roleIndexes.length; roleIndex += 1) {
     const start = roleIndexes[roleIndex]; const end = roleIndexes[roleIndex + 1] ?? lines.length;
-    const titleLine = lines[start]; const parts = titleParts(titleLine); const position = parts.find((part) => WORK_TITLE_PATTERN.test(part)) ?? titleLine;
+    const titleLine = lines[start]; const parts = titleParts(titleLine);
+    const inlineRoleCompany = titleLine.match(/^(.+?\b(?:engineer(?:ing)?|developer|intern(?:ship)?|architect|designer|manager|director|consultant|analyst|administrator|specialist|coordinator|assistant|associate|officer|representative|technician|researcher|teacher|instructor|supervisor|lead|founder|owner|operator|accountant|recruiter|marketer|editor|writer)\b)\s+(.+)$/i);
+    const position = (parts.length > 1 ? parts.find((part) => WORK_TITLE_PATTERN.test(part)) : '') || inlineRoleCompany?.[1].trim() || titleLine;
     const before = lines.slice(Math.max(0, start - 2), start).reverse().find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
     const after = lines.slice(start + 1, Math.min(end, start + 3)).find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
-    const company = parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? before ?? after ?? '';
+    const company = parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? inlineRoleCompany?.[2].trim() ?? before ?? after ?? '';
     const dates = dateRange(lines.slice(start, end).join(' '));
     const bullets = descriptionLines(lines.slice(start + 1, end));
     entries.push({ company, position, ...dates, description: '', descriptionBullets: bullets.filter((line) => line.length > 2) });
@@ -588,17 +591,17 @@ export async function POST(request: Request) {
         emitStage('upload', 'Saving the PDF in the private processing workspace…');
         workspace = await mkdtemp(join(tmpdir(), 'resume-import-')); await mkdir(workspace, { recursive: true });
         const sourcePath = join(workspace, 'source.pdf'); const uploadStartedAt = performance.now(); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer())); timings.uploadWrite = Math.round(performance.now() - uploadStartedAt);
-        const extractedText = (await withStageHeartbeat('docling', 'Docling is converting the PDF into structured Markdown…', () => extractDoclingMarkdown(sourcePath, workspace, () => {}, timings), emitStage)).trim();
-        if (extractedText.length < 30) throw new Error('Docling could not find readable résumé content in this PDF.');
-        emitStage('parsing', 'TypeScript is detecting sections and building the fast PDF extract…');
-        const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); timings.markdownParsing = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
         const photoPromise = (async () => {
           const photoStartedAt = performance.now();
           try { return await extractEmbeddedProfilePhoto(sourcePath, workspace); }
           catch { return ''; }
           finally { timings.photoExtraction = Math.round(performance.now() - photoStartedAt); }
         })();
-        emitStage('ollama', 'The PDF extract is ready. Ollama is structuring résumé details while the PDF profile image is checked…');
+        const extractedText = (await withStageHeartbeat('docling', 'Docling is converting the PDF into structured Markdown…', () => extractDoclingMarkdown(sourcePath, workspace, () => {}, timings), emitStage)).trim();
+        if (extractedText.length < 30) throw new Error('Docling could not find readable résumé content in this PDF.');
+        emitStage('parsing', 'TypeScript is detecting sections and building the fast PDF extract…');
+        const draftStartedAt = performance.now(); let draft = inferDraftFromText(extractedText); const photoDataUrl = await photoPromise; if (photoDataUrl) draft = { ...draft, photoDataUrl }; timings.markdownParsing = Math.round(performance.now() - draftStartedAt); emit({ type: 'draft', draft, source: 'extracted' });
+        emitStage('ollama', 'The PDF extract is ready. Ollama is structuring résumé details in the background…');
         let streamedRecords = 0;
         const aiDraftPromise = withStageHeartbeat('ollama', 'Ollama is reading the Docling Markdown and structuring résumé details…', () => streamDraftWithAi(extractedText, (record) => {
           if (!applyStreamRecord(draft, record)) return false;
@@ -612,8 +615,6 @@ export async function POST(request: Request) {
         try {
           await aiDraftPromise;
           emitStage('finalizing', 'Combining the AI records and PDF profile-image result…');
-          const photoDataUrl = await photoPromise;
-          if (photoDataUrl) draft = { ...draft, photoDataUrl };
           emit({ type: 'draft', draft, source: 'ai' });
           emit({ type: 'complete', message: `PDF extract + AI is complete. Option 2 is ready with ${photoDataUrl ? 'the PDF profile image and ' : ''}${streamedRecords} structured detail${streamedRecords === 1 ? '' : 's'}.` });
         }
