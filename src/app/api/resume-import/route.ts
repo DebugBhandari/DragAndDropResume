@@ -66,13 +66,13 @@ function sanitizeDraft(value: unknown): ResumeImportDraft {
   const personal = raw.personalInfo && typeof raw.personalInfo === 'object' ? raw.personalInfo as Record<string, unknown> : {};
   return {
     personalInfo: { fullName: text(personal.fullName ?? personal.name, 120), email: text(personal.email, 160), phone: text(personal.phone, 80), location: text(personal.location, 160), linkedin: text(personal.linkedin, 240), website: text(personal.website, 240), summary: text(personal.summary, 1200) },
-    experience: array(raw.experience).slice(0, 12).map((item) => {
+    experience: array(raw.experience).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       const description = text(row.description ?? row.summary, 1200);
       const bullets = splitDescriptionIntoBullets(descriptionValues(row), description);
       return { company: text(row.company ?? row.employer ?? row.organization, 180), position: text(row.position ?? row.jobTitle ?? row.title ?? row.role, 180), startDate: text(row.startDate ?? row.start ?? row.from, 60), endDate: text(row.endDate ?? row.end ?? row.to, 60), description, descriptionBullets: bullets };
     }).filter((item) => item.company || item.position),
-    projects: array(raw.projects).slice(0, 12).map((item) => {
+    projects: array(raw.projects).map((item) => {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       const description = text(row.description ?? row.summary, 1200);
       const bullets = splitDescriptionIntoBullets(descriptionValues(row), description);
@@ -296,7 +296,7 @@ function parseExperience(lines: string[]) {
     const bullets = descriptionLines(lines.slice(start + 1, end));
     entries.push({ company, position, ...dates, description: '', descriptionBullets: bullets.filter((line) => line.length > 2) });
   }
-  return entries.filter((item, index, items) => item.position && items.findIndex((candidate) => `${candidate.company}|${candidate.position}|${candidate.startDate}`.toLowerCase() === `${item.company}|${item.position}|${item.startDate}`.toLowerCase()) === index).slice(0, 12);
+  return entries.filter((item, index, items) => item.position && items.findIndex((candidate) => `${candidate.company}|${candidate.position}|${candidate.startDate}`.toLowerCase() === `${item.company}|${item.position}|${item.startDate}`.toLowerCase()) === index);
 }
 function parseProjects(lines: string[]) {
   const entries: Array<{ name: string; description: string; descriptionBullets: string[]; completionDate: string; technologies: string; link: string }> = [];
@@ -317,7 +317,7 @@ function parseProjects(lines: string[]) {
     if (!bullets.length && !technologies && !link && !dates.startDate && !dates.endDate) continue;
     entries.push({ name, description: '', descriptionBullets: bullets, completionDate: dates.endDate || dates.startDate, technologies, link });
   }
-  return entries.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 12);
+  return entries.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index);
 }
 function inferTechnicalSkills(rawText: string) {
   const found = TECHNICAL_SKILLS.filter((skill) => new RegExp(`(^|[^a-z0-9])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9])`, 'i').test(rawText));
