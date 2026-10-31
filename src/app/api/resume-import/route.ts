@@ -550,7 +550,7 @@ async function extractDoclingMarkdown(pdfPath: string, workspace: string, progre
   progress('Converting the PDF to structured Markdown with Docling…');
   const startedAt = performance.now();
   try {
-    await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--no-ocr', pdfPath], { timeout: 120_000, maxBuffer: 2_000_000 });
+    await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'native', '--no-ocr', pdfPath], { timeout: 120_000, maxBuffer: 2_000_000 });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Docling could not convert this PDF.';
     throw new Error(`Docling PDF extraction failed. ${detail}`);
