@@ -115,9 +115,12 @@ const PHONE_PATTERN = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4
 function cleanUrl(value: string) {
   return value.trim().replace(/^[<(\[]+|[)>\],.;:]+$/g, '').replace(/^www\./i, 'https://www.').replace(/^(?!https?:\/\/)/i, 'https://');
 }
+function isPrimaryResumeSection(line: string) {
+  return ['experience', 'projects', 'education', 'skills', 'languages', 'certificates'].includes(sectionHeading(line) || inlineSectionContent(line).section);
+}
 function headerLines(lines: string[]) {
-  const firstSection = lines.findIndex((line) => Boolean(sectionHeading(line) || inlineSectionContent(line).section));
-  return lines.slice(0, firstSection < 0 ? Math.min(lines.length, 12) : firstSection);
+  const firstPrimarySection = lines.findIndex(isPrimaryResumeSection);
+  return lines.slice(0, firstPrimarySection < 0 ? Math.min(lines.length, 20) : firstPrimarySection);
 }
 function firstMatch(lines: string[], pattern: RegExp) {
   for (const line of lines) {
