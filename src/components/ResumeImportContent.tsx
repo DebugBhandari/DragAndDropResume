@@ -1,8 +1,25 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type ResumeImportPreviewSnapshot, useResumeStore } from '@/store/useResumeStore';
 import type { ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
+
+function formatElapsedTime(milliseconds: number) {
+  const totalSeconds = Math.floor(milliseconds / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `0:${seconds.toString().padStart(2, '0')}`;
+}
+
+function backendStage(message: string) {
+  if (/saving your file|starting private résumé import/i.test(message)) return { label: 'Uploading PDF', detail: 'Saving the selected PDF to the private processing workspace.' };
+  if (/converting.*docling|docling.*markdown/i.test(message)) return { label: 'Docling PDF extraction', detail: 'Converting the PDF into structured Markdown.' };
+  if (/building the pdf extract/i.test(message)) return { label: 'TypeScript résumé parser', detail: 'Detecting résumé sections and building the fast PDF extract.' };
+  if (/profile image|embedded photo/i.test(message)) return { label: 'PDF profile image check', detail: 'Looking for an embedded profile-photo candidate.' };
+  if (/ollama|reading the docling markdown|detected (?:experience|project|skill|language|certificate|education|personal)/i.test(message)) return { label: 'Ollama AI parsing', detail: 'Structuring résumé details with the local Qwen model.' };
+  if (/complete|ready to review/i.test(message)) return { label: 'Import complete', detail: 'The available résumé draft is ready to review.' };
+  return { label: 'Preparing import', detail: 'Waiting for the next private processing stage.' };
+}
 
 export default function ResumeImportContent() {
   const { applyImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot } = useResumeStore();
@@ -16,8 +33,18 @@ export default function ResumeImportContent() {
   const [progressUpdates, setProgressUpdates] = useState<string[]>([]);
   const [isAiRefining, setIsAiRefining] = useState(false);
   const [appliedCount, setAppliedCount] = useState(0);
+  const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
+  const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0);
   const importRunRef = useRef(0);
   const previewSnapshotRef = useRef<ResumeImportPreviewSnapshot | null>(null);
+
+  useEffect(() => {
+    if (!importStartedAt || status !== 'uploading') return;
+    const updateElapsed = () => setElapsedMilliseconds(Date.now() - importStartedAt);
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1_000);
+    return () => window.clearInterval(interval);
+  }, [importStartedAt, status]);
 
   function restoreImportPreview() {
     if (!previewSnapshotRef.current) return;
@@ -46,6 +73,8 @@ export default function ResumeImportContent() {
     importRunRef.current = importRun;
     restoreImportPreview();
     setStatus('uploading');
+    setImportStartedAt(Date.now());
+    setElapsedMilliseconds(0);
     setMessage('Starting private résumé import…');
     setProgressUpdates(['Starting private résumé import…']);
     setIsAiRefining(false);
@@ -157,6 +186,7 @@ export default function ResumeImportContent() {
   }
 
   const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
+  const activeBackendStage = backendStage(message);
   const detected = draft ? [
     ['personalInfo', 'Personal details', Object.values(draft.personalInfo).some(Boolean)],
     ['photo', 'Profile photo embedded in the PDF', Boolean(draft.photoDataUrl)],
@@ -183,9 +213,16 @@ export default function ResumeImportContent() {
       {message && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
       {status === 'uploading' && (
         <div className="resume-import-status mt-3 p-3 text-xs">
-          <div className="resume-import-status-title flex items-center gap-2 font-semibold">
-            <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
-            {draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : /profile photo|embedded photo/i.test(message) ? 'Downloading profile photo' : 'Import in progress'}
+          <div className="flex items-start justify-between gap-3">
+            <div className="resume-import-status-title flex items-center gap-2 font-semibold">
+              <span className="resume-import-status-dot mt-1 inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
+              <span>{draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : 'Import in progress'}</span>
+            </div>
+            <span className="resume-import-elapsed" aria-label={`Elapsed import time ${formatElapsedTime(elapsedMilliseconds)}`}>Elapsed {formatElapsedTime(elapsedMilliseconds)}</span>
+          </div>
+          <div className="resume-import-stage mt-2">
+            <p className="font-semibold">Backend: {activeBackendStage.label}</p>
+            <p className="mt-0.5 opacity-80">{activeBackendStage.detail}</p>
           </div>
           {draft?.personalInfo.fullName && <p className="mt-1 opacity-80">Detected résumé: <strong>{draft.personalInfo.fullName}</strong>. The remaining details are loading now.</p>}
           <p className="mt-1 opacity-80">The PDF extract appears first when ready. The optional PDF extract + AI result can take 2–3 minutes for a detailed résumé.</p>

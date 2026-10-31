@@ -295,6 +295,8 @@
   .resume-import-status { border: 1px solid color-mix(in srgb, var(--hunter-green) 52%, var(--form-border)); border-radius: 0.7rem; color: var(--ink); background: color-mix(in srgb, var(--yellow-green) 23%, var(--form-surface)); }
   .resume-import-status-title { color: #173d20; }
   .resume-import-status-dot { background: var(--hunter-green); }
+  .resume-import-elapsed { flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--hunter-green) 38%, transparent); border-radius: 999px; padding: 0.2rem 0.45rem; color: #173d20; background: color-mix(in srgb, #fff 48%, transparent); font-variant-numeric: tabular-nums; font-weight: 800; }
+  .resume-import-stage { padding: 0.5rem 0.6rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 28%, var(--form-border)); border-radius: 0.55rem; color: #234b2a; background: color-mix(in srgb, #fff 32%, transparent); }
   .resume-import-status-list { color: #29452d; }
   .resume-import-refining-note { color: #234b2a; font-weight: 600; }
   .resume-import-source-picker { padding: 0.65rem; border: 1px solid var(--form-border); border-radius: 0.7rem; background: color-mix(in srgb, var(--form-surface-strong) 42%, transparent); }
