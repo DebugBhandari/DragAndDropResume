@@ -235,13 +235,28 @@ function parseLanguages(lines: string[]) {
   return languages.filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 15);
 }
 function parseCertificates(lines: string[]) {
-  const provider = (name: string) => /\baws\b/i.test(name) ? 'Amazon Web Services (AWS)' : /\bkaggle\b/i.test(name) ? 'Kaggle' : /\bgoogle\b/i.test(name) ? 'Google' : /\bmicrosoft\b/i.test(name) ? 'Microsoft' : /\bcoursera\b/i.test(name) ? 'Coursera' : '';
-  return lines.map((line) => line.trim()).filter(isSubheading).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value)).filter((value) => !WORK_TITLE_PATTERN.test(value) && !QUALIFICATION_PATTERN.test(value)).map((value) => {
+  const provider = (name: string) => /\baws\b/i.test(name) ? 'Amazon Web Services (AWS)' : /\bkaggle\b/i.test(name) ? 'Kaggle' : /\bintegrify\b/i.test(name) ? 'Integrify' : /\bgoogle\b/i.test(name) ? 'Google' : /\bmicrosoft\b/i.test(name) ? 'Microsoft' : /\bcoursera\b/i.test(name) ? 'Coursera' : '';
+  const cleaned = lines.map((line) => line.trim()).filter(Boolean).filter((value) => !/^(achievements?(?:\s*\/\s*tasks?)?|tasks?|contact|references?)$/i.test(value));
+  const certificates: Array<{ name: string; issuer: string; date: string; link: string }> = [];
+  for (let index = 0; index < cleaned.length; index += 1) {
+    const value = cleaned[index];
     const date = value.match(/\(([^)]*(?:19|20)\d{2}[^)]*)\)/)?.[1] ?? '';
-    const withoutDate = value.replace(/\s*\([^)]*(?:19|20)\d{2}[^)]*\)\s*/, '').trim();
+    if (!date) continue;
+    const dateOnly = /^\([^)]*(?:19|20)\d{2}[^)]*\)$/.test(value);
+    const withoutDate = (dateOnly ? cleaned[index - 1] : value).replace(/\s*\([^)]*(?:19|20)\d{2}[^)]*\)\s*/, '').trim();
+    if (!withoutDate || /^contact\s*:/i.test(withoutDate) || isBulletLine(withoutDate)) continue;
+    const previous = cleaned[index - (dateOnly ? 2 : 1)] ?? '';
+    const previousLooksLikeIssuer = previous.length <= 100 && !previous.match(/\((?:[^)]*(?:19|20)\d{2}[^)]*)\)/) && /(?:kaggle|coursera|udemy|edx|pluralsight|linkedin learning|academy|courses?)\b/i.test(previous);
+    const commaIssuer = withoutDate.match(/^(.+?),\s*([^,]{2,80})$/);
     const issuerMatch = withoutDate.match(/^(.*?)\s+(?:[-–—|]|by|from)\s+(.+)$/i);
-    return { name: (issuerMatch?.[1] ?? withoutDate).trim(), issuer: (issuerMatch?.[2] ?? provider(withoutDate)).trim(), date, link: '' };
-  }).filter((item) => item.name).filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 20);
+    certificates.push({
+      name: (issuerMatch?.[1] ?? commaIssuer?.[1] ?? withoutDate).trim(),
+      issuer: (previousLooksLikeIssuer ? previous : issuerMatch?.[2] ?? commaIssuer?.[2] ?? provider(withoutDate)).trim(),
+      date,
+      link: '',
+    });
+  }
+  return certificates.filter((item) => item.name).filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index).slice(0, 20);
 }
 function inlineSectionContent(line: string) {
   const match = line.match(/^(.{2,80}?)[\s:–—-]+(.{2,})$/);
@@ -281,7 +296,15 @@ function parseExperience(lines: string[]) {
 }
 function parseProjects(lines: string[]) {
   const entries: Array<{ name: string; description: string; descriptionBullets: string[]; completionDate: string; technologies: string; link: string }> = [];
-  const titleIndexes = lines.map((line, index) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line) && !/^(?:technologies|tech(?:nology)? stack|tools|features|responsibilities|achievements?)[:\s]*$/i.test(line) ? index : -1).filter((index) => index >= 0);
+  const isProjectTitle = (line: string) => {
+    const value = line.trim();
+    return !WORK_TITLE_PATTERN.test(value)
+      && !QUALIFICATION_PATTERN.test(value)
+      && !/^(?:technologies|tech(?:nology)? stack|tools|features|responsibilities|achievements?)[:\s]*$/i.test(value)
+      && !/^contact\s*:/i.test(value)
+      && (isSubheading(value) || /(?:\([^)]+(?:19|20)\d{2}[^)]*\)|\b[a-z0-9-]+\.(?:com|io|dev|app|link|ai|net|org)\b)/i.test(value));
+  };
+  const titleIndexes = lines.map((line, index) => isProjectTitle(line) ? index : -1).filter((index) => index >= 0);
   for (let titleIndex = 0; titleIndex < titleIndexes.length; titleIndex += 1) {
     const start = titleIndexes[titleIndex]; const end = titleIndexes[titleIndex + 1] ?? lines.length;
     const name = lines[start].trim(); const block = lines.slice(start + 1, end); const bullets = descriptionLines(block);
