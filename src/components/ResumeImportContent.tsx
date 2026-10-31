@@ -201,13 +201,11 @@ export default function ResumeImportContent() {
       {message && status !== 'uploading' && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
       {status === 'uploading' && (
         <div className="resume-import-status mt-3 p-3 text-xs">
-          <div className="flex items-start justify-between gap-3">
-            <div className="resume-import-status-title flex items-center gap-2 font-semibold">
-              <span className="resume-import-status-dot mt-1 inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
-              <span>{draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : 'Import in progress'}</span>
-            </div>
-            <span className="resume-import-elapsed" aria-live="polite">Elapsed time: {formatElapsedTime(elapsedMilliseconds)} ({backendStageName})</span>
+          <div className="resume-import-status-title flex items-center gap-2 font-semibold">
+            <span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />
+            <span>{draft?.personalInfo.fullName ? `Importing ${draft.personalInfo.fullName}’s résumé` : isAiRefining && draft ? 'PDF extract available — AI enrichment continues' : 'Import in progress'}</span>
           </div>
+          <p className="resume-import-elapsed mt-2" aria-live="polite">Elapsed time: {formatElapsedTime(elapsedMilliseconds)} ({backendStageName})</p>
         </div>
       )}
       {draft && (
