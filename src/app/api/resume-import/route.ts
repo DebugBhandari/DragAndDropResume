@@ -110,6 +110,57 @@ function normalizeDoclingMarkdown(markdown: string) {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\r/g, '');
 }
+const URL_PATTERN = /(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/[a-z0-9_./%-]+|[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[a-z0-9_./?&=%#~-]*)?)/gi;
+const PHONE_PATTERN = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4}/g;
+function cleanUrl(value: string) {
+  return value.trim().replace(/^[<(\[]+|[)>\],.;:]+$/g, '').replace(/^www\./i, 'https://www.').replace(/^(?!https?:\/\/)/i, 'https://');
+}
+function headerLines(lines: string[]) {
+  const firstSection = lines.findIndex((line) => Boolean(sectionHeading(line) || inlineSectionContent(line).section));
+  return lines.slice(0, firstSection < 0 ? Math.min(lines.length, 12) : firstSection);
+}
+function firstMatch(lines: string[], pattern: RegExp) {
+  for (const line of lines) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(line);
+    if (match?.[0]) return match[0];
+  }
+  return '';
+}
+function normalizePhone(value: string) {
+  const candidate = value.replace(/[^+\d().\s-]/g, '').replace(/\s+/g, ' ').trim();
+  return candidate.replace(/\d/g, '').includes('+') && !candidate.startsWith('+') ? candidate.replace('+', '') : candidate;
+}
+function extractHeaderContact(lines: string[]) {
+  const header = headerLines(lines);
+  const headerText = header.join('\n');
+  const email = firstMatch(header, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const urls = [...headerText.matchAll(URL_PATTERN)]
+    .filter((match) => match.index === 0 || headerText[match.index - 1] !== '@')
+    .map((match) => cleanUrl(match[0]));
+  const linkedIn = urls.find((url) => /^https?:\/\/(?:www\.)?linkedin\.com\//i.test(url)) ?? '';
+  const website = urls.find((url) => !/^https?:\/\/(?:www\.)?linkedin\.com\//i.test(url)) ?? '';
+  const labelledPhone = firstMatch(header, /(?:phone|mobile|tel(?:ephone)?|cell)\s*[:|-]?\s*(\+?[\d().\s-]{7,}\d)/i).replace(/^(?:phone|mobile|tel(?:ephone)?|cell)\s*[:|-]?\s*/i, '');
+  const phone = normalizePhone(labelledPhone || firstMatch(header, PHONE_PATTERN));
+  const labelledLocation = firstMatch(header, /(?:location|address|based\s+in)\s*[:|-]?\s*([^|•·▪◦\n]{2,120})/i).replace(/^(?:location|address|based\s+in)\s*[:|-]?\s*/i, '').trim();
+  const contactFragments = header.flatMap((line) => line.split(/[|•·▪◦]/).map((fragment) => fragment.trim()));
+  const inferredLocation = contactFragments.find((fragment) => {
+    const candidate = fragment.replace(/^(?:location|address|based\s+in)\s*[:|-]?\s*/i, '').trim();
+    PHONE_PATTERN.lastIndex = 0;
+    return candidate.length >= 3
+      && candidate.length <= 100
+      && /[A-Za-z]/.test(candidate)
+      && !/@|https?:\/\/|www\.|linkedin\.com/i.test(candidate)
+      && !PHONE_PATTERN.test(candidate)
+      && /(?:,|\b(?:city|state|province|country|remote|hybrid)\b)/i.test(candidate);
+  })?.replace(/^(?:location|address|based\s+in)\s*[:|-]?\s*/i, '').trim() ?? '';
+  const location = labelledLocation || inferredLocation;
+  return { email, phone, location, linkedin: linkedIn, website };
+}
+function isContactLine(value: string) {
+  PHONE_PATTERN.lastIndex = 0;
+  return /@|https?:\/\/|www\.|linkedin\.com|\b(?:phone|mobile|tel(?:ephone)?|cell|location|address|based\s+in)\b/i.test(value) || PHONE_PATTERN.test(value);
+}
 function sectionHeading(line: string) {
   const heading = normalizeHeading(line);
   const match = (values: string[]) => values.some((value) => heading === value || heading.startsWith(value));
@@ -246,13 +297,9 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   const draft = emptyDraft();
   const normalizedText = normalizeDoclingMarkdown(rawText);
   const lines = normalizedText.split('\n').map((line) => line.trim()).filter(Boolean);
-  const joined = lines.join('\n');
-  const email = joined.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '';
-  const linkedIn = joined.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s|]+/i)?.[0] ?? '';
-  const website = [...joined.matchAll(/(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s|]*)?/gi)].map((match) => match[0]).find((value) => !value.toLowerCase().includes('linkedin.com')) ?? '';
-  const phone = joined.match(/(?:\+?\d[\d().\s-]{7,}\d)/)?.[0] ?? '';
-  const fullName = lines.find((line) => line.length >= 3 && line.length <= 80 && !/@/.test(line) && !/https?:\/\//i.test(line) && !isHeading(line, ['experience', 'education', 'skills', 'languages', 'summary'])) ?? '';
-  draft.personalInfo = { fullName, email, phone: phone.replace(/\s+/g, ' ').trim(), location: '', linkedin: linkedIn, website, summary: '' };
+  const contact = extractHeaderContact(lines);
+  const fullName = lines.find((line) => line.length >= 3 && line.length <= 80 && !/\d/.test(line) && !isContactLine(line) && !isHeading(line, ['experience', 'education', 'skills', 'languages', 'summary'])) ?? '';
+  draft.personalInfo = { fullName, ...contact, summary: '' };
   const sections: Record<string, string[]> = { experience: [], projects: [], education: [], skills: [], languages: [], certificates: [], summary: [] };
   let current = '';
   for (const line of lines) {
@@ -270,7 +317,7 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
   if (!draft.personalInfo.summary) {
     const firstMainSection = lines.findIndex((line) => ['experience', 'projects', 'education', 'skills', 'languages', 'certificates'].includes(sectionHeading(line) || inlineSectionContent(line).section));
-    const openingNarrative = lines.slice(0, firstMainSection < 0 ? 12 : firstMainSection).filter((line) => line.length >= 100 && !/@/.test(line) && !/https?:\/\//i.test(line));
+    const openingNarrative = lines.slice(0, firstMainSection < 0 ? 12 : firstMainSection).filter((line) => line.length >= 100 && !isContactLine(line));
     draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
   }
   const toolLines = lines.filter((line) => /^\s*(?:[-*]\s*)?(?:tools?|technologies|tech(?:nology)?\s*stack|frameworks?|libraries|platforms?|databases?)\s*:/i.test(line));
