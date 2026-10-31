@@ -302,7 +302,10 @@ function parseExperience(lines: string[]) {
     const position = (parts.length > 1 ? parts.find((part) => WORK_TITLE_PATTERN.test(part)) : '') || inlineRoleCompany?.[1].trim() || titleLine;
     const before = lines.slice(Math.max(0, start - 2), start).reverse().find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
     const after = lines.slice(start + 1, Math.min(end, start + 3)).find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
-    const company = inlineRoleCompany?.[2].trim() ?? parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? before ?? after ?? '';
+    const inlineCompany = inlineRoleCompany && !/^(?:intern(?:ship)?|associate|assistant|lead|senior|junior)$/i.test(inlineRoleCompany[2].trim())
+      ? inlineRoleCompany[2].trim()
+      : '';
+    const company = after ?? before ?? inlineCompany ?? parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? '';
     const dates = dateRange(lines.slice(start, end).join(' '));
     const bullets = descriptionLines(lines.slice(start + 1, end));
     entries.push({ company, position, ...dates, description: '', descriptionBullets: bullets.filter((line) => line.length > 2) });
