@@ -301,7 +301,6 @@ export default function Home() {
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
   const [editorPaneWidth, setEditorPaneWidth] = useState(520);
   const [isResizingEditor, setIsResizingEditor] = useState(false);
-  const [pageCount, setPageCount] = useState(1);
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
   const {
@@ -1198,13 +1197,32 @@ export default function Home() {
         setTrailingDetailContinuationChunks([]);
         setTrailingDetailTransitionItemEnd(0);
       }
-      setPageCount(splitIdx === -1 ? 1 : 2);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(contentRef.current);
     measure();
     return () => observer.disconnect();
-  }, [layout, sectionOrder, experience, projects, USABLE_HEIGHT, s.fontSize, s.headingSize, s.sectionSpacing, s.sidebarWidth]);
+  }, [
+    layout,
+    sectionOrder,
+    personalInfo,
+    photo,
+    education,
+    experience,
+    projects,
+    languages,
+    skills,
+    certificates,
+    awards,
+    volunteer,
+    references,
+    interests,
+    USABLE_HEIGHT,
+    s.fontSize,
+    s.headingSize,
+    s.sectionSpacing,
+    s.sidebarWidth,
+  ]);
 
   if (!mounted) return null;
 
@@ -2478,7 +2496,7 @@ export default function Home() {
           {/* Resume Preview */}
           <div className="studio-canvas w-full lg:flex-1 overflow-y-auto overflow-x-hidden">
             <div className="studio-canvas-toolbar">
-              <span className="studio-canvas-status"><span aria-hidden="true">●</span> Live preview</span>
+              <span className="studio-canvas-status"><span aria-hidden="true">●</span> Live preview · {continuationPageCount + 1} {continuationPageCount === 0 ? 'page' : 'pages'}</span>
               <span className="hidden sm:inline">Drag sections directly on the page</span>
             </div>
             <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
