@@ -214,11 +214,16 @@ export default function ResumeImportContent() {
           {enhancedDraft && isEnhancedDraftReady && (
             <div className="resume-import-source-picker" role="group" aria-label="Choose import data source">
               <p className="text-xs font-semibold">Choose the data to review and apply</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
-                <button type="button" className={`resume-import-source ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <button type="button" className={`resume-import-source w-full ${selectedDraftSource === 'extracted' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('extracted')} aria-pressed={selectedDraftSource === 'extracted'}>Use PDF extract</button>
+                  <p className="mt-1 text-xs opacity-75">Fast local Docling extract with TypeScript parsing, including work history, projects, certificates, and the embedded PDF profile image when available. No AI enrichment.</p>
+                </div>
+                <div>
+                  <button type="button" className={`resume-import-source w-full ${selectedDraftSource === 'enhanced' ? 'resume-import-source-active' : ''}`} onClick={() => selectDraftSource('enhanced')} aria-pressed={selectedDraftSource === 'enhanced'}>Use PDF extract + AI</button>
+                  <p className="mt-1 text-xs opacity-75">The same PDF extract and profile image, enhanced by local Ollama to improve work-history and project structure.</p>
+                </div>
               </div>
-              <p className="mt-2 text-xs opacity-75">{selectedDraftSource === 'enhanced' ? 'Using the fast PDF extract enriched by local Ollama for additional work and project structure.' : 'Using the fast local Docling PDF extract, TypeScript section parser, and embedded PDF profile-image extraction — no LLM enrichment.'}</p>
             </div>
           )}
           {draft.photoDataUrl && (
