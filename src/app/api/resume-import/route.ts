@@ -204,7 +204,7 @@ function isSubheading(value: string) {
   if (/[|]|\s+[–—]\s+|\s+-\s+/.test(value)) return true;
   const words = value.match(/[A-Za-z][A-Za-z'.-]*/g) ?? [];
   if (!words.length || words.length > 12) return false;
-  const titleWords = words.filter((word) => /^(?:[A-Z]{2,}|[A-Z][a-z]|[A-Z][A-Z'.-]*)$/.test(word));
+  const titleWords = words.filter((word) => /^(?:[A-Z]{2,}|[A-Z][a-z]+|[A-Z][A-Z'.-]*)$/.test(word));
   return titleWords.length / words.length >= 0.6;
 }
 function dateRange(value: string) {
