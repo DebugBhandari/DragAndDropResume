@@ -283,7 +283,18 @@ function parseEducation(lines: string[]) {
 }
 function parseExperience(lines: string[]) {
   const entries: Array<{ company: string; position: string; startDate: string; endDate: string; description: string; descriptionBullets: string[] }> = [];
-  const roleIndexes = lines.map((line, index) => isTitleLike(line) && WORK_TITLE_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
+  const isExperienceRoleLine = (line: string, index: number) => {
+    const value = line.trim();
+    const words = value.split(/\s+/).filter(Boolean);
+    const nearbyLines = lines.slice(Math.max(0, index - 2), Math.min(lines.length, index + 4));
+    return isTitleLike(value)
+      && WORK_TITLE_PATTERN.test(value)
+      && words.length <= 10
+      && !/[,;:]$/.test(value)
+      && !/^(?:as|built|collaborated|contributed|created|delivered|developed|designed|empowering|implemented|led|migrated|utilized|worked)\b/i.test(value)
+      && nearbyLines.some((candidate) => DATE_RANGE_PATTERN.test(candidate));
+  };
+  const roleIndexes = lines.map((line, index) => isExperienceRoleLine(line, index) ? index : -1).filter((index) => index >= 0);
   for (let roleIndex = 0; roleIndex < roleIndexes.length; roleIndex += 1) {
     const start = roleIndexes[roleIndex]; const end = roleIndexes[roleIndex + 1] ?? lines.length;
     const titleLine = lines[start]; const parts = titleParts(titleLine);
