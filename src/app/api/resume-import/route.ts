@@ -140,7 +140,9 @@ function extractHeaderContact(lines: string[]) {
   const email = firstMatch(header, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const urls = [...headerText.matchAll(URL_PATTERN)]
     .filter((match) => match.index === 0 || headerText[match.index - 1] !== '@')
-    .map((match) => cleanUrl(match[0]));
+    .map((match) => match[0])
+    .filter((url) => /^https?:\/\//i.test(url) || /^www\./i.test(url) || url === url.toLowerCase())
+    .map(cleanUrl);
   const linkedIn = urls.find((url) => /^https?:\/\/(?:www\.)?linkedin\.com\//i.test(url)) ?? '';
   const website = urls.find((url) => !/^https?:\/\/(?:www\.)?linkedin\.com\//i.test(url)) ?? '';
   const labelledPhone = firstMatch(header, /(?:phone|mobile|tel(?:ephone)?|cell)\s*[:|-]?\s*(\+?[\d().\s-]{7,}\d)/i).replace(/^(?:phone|mobile|tel(?:ephone)?|cell)\s*[:|-]?\s*/i, '');
@@ -281,7 +283,7 @@ function parseEducation(lines: string[]) {
 }
 function parseExperience(lines: string[]) {
   const entries: Array<{ company: string; position: string; startDate: string; endDate: string; description: string; descriptionBullets: string[] }> = [];
-  const roleIndexes = lines.map((line, index) => isSubheading(line) && WORK_TITLE_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
+  const roleIndexes = lines.map((line, index) => isTitleLike(line) && WORK_TITLE_PATTERN.test(line) ? index : -1).filter((index) => index >= 0);
   for (let roleIndex = 0; roleIndex < roleIndexes.length; roleIndex += 1) {
     const start = roleIndexes[roleIndex]; const end = roleIndexes[roleIndex + 1] ?? lines.length;
     const titleLine = lines[start]; const parts = titleParts(titleLine);
@@ -289,7 +291,7 @@ function parseExperience(lines: string[]) {
     const position = (parts.length > 1 ? parts.find((part) => WORK_TITLE_PATTERN.test(part)) : '') || inlineRoleCompany?.[1].trim() || titleLine;
     const before = lines.slice(Math.max(0, start - 2), start).reverse().find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
     const after = lines.slice(start + 1, Math.min(end, start + 3)).find((line) => isSubheading(line) && !WORK_TITLE_PATTERN.test(line) && !QUALIFICATION_PATTERN.test(line) && !DATE_RANGE_PATTERN.test(line));
-    const company = parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? inlineRoleCompany?.[2].trim() ?? before ?? after ?? '';
+    const company = inlineRoleCompany?.[2].trim() ?? parts.find((part) => part !== position && !DATE_RANGE_PATTERN.test(part)) ?? before ?? after ?? '';
     const dates = dateRange(lines.slice(start, end).join(' '));
     const bullets = descriptionLines(lines.slice(start + 1, end));
     entries.push({ company, position, ...dates, description: '', descriptionBullets: bullets.filter((line) => line.length > 2) });
