@@ -43,13 +43,13 @@ export interface Project {
 export interface Language {
   id: string;
   name: string;
-  proficiency: 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Beginner';
+  proficiency: "Native" | "Fluent" | "Advanced" | "Intermediate" | "Beginner";
 }
 
 export interface Skill {
   id: string;
   name: string;
-  level: 'Expert' | 'Advanced' | 'Intermediate' | 'Beginner';
+  level: "Expert" | "Advanced" | "Intermediate" | "Beginner";
 }
 
 export interface Certificate {
@@ -90,10 +90,29 @@ export interface Interest {
   name: string;
 }
 
-export type LocaleCode = 'en' | 'fi' | 'sv' | 'es' | 'de' | 'fr' | 'ne' | 'zh' | 'ja';
+export type LocaleCode =
+  | "en"
+  | "fi"
+  | "sv"
+  | "es"
+  | "de"
+  | "fr"
+  | "ne"
+  | "zh"
+  | "ja";
 
-export type SectionType = 'education' | 'experience' | 'projects' | 'languages' | 'skills' | 'certificates' | 'awards' | 'volunteer' | 'references' | 'interests';
-export type ColumnZone = 'main' | 'sidebar';
+export type SectionType =
+  | "education"
+  | "experience"
+  | "projects"
+  | "languages"
+  | "skills"
+  | "certificates"
+  | "awards"
+  | "volunteer"
+  | "references"
+  | "interests";
+export type ColumnZone = "main" | "sidebar";
 
 export interface ResumeSection {
   id: string;
@@ -102,19 +121,19 @@ export interface ResumeSection {
   zone: ColumnZone;
 }
 
-export type LayoutType = 'classic' | 'modern' | 'compact' | 'two-column';
+export type LayoutType = "classic" | "modern" | "compact" | "two-column";
 
-export type HeaderAlignment = 'left' | 'center' | 'right';
-export type PhotoVerticalPosition = 'top' | 'center' | 'bottom';
-export type PhotoHorizontalPosition = 'left' | 'center' | 'right';
+export type HeaderAlignment = "left" | "center" | "right";
+export type PhotoVerticalPosition = "top" | "center" | "bottom";
+export type PhotoHorizontalPosition = "left" | "center" | "right";
 
 export interface StyleConfig {
   accentColor: string;
   sidebarColor: string;
-  headingSize: 'sm' | 'md' | 'lg';
-  sectionSpacing: 'tight' | 'normal' | 'relaxed';
-  fontFamily: 'serif' | 'sans-serif' | 'mono';
-  fontSize: 'sm' | 'md' | 'lg';
+  headingSize: "sm" | "md" | "lg";
+  sectionSpacing: "tight" | "normal" | "relaxed";
+  fontFamily: "serif" | "sans-serif" | "mono";
+  fontSize: "sm" | "md" | "lg";
   headerAlignment: HeaderAlignment;
   sidebarWidth: number;
 }
@@ -126,6 +145,8 @@ export interface PhotoConfig {
   headerHeight: number;
   marginTop: number;
   marginBottom: number;
+  marginLeft: number;
+  marginRight: number;
   size: number;
   borderRadius: number;
   contentGap: number;
@@ -152,12 +173,12 @@ export interface ResumeData {
 export interface ResumeImportDraft {
   personalInfo: Partial<PersonalInfo>;
   photoDataUrl?: string;
-  experience: Array<Omit<WorkExperience, 'id' | 'visible'>>;
-  projects: Array<Omit<Project, 'id' | 'visible'>>;
-  education: Array<Omit<Education, 'id'>>;
-  skills: Array<Omit<Skill, 'id'>>;
-  languages: Array<Omit<Language, 'id'>>;
-  certificates: Array<Omit<Certificate, 'id'>>;
+  experience: Array<Omit<WorkExperience, "id" | "visible">>;
+  projects: Array<Omit<Project, "id" | "visible">>;
+  education: Array<Omit<Education, "id">>;
+  skills: Array<Omit<Skill, "id">>;
+  languages: Array<Omit<Language, "id">>;
+  certificates: Array<Omit<Certificate, "id">>;
   warnings: string[];
 }
 
