@@ -100,8 +100,21 @@ export default function FeedbackWidget() {
       </button>
 
       {isOpen && createPortal(
-        <div className="feedback-overlay fixed inset-0 z-[2147483647] flex items-center justify-center overflow-y-auto p-3 backdrop-blur-sm sm:p-6">
-          <div className="feedback-modal flex h-[50dvh] w-[50vw] flex-col overflow-hidden rounded-3xl shadow-2xl">
+        <div
+          className="feedback-overlay fixed inset-0 z-[2147483647] flex items-center justify-center overflow-y-auto p-3 backdrop-blur-sm sm:p-6"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2147483647,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            className="feedback-modal flex h-[50dvh] w-[50vw] flex-col overflow-hidden rounded-3xl shadow-2xl"
+            style={{ width: "50vw", height: "50vh" }}
+          >
             <div className="feedback-modal-header px-5 py-4 sm:px-6">
               <div className="feedback-modal-badge mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
                 {ui.feedbackContact}
