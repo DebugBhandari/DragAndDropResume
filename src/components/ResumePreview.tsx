@@ -714,7 +714,9 @@ export function PersonalHeader({
           }}
         >
           {photoNode}
-          <div className="min-w-0 flex-1">{content}</div>
+          <div className="min-w-0 flex-1" style={{ flexBasis: 0 }}>
+            {content}
+          </div>
         </div>
       );
     }
@@ -809,7 +811,7 @@ export function PersonalHeader({
             />
             {personalInfo.summary && (
               <p
-                className={`mt-2 opacity-90 max-w-[500px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
+                className={`mt-2 w-full opacity-90 ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
               >
                 {personalInfo.summary}
               </p>
@@ -944,7 +946,7 @@ export function PersonalHeader({
           <ContactRow personalInfo={personalInfo} accentColor={s.accentColor} />
           {personalInfo.summary && (
             <p
-              className={`mt-2 text-gray-700 max-w-[600px] ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
+              className={`mt-2 w-full text-gray-700 ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
             >
               {personalInfo.summary}
             </p>

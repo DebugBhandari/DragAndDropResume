@@ -99,8 +99,8 @@ export default function FeedbackWidget() {
       </button>
 
       {isOpen && (
-        <div className="feedback-overlay fixed inset-0 z-100 flex items-end justify-center p-3 backdrop-blur-sm sm:items-center sm:p-6">
-          <div className="feedback-modal w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl">
+        <div className="feedback-overlay fixed inset-0 z-100 flex items-end justify-center overflow-y-auto p-3 backdrop-blur-sm sm:items-center sm:p-6">
+          <div className="feedback-modal my-auto flex w-full max-w-lg max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-3xl shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
             <div className="feedback-modal-header px-5 py-4 sm:px-6">
               <div className="feedback-modal-badge mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
                 {ui.feedbackContact}
@@ -115,7 +115,7 @@ export default function FeedbackWidget() {
               </div>
             </div>
 
-            <div className="p-4 sm:p-6">
+            <div className="min-h-0 overflow-y-auto p-4 sm:p-6">
               <div className="mb-4 flex items-center justify-end">
                 <button
                   type="button"
