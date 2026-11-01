@@ -160,6 +160,8 @@ const defaultPhoto: PhotoConfig = {
   headerHeight: 180,
   marginTop: 0,
   marginBottom: 0,
+  marginLeft: 0,
+  marginRight: 0,
   size: 113,
   borderRadius: 50,
   contentGap: 24,

@@ -6,7 +6,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { arrayMove, useSortable } from '@dnd-kit/sortable';
 import { useResumeStore } from '@/store/useResumeStore';
 import { useUIStore } from '@/store/useUIStore';
-import type { ColumnZone, Interest, Language, LayoutType, PhotoConfig, Project, ResumeSection, SectionType, StyleConfig, WorkExperience, Skill } from '@/types/resume';
+import type { ColumnZone, HeaderAlignment, Interest, Language, LayoutType, PhotoConfig, Project, ResumeSection, SectionType, StyleConfig, WorkExperience, Skill } from '@/types/resume';
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 
 // ─── Contact icons for resume ───
@@ -467,10 +467,12 @@ function ContactRow({
   personalInfo,
   accentColor,
   light,
+  alignment,
 }: {
   personalInfo: any;
   accentColor: string;
   light?: boolean;
+  alignment: HeaderAlignment;
 }) {
   const { showHeaderIcons } = useUIStore();
   const linkStyle = light ? {} : { color: accentColor };
@@ -507,7 +509,13 @@ function ContactRow({
 
   const row1 = items.slice(0, 3);
   const row2 = items.slice(3);
-  const rowClass = light ? "inline-flex gap-3 flex-wrap opacity-80" : "text-gray-600 inline-flex gap-3 flex-wrap";
+  const justifyClass =
+    alignment === "left"
+      ? "justify-start"
+      : alignment === "right"
+        ? "justify-end"
+        : "justify-center";
+  const rowClass = `flex w-full flex-wrap gap-3 ${justifyClass}${light ? " opacity-80" : " text-gray-600"}`;
 
   return (
     <div className="mt-1">
@@ -627,6 +635,8 @@ export function PersonalHeader({
   const headerHeightPx = Math.max(80, Math.min(maxHeaderHeightPx, photo.headerHeight ?? 180));
   const headerMarginTopPx = Math.max(0, photo.marginTop ?? 0);
   const headerMarginBottomPx = Math.max(0, photo.marginBottom ?? 0);
+  const headerMarginLeftPx = Math.max(0, photo.marginLeft ?? 0);
+  const headerMarginRightPx = Math.max(0, photo.marginRight ?? 0);
 
   const handleHeaderClick = () => {
     focusPanel('panel-header');
@@ -766,6 +776,8 @@ export function PersonalHeader({
           maxHeight: headerMaxHeightStyle,
           marginTop: `${headerMarginTopPx}px`,
           marginBottom: `${24 + headerMarginBottomPx}px`,
+          marginLeft: `calc(-3rem + ${headerMarginLeftPx}px)`,
+          marginRight: `calc(-3rem + ${headerMarginRightPx}px)`,
           overflow: "hidden",
         }}
       >
@@ -808,6 +820,7 @@ export function PersonalHeader({
               personalInfo={personalInfo}
               accentColor={s.accentColor}
               light
+              alignment={align}
             />
             {personalInfo.summary && (
               <p
@@ -833,6 +846,8 @@ export function PersonalHeader({
           maxHeight: headerMaxHeightStyle,
           marginTop: `${headerMarginTopPx}px`,
           marginBottom: `${headerMarginBottomPx}px`,
+          marginLeft: `${headerMarginLeftPx}px`,
+          marginRight: `${headerMarginRightPx}px`,
           overflow: "hidden",
         }}
       >
@@ -905,6 +920,8 @@ export function PersonalHeader({
         maxHeight: headerMaxHeightStyle,
         marginTop: `${headerMarginTopPx}px`,
         marginBottom: `${headerMarginBottomPx}px`,
+        marginLeft: `${headerMarginLeftPx}px`,
+        marginRight: `${headerMarginRightPx}px`,
         overflow: "hidden",
       }}
     >
@@ -943,7 +960,11 @@ export function PersonalHeader({
           {personalInfo.fullName && (
             <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
           )}
-          <ContactRow personalInfo={personalInfo} accentColor={s.accentColor} />
+          <ContactRow
+            personalInfo={personalInfo}
+            accentColor={s.accentColor}
+            alignment={align}
+          />
           {personalInfo.summary && (
             <p
               className={`mt-2 w-full text-gray-700 ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
