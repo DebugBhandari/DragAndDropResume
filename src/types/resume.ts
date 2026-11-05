@@ -170,6 +170,18 @@ export interface ResumeData {
   photo: PhotoConfig;
 }
 
+export interface ResumeVersion {
+  id: string;
+  name: string;
+  savedAt: string;
+  data: ResumeData & {
+    activeLocale: LocaleCode;
+    removedSections: SectionType[];
+    experienceManualOrder: boolean;
+    projectsManualOrder: boolean;
+  };
+}
+
 export interface ResumeImportDraft {
   personalInfo: Partial<PersonalInfo>;
   photoDataUrl?: string;

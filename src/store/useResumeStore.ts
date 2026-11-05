@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certificate, Award, Volunteer, Reference, Interest, PersonalInfo, ResumeSection, SectionType, LayoutType, StyleConfig, PhotoConfig, ColumnZone, LocaleCode, ResumeImportDraft, ResumeImportSelection } from '@/types/resume';
+import { ResumeData, Education, WorkExperience, Project, Language, Skill, Certificate, Award, Volunteer, Reference, Interest, PersonalInfo, ResumeSection, SectionType, LayoutType, StyleConfig, PhotoConfig, ColumnZone, LocaleCode, ResumeImportDraft, ResumeImportSelection, ResumeVersion } from '@/types/resume';
 import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from '@/utils/dateSort';
 import { getSectionLabel } from '@/utils/sectionTranslations';
 
@@ -1023,6 +1023,10 @@ export type ResumeImportPreviewSnapshot = ResumeData & {
   projectsManualOrder: boolean;
 };
 
+type ResumeVersionSnapshot = ResumeImportPreviewSnapshot & {
+  activeLocale: LocaleCode;
+};
+
 interface ResumeStore extends ResumeData {
   activeLocale: LocaleCode;
   clearResume: () => void;
@@ -1035,6 +1039,10 @@ interface ResumeStore extends ResumeData {
   replaceImportDraft: (draft: ResumeImportDraft, selection: ResumeImportSelection) => void;
   captureImportPreviewSnapshot: () => ResumeImportPreviewSnapshot;
   restoreImportPreviewSnapshot: (snapshot: ResumeImportPreviewSnapshot) => void;
+  resumeVersions: ResumeVersion[];
+  saveResumeVersion: (name: string) => void;
+  loadResumeVersion: (id: string) => void;
+  deleteResumeVersion: (id: string) => void;
   addEducation: () => void;
   updateEducation: (id: string, data: Partial<Education>) => void;
   removeEducation: (id: string) => void;
@@ -1105,6 +1113,7 @@ export const useResumeStore = create<ResumeStore>()(
         layout: 'modern',
         style: defaultStyle,
         photo: defaultPhoto,
+        resumeVersions: [],
 
       clearResume: () => set((state) => ({
         personalInfo: {
@@ -1204,6 +1213,45 @@ export const useResumeStore = create<ResumeStore>()(
           projectsManualOrder: state.projectsManualOrder,
         });
       },
+      saveResumeVersion: (name) => set((state) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return state;
+        const data: ResumeVersionSnapshot = structuredClone({
+          personalInfo: state.personalInfo,
+          education: state.education,
+          experience: state.experience,
+          projects: state.projects,
+          languages: state.languages,
+          skills: state.skills,
+          certificates: state.certificates,
+          awards: state.awards,
+          volunteer: state.volunteer,
+          references: state.references,
+          interests: state.interests,
+          sectionOrder: state.sectionOrder,
+          layout: state.layout,
+          style: state.style,
+          photo: state.photo,
+          removedSections: state.removedSections,
+          experienceManualOrder: state.experienceManualOrder,
+          projectsManualOrder: state.projectsManualOrder,
+          activeLocale: state.activeLocale,
+        });
+        return {
+          resumeVersions: [
+            { id: uuidv4(), name: trimmedName, savedAt: new Date().toISOString(), data },
+            ...state.resumeVersions,
+          ],
+        };
+      }),
+      loadResumeVersion: (id) => set((state) => {
+        const version = state.resumeVersions.find((item) => item.id === id);
+        if (!version) return state;
+        return structuredClone(version.data);
+      }),
+      deleteResumeVersion: (id) => set((state) => ({
+        resumeVersions: state.resumeVersions.filter((version) => version.id !== id),
+      })),
       restoreImportPreviewSnapshot: (snapshot) => set(() => structuredClone(snapshot)),
       replaceImportDraft: (draft, selection) => set((s) => {
         const importedSectionTypes: SectionType[] = [];
