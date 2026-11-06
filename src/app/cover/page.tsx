@@ -22,7 +22,7 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'centered', label: 'Centered', detail: 'Formal centered header' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
-type CoverLetterPackage = Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation' | 'companyName' | 'roleTitle' | 'body'>;
+type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'companyName' | 'roleTitle'>;
 
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
@@ -46,26 +46,12 @@ export default function CoverLetterPage() {
   const [activityStage, setActivityStage] = useState('');
   const [activityDetail, setActivityDetail] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
-  const [pendingTailoredLetter, setPendingTailoredLetter] = useState<CoverLetterPackage | null>(null);
-  const [originalLetter, setOriginalLetter] = useState<CoverLetterPackage | null>(null);
-  const [isTailoredInfoApplied, setIsTailoredInfoApplied] = useState(false);
+  const [pendingTailoredLetter, setPendingTailoredLetter] = useState<PendingTailoredLetter | null>(null);
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
 
-  const coverLetterPackage = (letter: CoverLetterData): CoverLetterPackage => ({
-    senderName: letter.senderName,
-    senderEmail: letter.senderEmail,
-    senderPhone: letter.senderPhone,
-    senderLocation: letter.senderLocation,
-    companyName: letter.companyName,
-    roleTitle: letter.roleTitle,
-    body: letter.body,
-  });
-
   function clearTailoredCandidate() {
     setPendingTailoredLetter(null);
-    setOriginalLetter(null);
-    setIsTailoredInfoApplied(false);
   }
 
   async function readProgressStream(response: Response, onEvent: (event: Record<string, unknown>) => void) {
@@ -227,13 +213,8 @@ export default function CoverLetterPage() {
           setActivityDetail(String(event.detail ?? 'Tailoring your cover letter…'));
         }
         if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
-          setOriginalLetter(coverLetterPackage(coverLetter));
           setPendingTailoredLetter({
             body: event.body.trim(),
-            senderName: typeof event.senderName === 'string' ? event.senderName : '',
-            senderEmail: typeof event.senderEmail === 'string' ? event.senderEmail : '',
-            senderPhone: typeof event.senderPhone === 'string' ? event.senderPhone : '',
-            senderLocation: typeof event.senderLocation === 'string' ? event.senderLocation : '',
             roleTitle: typeof event.roleTitle === 'string' ? event.roleTitle : '',
             companyName: typeof event.companyName === 'string' ? event.companyName : '',
           });
@@ -243,7 +224,7 @@ export default function CoverLetterPage() {
       });
       if (streamError) throw new Error(streamError);
       if (!tailored) throw new Error('The server AI did not return a revised letter body.');
-      setMessage('Tailored information is ready. Use the toggle below to apply it to the preview.');
+      setMessage('Tailored letter body is ready. Apply it to update the saved cover letter and preview.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
@@ -253,15 +234,18 @@ export default function CoverLetterPage() {
     }
   }
 
-  function toggleTailoredInfo() {
-    if (!pendingTailoredLetter || !originalLetter) return;
-    updateCoverLetter(isTailoredInfoApplied ? originalLetter : pendingTailoredLetter);
+  function applyTailoredLetter() {
+    if (!pendingTailoredLetter) return;
+    updateCoverLetter({
+      body: pendingTailoredLetter.body,
+      companyName: pendingTailoredLetter.companyName,
+      roleTitle: pendingTailoredLetter.roleTitle,
+    });
     setPreviewRevision((revision) => revision + 1);
-    setIsTailoredInfoApplied((applied) => !applied);
-    if (!isTailoredInfoApplied) {
-      setMessage('Applied the tailored body, letterhead, role title, and company to the preview. Please verify every claim before exporting.');
-      trackAnalyticsEvent('cover_letter_tailored');
-    } else setMessage('Restored the original letter body and letterhead in the preview.');
+    clearTailoredCandidate();
+    setMessage('Applied the tailored body, company, and role title. Reloading the preview with saved cover-letter data…');
+    trackAnalyticsEvent('cover_letter_tailored');
+    window.setTimeout(() => window.location.reload(), 80);
   }
 
   return (
@@ -296,7 +280,7 @@ export default function CoverLetterPage() {
           </div>
           <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor entire letter body'}</button>{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored information ready</p><p className="mt-1 text-sm opacity-75">Tailored letterhead: {pendingTailoredLetter.senderName || 'Name not found'} · {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p><p className="mt-2 text-sm opacity-80">Use the toggle to apply or restore the complete body and all tailored letterhead details in the preview.</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Complete tailored letter body" /><button type="button" aria-pressed={isTailoredInfoApplied} className={`career-tailored-toggle mt-3 ${isTailoredInfoApplied ? 'career-tailored-toggle-active' : ''}`} onClick={toggleTailoredInfo}>{isTailoredInfoApplied ? 'Show original info in preview' : 'Apply tailored info to preview'}</button></div>}</div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor entire letter body'}</button>{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored letter ready</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p><p className="mt-2 text-sm opacity-80">Applying this keeps the existing Docling-imported name, email, phone, and location.</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Complete tailored letter body" /><button type="button" className="career-primary-button mt-3" onClick={applyTailoredLetter}>Apply tailored letter body</button></div>}</div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
