@@ -87,7 +87,7 @@ export default function AiPage() {
       setMessages((current) => [...current, { role: "assistant", content: result.reply! }]);
       void checkStatus();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to contact local Ollama.");
+      setError(reason instanceof Error ? reason.message : "Unable to contact the server AI.");
     } finally {
       setSending(false);
     }
@@ -99,8 +99,8 @@ export default function AiPage() {
         <header className="ai-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="ai-kicker">Private server diagnostic</p>
-            <h1 className="text-2xl font-bold">Local AI / Ollama</h1>
-            <p className="mt-1 text-sm opacity-75">This page sends requests only through this app to the VPS-local model. Ollama remains unexposed to the public internet.</p>
+            <h1 className="text-2xl font-bold">Server AI / Ollama</h1>
+            <p className="mt-1 text-sm opacity-75">This page sends requests only through this app to the server AI model. Ollama remains unexposed to the public internet.</p>
           </div>
           <Link href="/" className="ai-secondary-button">Back to résumé builder</Link>
         </header>
@@ -109,7 +109,7 @@ export default function AiPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-semibold">Model status</h2>
-              {checking ? <p className="mt-1 text-sm opacity-75">Checking local Ollama…</p> : status ? (
+              {checking ? <p className="mt-1 text-sm opacity-75">Checking server AI…</p> : status ? (
                 <p className="mt-1 text-sm opacity-75">Configured model: <strong>{status.model}</strong></p>
               ) : <p className="mt-1 text-sm opacity-75">No status response.</p>}
             </div>

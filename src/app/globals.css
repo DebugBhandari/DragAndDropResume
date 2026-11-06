@@ -338,6 +338,8 @@
   .career-primary-button:disabled { cursor: not-allowed; opacity: .6; }
   .career-secondary-button { border: 1px solid var(--form-border); color: var(--form-text); background: transparent; }
   .career-message { padding: .7rem .8rem; border: 1px solid color-mix(in srgb, var(--sage-green) 46%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 20%, #fffaf0); font-size: .85rem; }
+  .career-activity { padding: .75rem .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 52%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 21%, var(--form-surface)); font-size: .82rem; }
+  .career-activity-title { display: flex; align-items: center; gap: .45rem; font-weight: 800; }
   .career-preview-shell { min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 26%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, var(--form-surface-strong) 45%, transparent); overflow: auto; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
   .career-style-card { padding: .8rem; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }

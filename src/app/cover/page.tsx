@@ -48,8 +48,32 @@ export default function CoverLetterPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [isTailoring, setIsTailoring] = useState(false);
   const [message, setMessage] = useState('');
+  const [activityStage, setActivityStage] = useState('');
+  const [activityDetail, setActivityDetail] = useState('');
+  const [previewRevision, setPreviewRevision] = useState(0);
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
+
+  async function readProgressStream(response: Response, onEvent: (event: Record<string, unknown>) => void) {
+    if (!response.body) throw new Error('The server did not return a progress stream.');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { onEvent(JSON.parse(line) as Record<string, unknown>); } catch { /* Ignore malformed progress events. */ }
+      }
+      if (done) break;
+    }
+    if (buffer.trim()) {
+      try { onEvent(JSON.parse(buffer) as Record<string, unknown>); } catch { /* Ignore malformed progress events. */ }
+    }
+  }
 
   const printCoverLetter = useCallback(() => {
     const source = previewRef.current;
@@ -111,14 +135,36 @@ export default function CoverLetterPage() {
       if (name?.trim()) saveCoverLetterVersion(name);
     }
     setIsImporting(true);
-    setMessage('Docling is extracting your cover letter…');
+    setActivityStage('Preparing PDF import');
+    setActivityDetail('Sending your PDF to Docling on the server…');
+    setMessage('');
     try {
       const formData = new FormData();
       formData.append('file', file);
       const response = await fetch('/api/cover-letter-import', { method: 'POST', body: formData });
-      const payload = await response.json() as { text?: string; fields?: Partial<CoverLetterData>; message?: string };
-      if (!response.ok || !payload.text) throw new Error(payload.message || 'Could not import this PDF.');
-      replaceCoverLetter({ ...payload.fields, body: cleanImportedText(payload.text) });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { message?: string };
+        throw new Error(payload.message || 'Could not import this PDF.');
+      }
+      let imported = false;
+      let streamError = '';
+      await readProgressStream(response, (event) => {
+        if (event.type === 'stage') {
+          const labels: Record<string, string> = { upload: 'Uploading PDF', docling: 'Docling extraction', parsing: 'Cleaning letter details' };
+          setActivityStage(labels[String(event.stage)] ?? 'Processing PDF');
+          setActivityDetail(String(event.detail ?? 'Processing your cover letter…'));
+        }
+        if (event.type === 'result' && typeof event.text === 'string') {
+          const fields = event.fields && typeof event.fields === 'object' ? event.fields as Partial<CoverLetterData> : {};
+          replaceCoverLetter({ ...fields, body: cleanImportedText(event.text) });
+          setPreviewRevision((revision) => revision + 1);
+          imported = true;
+        }
+        if (event.type === 'complete') setActivityDetail(String(event.message ?? 'Import complete.'));
+        if (event.type === 'error') streamError = String(event.message ?? 'Could not import this PDF.');
+      });
+      if (streamError) throw new Error(streamError);
+      if (!imported) throw new Error('Docling did not return usable cover-letter text.');
       saveCoverLetterVersion(`Imported ${file.name.replace(/\.pdf$/i, '')}`);
       setMessage('Imported with Docling. Review the editable letter and saved version.');
       trackAnalyticsEvent('cover_letter_imported', { source: 'docling' });
@@ -126,6 +172,8 @@ export default function CoverLetterPage() {
       setMessage(error instanceof Error ? error.message : 'Unable to import this PDF.');
     } finally {
       setIsImporting(false);
+      setActivityStage('');
+      setActivityDetail('');
     }
   }
 
@@ -135,21 +183,43 @@ export default function CoverLetterPage() {
       return;
     }
     setIsTailoring(true);
-    setMessage('Tailoring the letter with your local AI…');
+    setActivityStage('Preparing server AI');
+    setActivityDetail('Sending your current letter and job requirements to the server AI…');
+    setMessage('');
     try {
       const response = await fetch('/api/cover-letter-tailor', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: coverLetter.body, jobDescription: coverLetter.jobDescription, roleTitle: coverLetter.roleTitle, companyName: coverLetter.companyName }),
       });
-      const payload = await response.json() as { body?: string; message?: string };
-      if (!response.ok || !payload.body?.trim()) throw new Error(payload.message || 'Unable to tailor this letter.');
-      updateCoverLetter({ body: payload.body });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { message?: string };
+        throw new Error(payload.message || 'Unable to tailor this letter.');
+      }
+      let tailored = false;
+      let streamError = '';
+      await readProgressStream(response, (event) => {
+        if (event.type === 'stage') {
+          const labels: Record<string, string> = { validating: 'Preparing server AI', 'server-ai': 'Server AI tailoring', applying: 'Updating current letter' };
+          setActivityStage(labels[String(event.stage)] ?? 'Server AI');
+          setActivityDetail(String(event.detail ?? 'Tailoring your cover letter…'));
+        }
+        if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
+          updateCoverLetter({ body: event.body });
+          setPreviewRevision((revision) => revision + 1);
+          tailored = true;
+        }
+        if (event.type === 'error') streamError = String(event.message ?? 'Unable to tailor this letter.');
+      });
+      if (streamError) throw new Error(streamError);
+      if (!tailored) throw new Error('The server AI did not return a revised letter body.');
       setMessage('Tailored draft ready. Please review every claim before exporting.');
       trackAnalyticsEvent('cover_letter_tailored');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
       setIsTailoring(false);
+      setActivityStage('');
+      setActivityDetail('');
     }
   }
 
@@ -185,16 +255,17 @@ export default function CoverLetterPage() {
           </div>
           <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste job requirements here. The local AI will revise only the body and preserve claims from your draft." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring}>{isTailoring ? 'Tailoring…' : 'Tailor letter to this job'}</button></div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste job requirements here. The server AI will revise only the body and preserve claims from your draft." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter to this job'}</button></div>
           <div className="career-divider" />
-          <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${isImporting ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
+          <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Versions</p><h2 className="font-bold">Named cover letters</h2></div><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => loadCoverLetterVersion(version.id)}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div>
           <button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) clearCoverLetter(); }}>Clear current letter</button>
+          {(isImporting || isTailoring) && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content"><p>{coverLetter.date}</p>{coverLetter.recipientName && <p>{coverLetter.recipientName}</p>}{coverLetter.companyName && <p>{coverLetter.companyName}</p>}{coverLetter.subject && <p className="mt-7 font-bold">Re: {coverLetter.subject}</p>}<p className="mt-7">{coverLetter.greeting || 'Dear Hiring Manager,'}</p><div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div><p className="mt-7">{coverLetter.closing || 'Sincerely,'}</p><p className="mt-6 font-semibold">{coverLetter.signature || coverLetter.senderName || 'Your Name'}</p></div></article></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article key={previewRevision} ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content"><p>{coverLetter.date}</p>{coverLetter.recipientName && <p>{coverLetter.recipientName}</p>}{coverLetter.companyName && <p>{coverLetter.companyName}</p>}{coverLetter.subject && <p className="mt-7 font-bold">Re: {coverLetter.subject}</p>}<p className="mt-7">{coverLetter.greeting || 'Dear Hiring Manager,'}</p><div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div><p className="mt-7">{coverLetter.closing || 'Sincerely,'}</p><p className="mt-6 font-semibold">{coverLetter.signature || coverLetter.senderName || 'Your Name'}</p></div></article></div></section>
       </div>
     </main>
   );

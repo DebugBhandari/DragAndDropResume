@@ -10,6 +10,7 @@ export const maxDuration = 150;
 const execFileAsync = promisify(execFile);
 const MAX_BYTES = 10 * 1024 * 1024;
 const DOCLING_BIN = process.env.DOCLING_BIN ?? 'docling';
+const encoder = new TextEncoder();
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_PATTERN = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4}/g;
 
@@ -101,27 +102,29 @@ export async function POST(request: Request) {
     return Response.json({ message: 'Upload a PDF no larger than 10 MB.' }, { status: 400 });
   }
 
-  let workspace = '';
-  try {
-    workspace = await mkdtemp(join(tmpdir(), 'cover-letter-import-'));
-    const sourcePath = join(workspace, 'source.pdf');
-    const outputDirectory = join(workspace, 'docling');
-    await mkdir(outputDirectory, { recursive: true });
-    await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
-    await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'native', '--no-ocr', sourcePath], {
-      timeout: 120_000,
-      maxBuffer: 2_000_000,
-    });
-    const markdownFiles = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
-    if (!markdownFiles[0]) throw new Error('Docling did not produce readable Markdown for this PDF.');
-    const markdown = await readFile(join(outputDirectory, markdownFiles[0]), 'utf8');
-    const text = normalizeDoclingMarkdown(markdown);
-    if (text.length < 20) throw new Error('Docling could not find readable cover-letter content in this PDF.');
-    return Response.json({ text, fields: extractImportedFields(markdown) });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Docling could not import this PDF.';
-    return Response.json({ message: `Docling PDF extraction failed. ${detail}` }, { status: 422 });
-  } finally {
-    if (workspace) await rm(workspace, { recursive: true, force: true });
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (event: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      let workspace = '';
+      try {
+        emit({ type: 'stage', stage: 'upload', detail: 'Saving the PDF in the server processing workspace…' });
+        workspace = await mkdtemp(join(tmpdir(), 'cover-letter-import-'));
+        const sourcePath = join(workspace, 'source.pdf'); const outputDirectory = join(workspace, 'docling');
+        await mkdir(outputDirectory, { recursive: true }); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
+        emit({ type: 'stage', stage: 'docling', detail: 'Docling is converting the PDF into structured Markdown…' });
+        await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'native', '--no-ocr', sourcePath], { timeout: 120_000, maxBuffer: 2_000_000 });
+        emit({ type: 'stage', stage: 'parsing', detail: 'Cleaning extracted text and finding contact details in the letter…' });
+        const markdownFiles = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
+        if (!markdownFiles[0]) throw new Error('Docling did not produce readable Markdown for this PDF.');
+        const markdown = await readFile(join(outputDirectory, markdownFiles[0]), 'utf8'); const text = normalizeDoclingMarkdown(markdown);
+        if (text.length < 20) throw new Error('Docling could not find readable cover-letter content in this PDF.');
+        emit({ type: 'result', text, fields: extractImportedFields(markdown) });
+        emit({ type: 'complete', message: 'Docling import is ready and has replaced the current cover-letter draft.' });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'Docling could not import this PDF.';
+        emit({ type: 'error', message: `Docling PDF extraction failed. ${detail}` });
+      } finally { if (workspace) await rm(workspace, { recursive: true, force: true }); controller.close(); }
+    },
+  });
+  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' } });
 }
