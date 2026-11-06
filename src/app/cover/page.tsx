@@ -141,10 +141,9 @@ export default function CoverLetterPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: coverLetter.body, jobDescription: coverLetter.jobDescription, roleTitle: coverLetter.roleTitle, companyName: coverLetter.companyName }),
       });
-      const payload = await response.json() as { updates?: Partial<CoverLetterData> & { body?: string }; message?: string };
-      if (!response.ok || !payload.updates?.body) throw new Error(payload.message || 'Unable to tailor this letter.');
-      const updates = Object.fromEntries(Object.entries(payload.updates).filter(([, value]) => typeof value === 'string' && value.trim())) as Partial<CoverLetterData>;
-      updateCoverLetter(updates);
+      const payload = await response.json() as { body?: string; message?: string };
+      if (!response.ok || !payload.body?.trim()) throw new Error(payload.message || 'Unable to tailor this letter.');
+      updateCoverLetter({ body: payload.body });
       setMessage('Tailored draft ready. Please review every claim before exporting.');
       trackAnalyticsEvent('cover_letter_tailored');
     } catch (error) {
