@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   DndContext,
   DragEndEvent,
@@ -2225,6 +2226,18 @@ export default function Home() {
             >
               {ui.edit}
             </button>
+            <Link
+              href="/cover"
+              className="studio-secondary-button inline-flex h-10 items-center justify-center px-3 text-sm font-semibold"
+            >
+              <span className="hidden xl:inline">Cover letter</span><span className="xl:hidden">Cover</span>
+            </Link>
+            <Link
+              href="/tracking"
+              className="studio-secondary-button inline-flex h-10 items-center justify-center px-3 text-sm font-semibold"
+            >
+              <span className="hidden xl:inline">Tracking</span><span className="xl:hidden">Jobs</span>
+            </Link>
             <ResumeVersionsWidget />
             <button
               type="button"

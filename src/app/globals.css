@@ -326,6 +326,37 @@
   .resume-reset-button:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--blushed-brick) 34%, transparent); }
   @media (max-width: 420px) { .resume-reset-card { align-items: stretch; flex-direction: column; } .resume-reset-button { width: 100%; } }
 
+  .career-tool { color: var(--ink); background: radial-gradient(circle at 95% -10%, color-mix(in srgb, var(--yellow-green) 44%, transparent), transparent 29rem), var(--vanilla-cream); }
+  .career-workspace { min-height: calc(100dvh - 4rem); }
+  .career-panel { padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 28%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, #fffaf0 85%, var(--form-surface)); box-shadow: 0 18px 48px -34px rgba(28,45,32,.62); }
+  .career-kicker { color: var(--sage-green); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .career-field-label { display: block; margin: 0 0 .35rem; color: var(--form-muted); font-size: .73rem; font-weight: 800; }
+  .career-divider { height: 1px; background: color-mix(in srgb, var(--form-border) 75%, transparent); }
+  .career-primary-button, .career-secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; padding: .55rem .85rem; border-radius: .7rem; font-size: .8rem; font-weight: 800; transition: filter 150ms ease, transform 150ms ease, background 150ms ease; }
+  .career-primary-button { color: #18351f; background: var(--yellow-green); }
+  .career-primary-button:hover:not(:disabled), .career-secondary-button:hover { filter: brightness(1.04); transform: translateY(-1px); }
+  .career-primary-button:disabled { cursor: not-allowed; opacity: .6; }
+  .career-secondary-button { border: 1px solid var(--form-border); color: var(--form-text); background: transparent; }
+  .career-message { padding: .7rem .8rem; border: 1px solid color-mix(in srgb, var(--sage-green) 46%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 20%, #fffaf0); font-size: .85rem; }
+  .career-preview-shell { min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 26%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, var(--form-surface-strong) 45%, transparent); overflow: auto; }
+  .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
+  .cover-letter-preview { width: 680px; min-height: 960px; padding: 62px 66px; color: #1d2920; background: #fff; box-shadow: 0 22px 52px -28px rgba(28,45,32,.56); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.65; }
+  .cover-letter-letterhead { padding-bottom: 1.5rem; border-bottom: 3px solid var(--hunter-green); }
+  .cover-letter-letterhead h2 { margin: 0; color: var(--hunter-green); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
+  .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
+  .cover-letter-content { padding-top: 1.7rem; }
+  .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
+  .cover-letter-body { margin-top: 1.75rem; }
+  .cover-letter-body p { margin: 0 0 1rem; white-space: pre-wrap; }
+  .tracking-table-wrap { overflow-x: auto; border: 1px solid var(--form-border); border-radius: .85rem; }
+  .tracking-table { width: 100%; min-width: 1160px; border-collapse: collapse; background: color-mix(in srgb, #fffaf0 75%, var(--form-surface)); }
+  .tracking-table th { padding: .7rem; color: var(--form-muted); background: color-mix(in srgb, var(--form-surface-strong) 64%, transparent); font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
+  .tracking-table td { min-width: 125px; padding: .45rem; border-top: 1px solid color-mix(in srgb, var(--form-border) 65%, transparent); vertical-align: top; }
+  .tracking-input { width: 100%; min-width: 0; padding: .48rem .55rem; border: 1px solid transparent; border-radius: .45rem; color: var(--form-text); background: transparent; font-size: .8rem; line-height: 1.3; }
+  .tracking-input:hover, .tracking-input:focus { border-color: var(--form-border); outline: none; background: #fffdf7; }
+  .tracking-empty { padding: 2.5rem !important; color: var(--form-muted); text-align: center; }
+  @media (max-width: 720px) { .studio-header { align-items: flex-start; } .career-preview-scale { justify-content: flex-start; } .cover-letter-preview { width: 620px; min-height: 875px; padding: 52px; } }
+
   .ai-diagnostic { min-height: 100vh; min-height: 100dvh; color: var(--ink); background: radial-gradient(circle at 90% -10%, rgba(167, 201, 87, 0.38), transparent 28rem), var(--vanilla-cream); }
   .ai-card { border: 1px solid rgba(56, 102, 65, 0.26); border-radius: 1rem; color: var(--ink); background: #fffaf0; box-shadow: 0 18px 40px -30px rgba(28, 45, 32, 0.5); }
   .ai-kicker { color: var(--sage-green); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
