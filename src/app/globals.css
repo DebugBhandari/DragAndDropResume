@@ -343,7 +343,14 @@
   .career-tailored-choice { padding: .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 38%, var(--form-border)); border-radius: .75rem; background: color-mix(in srgb, var(--yellow-green) 12%, var(--form-surface)); }
   .career-preview-shell { min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 26%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, var(--form-surface-strong) 45%, transparent); overflow: auto; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
-  .career-style-card { padding: .8rem; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
+  .career-style-card { padding: 0; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
+  .career-disclosure { border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
+  .career-disclosure-summary { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem; cursor: pointer; list-style: none; }
+  .career-disclosure-summary::-webkit-details-marker { display: none; }
+  .career-disclosure-summary:focus-visible { border-radius: .85rem; outline: 2px solid var(--sage-green); outline-offset: 2px; }
+  .career-disclosure-content { padding: 0 .8rem .8rem; }
+  .career-disclosure-icon { width: .6rem; height: .6rem; flex: 0 0 auto; border-right: 2px solid var(--form-muted); border-bottom: 2px solid var(--form-muted); transform: rotate(45deg) translateY(-.15rem); transition: transform 150ms ease; }
+  .career-disclosure[open] .career-disclosure-icon { transform: rotate(225deg) translate(-.15rem, -.15rem); }
   .career-layout-option { padding: .55rem; border: 1px solid var(--form-border); border-radius: .65rem; color: var(--form-text); text-align: left; background: color-mix(in srgb, var(--form-surface) 82%, transparent); transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
   .career-layout-option:hover { border-color: var(--sage-green); transform: translateY(-1px); }
   .career-layout-option-active { border-color: var(--hunter-green); background: color-mix(in srgb, var(--yellow-green) 26%, var(--form-surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--yellow-green) 35%, transparent); }
