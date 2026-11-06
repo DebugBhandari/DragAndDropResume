@@ -137,8 +137,10 @@ export async function POST(request: Request) {
         workspace = await mkdtemp(join(tmpdir(), 'cover-letter-import-'));
         const sourcePath = join(workspace, 'source.pdf'); const outputDirectory = join(workspace, 'docling');
         await mkdir(outputDirectory, { recursive: true }); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
-        emit({ type: 'stage', stage: 'docling', detail: 'Docling is extracting text and OCR content from the PDF…' });
-        await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'standard', sourcePath], { timeout: 120_000, maxBuffer: 2_000_000 });
+        emit({ type: 'stage', stage: 'docling', detail: 'Docling is extracting embedded text from the PDF…' });
+        // Use Docling's local-only pipeline. The standard pipeline downloads layout/OCR
+        // models on first use, which makes imports fail on servers without Hugging Face access.
+        await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'native', '--no-ocr', sourcePath], { timeout: 120_000, maxBuffer: 2_000_000 });
         emit({ type: 'stage', stage: 'parsing', detail: 'Extracting sender contact details and the letter body…' });
         const markdownFiles = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
         if (!markdownFiles[0]) throw new Error('Docling did not produce readable Markdown for this PDF.');
