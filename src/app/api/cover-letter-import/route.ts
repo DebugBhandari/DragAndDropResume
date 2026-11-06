@@ -13,6 +13,9 @@ const DOCLING_BIN = process.env.DOCLING_BIN ?? 'docling';
 const encoder = new TextEncoder();
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_PATTERN = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4}/g;
+const DATE_PATTERN = /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b|\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}\b/i;
+const GREETING_PATTERN = /^(?:dear|hello|hi|to whom it may concern)\b/i;
+const CLOSING_PATTERN = /^(?:sincerely|kind regards|best regards|warm regards|regards|best|thank you|yours truly|respectfully)[,!.]?$/i;
 
 const WORD_SUFFIXES = [
   'ations?', 'itions?', 'tions?', 'ments?', 'ences?', 'ances?', 'ities?', 'ingly', 'edly',
@@ -38,6 +41,9 @@ function normalizeDoclingMarkdown(value: string) {
   return value
     .replace(/\r\n?/g, '\n')
     .replace(/[\u00a0\u2007\u202f]/g, ' ')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm, '$1')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
     // A hyphen at the end of a PDF-wrapped line is generally a split word.
     .replace(/([A-Za-z])-[ \t]*\n[ \t]*([a-z])/g, '$1$2')
     .replace(/\n{3,}/g, '\n\n')
@@ -46,6 +52,45 @@ function normalizeDoclingMarkdown(value: string) {
     .filter(Boolean)
     .join('\n\n')
     .trim();
+}
+
+function isContactLine(value: string) {
+  return EMAIL_PATTERN.test(value) || Boolean(extractPhone(value)) || /^https?:\/\//i.test(value) || /\b(?:linkedin|github)\.com\b/i.test(value);
+}
+
+function hasLetterContent(value: string) {
+  return value.replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 20;
+}
+
+function parseCoverLetter(markdown: string) {
+  const text = normalizeDoclingMarkdown(markdown);
+  const paragraphs = text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  const fields = extractImportedFields(markdown);
+  const dateIndex = paragraphs.findIndex((paragraph) => DATE_PATTERN.test(paragraph));
+  const greetingIndex = paragraphs.findIndex((paragraph) => GREETING_PATTERN.test(paragraph));
+  const closingIndex = greetingIndex >= 0
+    ? paragraphs.findIndex((paragraph, index) => index > greetingIndex && CLOSING_PATTERN.test(paragraph))
+    : -1;
+  const signatureIndex = closingIndex >= 0 && isLikelyName(paragraphs[closingIndex + 1] ?? '') ? closingIndex + 1 : -1;
+  const beforeGreeting = greetingIndex >= 0 ? paragraphs.slice(0, greetingIndex) : [];
+  const recipientCandidates = beforeGreeting.filter((paragraph, index) => index !== dateIndex && !isContactLine(paragraph) && !isLikelyName(paragraph));
+  const recipientName = recipientCandidates.find((paragraph) => /^(?:hiring manager|recruiting team|talent acquisition|human resources|[A-Z][a-zÀ-ÿ'’-]+(?:\s+[A-Z][a-zÀ-ÿ'’-]+){1,3})$/.test(paragraph)) ?? '';
+  const companyName = recipientCandidates.find((paragraph) => paragraph !== recipientName && paragraph.length <= 100 && !DATE_PATTERN.test(paragraph)) ?? '';
+  const start = greetingIndex >= 0 ? greetingIndex + 1 : 0;
+  const end = closingIndex >= 0 ? closingIndex : paragraphs.length;
+  const bodyCandidates = paragraphs.slice(start, end).filter((paragraph) => !isContactLine(paragraph) && !DATE_PATTERN.test(paragraph));
+  const body = bodyCandidates.filter(hasLetterContent).join('\n\n') || text;
+
+  return {
+    ...fields,
+    date: dateIndex >= 0 ? paragraphs[dateIndex] : '',
+    recipientName,
+    companyName,
+    greeting: greetingIndex >= 0 ? paragraphs[greetingIndex] : '',
+    body,
+    closing: closingIndex >= 0 ? paragraphs[closingIndex] : '',
+    signature: signatureIndex >= 0 ? paragraphs[signatureIndex] : '',
+  };
 }
 
 function normalizeLine(value: string) {
@@ -111,14 +156,14 @@ export async function POST(request: Request) {
         workspace = await mkdtemp(join(tmpdir(), 'cover-letter-import-'));
         const sourcePath = join(workspace, 'source.pdf'); const outputDirectory = join(workspace, 'docling');
         await mkdir(outputDirectory, { recursive: true }); await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
-        emit({ type: 'stage', stage: 'docling', detail: 'Docling is converting the PDF into structured Markdown…' });
-        await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'native', '--no-ocr', sourcePath], { timeout: 120_000, maxBuffer: 2_000_000 });
-        emit({ type: 'stage', stage: 'parsing', detail: 'Cleaning extracted text and finding contact details in the letter…' });
+        emit({ type: 'stage', stage: 'docling', detail: 'Docling is extracting text and OCR content from the PDF…' });
+        await execFileAsync(DOCLING_BIN, ['convert', '--from', 'pdf', '--to', 'md', '--output', outputDirectory, '--pipeline', 'standard', sourcePath], { timeout: 120_000, maxBuffer: 2_000_000 });
+        emit({ type: 'stage', stage: 'parsing', detail: 'Building the complete letter and detecting its header, body, and signature…' });
         const markdownFiles = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
         if (!markdownFiles[0]) throw new Error('Docling did not produce readable Markdown for this PDF.');
-        const markdown = await readFile(join(outputDirectory, markdownFiles[0]), 'utf8'); const text = normalizeDoclingMarkdown(markdown);
-        if (text.length < 20) throw new Error('Docling could not find readable cover-letter content in this PDF.');
-        emit({ type: 'result', text, fields: extractImportedFields(markdown) });
+        const markdown = await readFile(join(outputDirectory, markdownFiles[0]), 'utf8'); const importedLetter = parseCoverLetter(markdown);
+        if (importedLetter.body.length < 20) throw new Error('Docling could not find readable cover-letter content in this PDF.');
+        emit({ type: 'result', text: importedLetter.body, fields: importedLetter });
         emit({ type: 'complete', message: 'Docling import is ready and has replaced the current cover-letter draft.' });
       } catch (error) {
         const detail = error instanceof Error ? error.message : 'Docling could not import this PDF.';
