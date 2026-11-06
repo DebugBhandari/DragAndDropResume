@@ -340,8 +340,10 @@
   .career-message { padding: .7rem .8rem; border: 1px solid color-mix(in srgb, var(--sage-green) 46%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 20%, #fffaf0); font-size: .85rem; }
   .career-activity { padding: .75rem .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 52%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 21%, var(--form-surface)); font-size: .82rem; }
   .career-activity-title { display: flex; align-items: center; gap: .45rem; font-weight: 800; }
+  .career-tailored-choice { padding: .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 38%, var(--form-border)); border-radius: .75rem; background: color-mix(in srgb, var(--yellow-green) 12%, var(--form-surface)); }
   .career-preview-shell { min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 26%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, var(--form-surface-strong) 45%, transparent); overflow: auto; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
+  .career-preview-pages { position: relative; align-items: center; flex-direction: column; gap: 2rem; }
   .career-style-card { padding: 0; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
   .career-disclosure { border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
   .career-disclosure-summary { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem; cursor: pointer; list-style: none; }
@@ -363,7 +365,9 @@
   .career-layout-thumbnail-centered { align-items: center; } .career-layout-thumbnail-centered b { width: 78%; }
   .career-color-swatch { width: 1.65rem; height: 1.65rem; border: 2px solid transparent; border-radius: 999px; transition: transform 150ms ease, border-color 150ms ease; }
   .career-color-swatch:hover { transform: scale(1.08); } .career-color-swatch-active { border-color: var(--ink); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--form-border); }
-  .cover-letter-preview { width: 680px; min-height: 960px; padding: 62px 66px; color: #1d2920; background: #fff; box-shadow: 0 22px 52px -28px rgba(28,45,32,.56); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.65; }
+  .cover-letter-preview { width: 680px; height: 962px; min-height: 962px; overflow: hidden; padding: 62px 66px; color: #1d2920; background: #fff; box-shadow: 0 22px 52px -28px rgba(28,45,32,.56); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.65; }
+  .cover-letter-measure { position: absolute; top: 0; left: 0; visibility: hidden; pointer-events: none; }
+  .cover-letter-continuation-content { padding-top: 0; }
   .cover-letter-preview[data-font="serif"] { font-family: Georgia, 'Times New Roman', serif; } .cover-letter-preview[data-font="sans-serif"] { font-family: Arial, Helvetica, sans-serif; } .cover-letter-preview[data-font="mono"] { font-family: 'SFMono-Regular', Consolas, monospace; }
   .cover-letter-preview[data-font-size="sm"] { font-size: 12.5px; } .cover-letter-preview[data-font-size="md"] { font-size: 14px; } .cover-letter-preview[data-font-size="lg"] { font-size: 15.5px; }
   .cover-letter-preview[data-paragraph-spacing="tight"] { --cover-paragraph-space: .6rem; } .cover-letter-preview[data-paragraph-spacing="normal"] { --cover-paragraph-space: 1rem; } .cover-letter-preview[data-paragraph-spacing="relaxed"] { --cover-paragraph-space: 1.4rem; }
@@ -376,7 +380,7 @@
   .cover-letter-body { margin-top: 1.75rem; }
   .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 1rem); white-space: pre-wrap; }
   .cover-letter-preview[data-layout="classic"] { padding: 72px 76px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead h2 { font-size: 24px; }
-  .cover-letter-preview[data-layout="compact"] { min-height: 900px; padding: 48px 54px; line-height: 1.48; } .cover-letter-preview[data-layout="compact"] .cover-letter-letterhead { padding-bottom: 1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-content { padding-top: 1.1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-body { margin-top: 1.1rem; }
+  .cover-letter-preview[data-layout="compact"] { height: 900px; min-height: 900px; padding: 48px 54px; line-height: 1.48; } .cover-letter-preview[data-layout="compact"] .cover-letter-letterhead { padding-bottom: 1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-content { padding-top: 1.1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-body { margin-top: 1.1rem; }
   .cover-letter-preview[data-layout="centered"] .cover-letter-letterhead { text-align: center; } .cover-letter-preview[data-layout="centered"] .cover-letter-content { padding-top: 2rem; }
   .tracking-table-wrap { overflow-x: auto; border: 1px solid var(--form-border); border-radius: .85rem; }
   .tracking-table { width: 100%; min-width: 1160px; border-collapse: collapse; background: color-mix(in srgb, #fffaf0 75%, var(--form-surface)); }
@@ -385,7 +389,7 @@
   .tracking-input { width: 100%; min-width: 0; padding: .48rem .55rem; border: 1px solid transparent; border-radius: .45rem; color: var(--form-text); background: transparent; font-size: .8rem; line-height: 1.3; }
   .tracking-input:hover, .tracking-input:focus { border-color: var(--form-border); outline: none; background: #fffdf7; }
   .tracking-empty { padding: 2.5rem !important; color: var(--form-muted); text-align: center; }
-  @media (max-width: 720px) { .studio-header { align-items: flex-start; } .career-preview-scale { justify-content: flex-start; } .cover-letter-preview { width: 620px; min-height: 875px; padding: 52px; } }
+  @media (max-width: 720px) { .studio-header { align-items: flex-start; } .career-preview-scale { justify-content: flex-start; } .cover-letter-preview { width: 620px; height: 877px; min-height: 877px; padding: 52px; } }
 
   .ai-diagnostic { min-height: 100vh; min-height: 100dvh; color: var(--ink); background: radial-gradient(circle at 90% -10%, rgba(167, 201, 87, 0.38), transparent 28rem), var(--vanilla-cream); }
   .ai-card { border: 1px solid rgba(56, 102, 65, 0.26); border-radius: 1rem; color: var(--ink); background: #fffaf0; box-shadow: 0 18px 40px -30px rgba(28, 45, 32, 0.5); }

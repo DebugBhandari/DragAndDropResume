@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, type CSSProperties, useCallback, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
-import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing } from '@/types/career';
+import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
 const fieldLabels: Array<{ key: keyof CoverLetterData; label: string; placeholder: string; type?: string }> = [
@@ -22,6 +22,7 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'centered', label: 'Centered', detail: 'Formal centered header' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
+type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'companyName' | 'roleTitle'>;
 
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
@@ -35,6 +36,55 @@ function cleanImportedText(value: string) {
     .trim();
 }
 
+function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number }) {
+  const measureRef = useRef<HTMLElement>(null);
+  const paragraphs = (coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  const [pages, setPages] = useState<string[][]>([paragraphs]);
+  const previewProps = { 'data-layout': coverLetterStyle.layout, 'data-font': coverLetterStyle.fontFamily, 'data-font-size': coverLetterStyle.fontSize, 'data-paragraph-spacing': coverLetterStyle.paragraphSpacing, style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties };
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const sheet = measureRef.current;
+      if (!sheet) return;
+      const items = Array.from(sheet.querySelectorAll<HTMLElement>('[data-cover-paragraph]'));
+      if (!items.length) return;
+      const styles = window.getComputedStyle(sheet);
+      const topPadding = Number.parseFloat(styles.paddingTop) || 0;
+      const bottomPadding = Number.parseFloat(styles.paddingBottom) || 0;
+      const pageHeight = sheet.offsetWidth * (297 / 210);
+      const firstPageBottom = pageHeight - bottomPadding;
+      const continuationCapacity = pageHeight - topPadding - bottomPadding;
+      const nextPages: string[][] = [[]];
+      let continuationUsed = 0;
+
+      items.forEach((item, index) => {
+        const itemStyles = window.getComputedStyle(item);
+        const itemHeight = item.getBoundingClientRect().height + (Number.parseFloat(itemStyles.marginTop) || 0) + (Number.parseFloat(itemStyles.marginBottom) || 0);
+        const itemBottom = item.offsetTop + item.offsetHeight + (Number.parseFloat(itemStyles.marginBottom) || 0);
+        const currentPage = nextPages.length - 1;
+        const overflowsFirstPage = currentPage === 0 && nextPages[0].length > 0 && itemBottom > firstPageBottom;
+        const overflowsContinuation = currentPage > 0 && nextPages[currentPage].length > 0 && continuationUsed + itemHeight > continuationCapacity;
+        if (overflowsFirstPage || overflowsContinuation) {
+          nextPages.push([]);
+          continuationUsed = 0;
+        }
+        nextPages[nextPages.length - 1].push(paragraphs[index]);
+        if (nextPages.length > 1) continuationUsed += itemHeight;
+      });
+      setPages((current) => JSON.stringify(current) === JSON.stringify(nextPages) ? current : nextPages);
+    };
+    const frame = window.requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    if (measureRef.current) observer.observe(measureRef.current);
+    return () => { window.cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [coverLetter.body, coverLetter.companyName, coverLetter.roleTitle, coverLetter.senderName, coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation, coverLetterStyle, revision, paragraphs]);
+
+  return <>
+    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article>
+    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}>{pageIndex === 0 && (coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{page.map((paragraph, index) => <p key={`${pageIndex}-${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article>)}
+  </>;
+}
+
 export default function CoverLetterPage() {
   const previewRef = useRef<HTMLDivElement>(null);
   const { coverLetter, coverLetterStyle, coverLetterVersions, updateCoverLetter, updateCoverLetterStyle, replaceCoverLetter, clearCoverLetter, saveCoverLetterVersion, loadCoverLetterVersion, deleteCoverLetterVersion } = useCareerStore();
@@ -45,8 +95,10 @@ export default function CoverLetterPage() {
   const [activityStage, setActivityStage] = useState('');
   const [activityDetail, setActivityDetail] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
+  const [pendingTailoredLetter, setPendingTailoredLetter] = useState<PendingTailoredLetter | null>(null);
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
+  const clearTailoredCandidate = () => setPendingTailoredLetter(null);
 
   async function readProgressStream(response: Response, onEvent: (event: Record<string, unknown>) => void) {
     if (!response.body) throw new Error('The server did not return a progress stream.');
@@ -83,6 +135,10 @@ export default function CoverLetterPage() {
       * { box-sizing: border-box; }
       html, body { width: 210mm; min-height: 297mm; margin: 0; padding: 0; background: #fff; }
       .cover-letter-preview { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 18mm 20mm !important; color: #1d2920; background: #fff; box-shadow: none !important; }
+      .cover-letter-measure { display: none !important; }
+      .career-preview-pages { display: block !important; min-width: 0 !important; gap: 0 !important; padding: 0 !important; }
+      .cover-letter-page { height: 297mm !important; min-height: 297mm !important; overflow: hidden !important; break-after: page; page-break-after: always; }
+      .cover-letter-page:last-child { break-after: auto; page-break-after: auto; }
       .cover-letter-preview, .cover-letter-preview * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .cover-letter-letterhead { padding-bottom: 8mm; border-bottom: 3px solid var(--cover-accent, #386641); }
       .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, #386641); font-size: 25px; font-weight: 800; letter-spacing: -.03em; }
@@ -152,6 +208,7 @@ export default function CoverLetterPage() {
           const fields = event.fields && typeof event.fields === 'object' ? event.fields as Partial<CoverLetterData> : {};
           replaceCoverLetter({ ...fields, companyName: '', roleTitle: '', body: cleanImportedText(event.text) });
           setPreviewRevision((revision) => revision + 1);
+          clearTailoredCandidate();
           imported = true;
         }
         if (event.type === 'complete') setActivityDetail(String(event.message ?? 'Import complete.'));
@@ -177,6 +234,7 @@ export default function CoverLetterPage() {
       return;
     }
     setIsTailoring(true);
+    clearTailoredCandidate();
     setActivityStage('Preparing server AI');
     setActivityDetail('Sending your current letter and job requirements to the server AI…');
     setMessage('');
@@ -200,25 +258,23 @@ export default function CoverLetterPage() {
       let streamError = '';
       await readProgressStream(response, (event) => {
         if (event.type === 'stage') {
-          const labels: Record<string, string> = { validating: 'Preparing server AI', 'server-ai': 'Server AI tailoring', review: 'Applying tailored letter' };
+          const labels: Record<string, string> = { validating: 'Preparing server AI', 'server-ai': 'Server AI tailoring', review: 'Tailored letter ready' };
           setActivityStage(labels[String(event.stage)] ?? 'Server AI');
           setActivityDetail(String(event.detail ?? 'Tailoring your cover letter…'));
         }
         if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
-          updateCoverLetter({
+          setPendingTailoredLetter({
             body: event.body.trim(),
             roleTitle: typeof event.roleTitle === 'string' ? event.roleTitle : '',
             companyName: typeof event.companyName === 'string' ? event.companyName : '',
           });
-          setPreviewRevision((revision) => revision + 1);
           tailored = true;
         }
         if (event.type === 'error') streamError = String(event.message ?? 'Unable to tailor this letter.');
       });
       if (streamError) throw new Error(streamError);
       if (!tailored) throw new Error('The server AI did not return a revised letter body.');
-      setMessage('Tailored letter body has replaced the current saved cover letter and preview.');
-      trackAnalyticsEvent('cover_letter_tailored');
+      setMessage('Tailored letter is ready. Review it, then update the saved letter body and preview.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
@@ -226,6 +282,15 @@ export default function CoverLetterPage() {
       setActivityStage('');
       setActivityDetail('');
     }
+  }
+
+  function updateTailoredInfo() {
+    if (!pendingTailoredLetter) return;
+    updateCoverLetter({ body: pendingTailoredLetter.body, companyName: pendingTailoredLetter.companyName, roleTitle: pendingTailoredLetter.roleTitle });
+    setPreviewRevision((revision) => revision + 1);
+    clearTailoredCandidate();
+    setMessage('Updated the saved letter body, company, and role title from the tailored result.');
+    trackAnalyticsEvent('cover_letter_tailored');
   }
 
   return (
@@ -267,17 +332,17 @@ export default function CoverLetterPage() {
             </div>
           </details>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor and replace letter body'}</button><p className="text-sm opacity-75">A successful server AI result immediately replaces the saved letter body and refreshes the preview. Your name, email, phone, and location stay unchanged.</p></div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter body'}</button><p className="text-sm opacity-75">Review the server AI result before replacing the saved letter body. Your name, email, phone, and location stay unchanged.</p>{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored letter ready</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Tailored letter body" /><button type="button" className="career-primary-button mt-3" onClick={updateTailoredInfo}>Update tailored info</button></div>}</div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
-          <div className="space-y-3"><div><p className="career-kicker">Versions</p><h2 className="font-bold">Named cover letters</h2></div><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => loadCoverLetterVersion(version.id)}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div>
-          <button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) clearCoverLetter(); }}>Clear current letter</button>
+          <div className="space-y-3"><div><p className="career-kicker">Versions</p><h2 className="font-bold">Named cover letters</h2></div><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => { loadCoverLetterVersion(version.id); clearTailoredCandidate(); }}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div>
+          <button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) { clearCoverLetter(); clearTailoredCandidate(); } }}>Clear current letter</button>
           {(isImporting || isTailoring) && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article key={previewRevision} ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div ref={previewRef} className="career-preview-scale career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} /></div></section>
       </div>
     </main>
   );
