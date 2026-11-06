@@ -17,25 +17,40 @@ function cleanText(value: unknown, max = 6_000) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function assertTailoredBody(body: string) {
+  const normalized = body.toLowerCase().replace(/[–—-]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (
+    normalized.length < 80
+    || /^(?:2|two) (?:to )?4 concise revised paragraphs?\.?$/.test(normalized)
+    || /^(?:revised|tailored) (?:cover )?letter (?:body|paragraphs?)\.?$/.test(normalized)
+    || /^(?:write|provide|insert) .*(?:paragraph|letter|body)/.test(normalized)
+  ) {
+    throw new Error('The local AI returned an instruction instead of a revised letter. Your current letter was not changed; please try again.');
+  }
+  return body;
+}
+
 function parseTailoredUpdates(content: string): CoverLetterUpdates {
   const trimmed = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  let parsed: Record<string, unknown> | null = null;
   try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const body = cleanText(parsed.body);
-    if (body) {
-      return {
-        body,
-        roleTitle: cleanText(parsed.roleTitle, 180),
-        companyName: cleanText(parsed.companyName, 180),
-        subject: cleanText(parsed.subject, 240),
-        greeting: cleanText(parsed.greeting, 120),
-      };
-    }
+    parsed = JSON.parse(trimmed) as Record<string, unknown>;
   } catch {
     // Older local models sometimes return plain text despite the requested JSON shape.
   }
+  if (parsed) {
+    const body = cleanText(parsed.body);
+    if (!body) throw new Error('The local AI returned JSON without a revised letter body. Your current letter was not changed; please try again.');
+    return {
+      body: assertTailoredBody(body),
+      roleTitle: cleanText(parsed.roleTitle, 180),
+      companyName: cleanText(parsed.companyName, 180),
+      subject: cleanText(parsed.subject, 240),
+      greeting: cleanText(parsed.greeting, 120),
+    };
+  }
   if (!trimmed) throw new Error('Ollama returned no tailored letter content.');
-  return { body: trimmed };
+  return { body: assertTailoredBody(trimmed) };
 }
 
 export async function POST(request: Request) {
@@ -58,7 +73,7 @@ export async function POST(request: Request) {
         think: false,
         options: { temperature: 0.25, num_ctx: 8192, num_predict: 1000 },
         messages: [
-          { role: 'system', content: 'You tailor cover letters. Return valid JSON only, with this exact shape: {"body":"2-4 concise revised paragraphs", "roleTitle":"", "companyName":"", "subject":"", "greeting":""}. Preserve only claims supported by the supplied draft. Emphasize requirements from the job description without inventing metrics, employers, skills, or experience. Use empty strings for roleTitle, companyName, subject, or greeting unless the job description clearly supplies a better value. Do not include a closing or signature.' },
+          { role: 'system', content: 'You tailor cover letters. Return one valid JSON object only, with exactly these string keys: body, roleTitle, companyName, subject, greeting. The body value MUST contain the complete rewritten cover-letter body itself: 2 to 4 substantive paragraphs, at least 80 characters, with no instructions, placeholders, labels, Markdown fence, greeting, closing, or signature. Preserve only claims supported by the supplied draft. Emphasize requirements from the job description without inventing metrics, employers, skills, or experience. Set roleTitle, companyName, subject, and greeting to empty strings unless the job description clearly supplies a better value.' },
           { role: 'user', content: `Role: ${roleTitle || 'Not provided'}\nCompany: ${companyName || 'Not provided'}\n\nCURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
         ],
       }),
