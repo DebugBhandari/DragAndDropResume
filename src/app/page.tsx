@@ -26,6 +26,7 @@ import SectionEditor from "@/components/SectionEditor";
 import StyleEditor from "@/components/StyleEditor";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import FeedbackWidget from "@/components/FeedbackWidget";
+import ResumeVersionsWidget from "@/components/ResumeVersionsWidget";
 import HeaderImageContent from "@/components/HeaderImageContent";
 import { LanguagePickerContent, LayoutPickerContent, LOCALE_OPTIONS, PersonalInfoContent } from "@/components/ResumeSettingsControls";
 import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, SECTION_ICONS, getFontFamily } from "@/components/ResumePreview";
@@ -2224,6 +2225,7 @@ export default function Home() {
             >
               {ui.edit}
             </button>
+            <ResumeVersionsWidget />
             <button
               type="button"
               onClick={handleExportPdf}

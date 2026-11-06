@@ -11,12 +11,8 @@ function formatElapsedTime(milliseconds: number) {
   return minutes ? `${minutes} min ${seconds} sec` : `${totalSeconds} sec`;
 }
 
-function formatSavedAt(savedAt: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
-}
-
 export default function ResumeImportContent() {
-  const { replaceImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot, resumeVersions, saveResumeVersion, loadResumeVersion, deleteResumeVersion } = useResumeStore();
+  const { replaceImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot, saveResumeVersion } = useResumeStore();
   const [extractedDraft, setExtractedDraft] = useState<ResumeImportDraft | null>(null);
   const [enhancedDraft, setEnhancedDraft] = useState<ResumeImportDraft | null>(null);
   const [isEnhancedDraftReady, setIsEnhancedDraftReady] = useState(false);
@@ -178,8 +174,10 @@ export default function ResumeImportContent() {
     if (!draft) return;
     restoreImportPreview();
     replaceImportDraft(draft, selection);
+    const importedName = draft.personalInfo.fullName?.trim() || 'Imported résumé';
+    saveResumeVersion(importedName);
     previewSnapshotRef.current = null;
-    setMessage(isAiRefining ? 'Selected PDF extract details replaced. Ollama continues in the background…' : `Selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details replaced the selected résumé data.`);
+    setMessage(isAiRefining ? `Saved ${importedName} and applied its PDF extract. Ollama continues in the background…` : `Saved ${importedName} and applied the selected ${selectedDraftSource === 'enhanced' ? 'PDF extract + AI' : 'PDF extract'} details.`);
   }
 
   const draft = selectedDraftSource === 'enhanced' && enhancedDraft ? enhancedDraft : extractedDraft;
@@ -206,28 +204,6 @@ export default function ResumeImportContent() {
           <input type="file" accept="application/pdf" className="sr-only" onChange={handleImport} disabled={status === 'uploading'} />
         </label>
       </div>
-      {resumeVersions.length > 0 && (
-        <div className="resume-version-panel mt-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-bold">Saved résumé versions</p>
-            <span className="text-[11px] opacity-70">Stored in this browser</span>
-          </div>
-          <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
-            {resumeVersions.map((version) => (
-              <div key={version.id} className="resume-version-item">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold">{version.name}</p>
-                  <p className="mt-0.5 text-[11px] opacity-70">{formatSavedAt(version.savedAt)}</p>
-                </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <button type="button" className="resume-version-load" onClick={() => loadResumeVersion(version.id)}>Load</button>
-                  <button type="button" className="resume-version-delete" onClick={() => deleteResumeVersion(version.id)} aria-label={`Delete ${version.name}`}>Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       {message && status !== 'uploading' && <p className={`mt-3 text-xs ${status === 'error' ? 'text-red-700' : 'opacity-80'}`}>{message}</p>}
       {status === 'uploading' && (
         <div className="resume-import-status mt-3 p-3 text-xs">
