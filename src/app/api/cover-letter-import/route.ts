@@ -10,6 +10,8 @@ export const maxDuration = 150;
 const execFileAsync = promisify(execFile);
 const MAX_BYTES = 10 * 1024 * 1024;
 const DOCLING_BIN = process.env.DOCLING_BIN ?? 'docling';
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const PHONE_PATTERN = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4}/g;
 
 const WORD_SUFFIXES = [
   'ations?', 'itions?', 'tions?', 'ments?', 'ences?', 'ances?', 'ities?', 'ingly', 'edly',
@@ -45,6 +47,47 @@ function normalizeDoclingMarkdown(value: string) {
     .trim();
 }
 
+function normalizeLine(value: string) {
+  return repairSplitWords(value.replace(/[\u00a0\u2007\u202f]/g, ' ').replace(/[ \t]+/g, ' ').trim());
+}
+
+function isLikelyName(value: string) {
+  const candidate = value.replace(/^(?:name|signed|from)\s*[:|-]\s*/i, '').trim();
+  return /^[A-Z][a-zÀ-ÿ'’-]{1,}(?:\s+[A-Z][a-zÀ-ÿ'’-]{1,}){1,3}$/.test(candidate);
+}
+
+function extractPhone(value: string) {
+  for (const match of value.matchAll(PHONE_PATTERN)) {
+    const candidate = match[0].replace(/\s+/g, ' ').trim();
+    if (candidate.replace(/\D/g, '').length >= 7) return candidate;
+  }
+  return '';
+}
+
+function extractImportedFields(markdown: string) {
+  const lines = markdown
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(normalizeLine)
+    .filter(Boolean);
+  const fullText = lines.join('\n');
+  const emails = fullText.match(new RegExp(EMAIL_PATTERN.source, 'gi')) ?? [];
+  const email = emails.at(-1) ?? '';
+  const phone = extractPhone([...lines].reverse().join('\n'));
+  const contactIndexes = lines.map((line, index) => EMAIL_PATTERN.test(line) || Boolean(extractPhone(line)) ? index : -1).filter((index) => index >= 0);
+  const contactIndex = contactIndexes.at(-1) ?? -1;
+  const footerWindow = contactIndex >= 0 ? lines.slice(Math.max(0, contactIndex - 3), Math.min(lines.length, contactIndex + 4)) : lines.slice(-6);
+  const nameFromContactLine = footerWindow
+    .flatMap((line) => line.split(/[|•·▪◦]/).map((part) => part.trim()))
+    .find(isLikelyName) ?? '';
+  const senderName = nameFromContactLine || [...lines].reverse().find(isLikelyName) || '';
+  const senderLocation = footerWindow.find((line) => {
+    const candidate = line.replace(EMAIL_PATTERN, '').replace(PHONE_PATTERN, '').replace(/[|•·▪◦]/g, ' ').trim();
+    return candidate.length >= 4 && candidate.length <= 100 && /[A-Za-zÀ-ÿ]/.test(candidate) && /,|\b(?:city|state|province|country|remote|hybrid)\b/i.test(candidate) && !isLikelyName(candidate);
+  }) ?? '';
+  return { senderName, senderEmail: email, senderPhone: phone, senderLocation };
+}
+
 export async function POST(request: Request) {
   let formData: FormData;
   try {
@@ -71,9 +114,10 @@ export async function POST(request: Request) {
     });
     const markdownFiles = (await readdir(outputDirectory)).filter((name) => name.endsWith('.md')).sort();
     if (!markdownFiles[0]) throw new Error('Docling did not produce readable Markdown for this PDF.');
-    const text = normalizeDoclingMarkdown(await readFile(join(outputDirectory, markdownFiles[0]), 'utf8'));
+    const markdown = await readFile(join(outputDirectory, markdownFiles[0]), 'utf8');
+    const text = normalizeDoclingMarkdown(markdown);
     if (text.length < 20) throw new Error('Docling could not find readable cover-letter content in this PDF.');
-    return Response.json({ text });
+    return Response.json({ text, fields: extractImportedFields(markdown) });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Docling could not import this PDF.';
     return Response.json({ message: `Docling PDF extraction failed. ${detail}` }, { status: 422 });

@@ -116,9 +116,9 @@ export default function CoverLetterPage() {
       const formData = new FormData();
       formData.append('file', file);
       const response = await fetch('/api/cover-letter-import', { method: 'POST', body: formData });
-      const payload = await response.json() as { text?: string; message?: string };
+      const payload = await response.json() as { text?: string; fields?: Partial<CoverLetterData>; message?: string };
       if (!response.ok || !payload.text) throw new Error(payload.message || 'Could not import this PDF.');
-      replaceCoverLetter({ body: cleanImportedText(payload.text) });
+      replaceCoverLetter({ ...payload.fields, body: cleanImportedText(payload.text) });
       saveCoverLetterVersion(`Imported ${file.name.replace(/\.pdf$/i, '')}`);
       setMessage('Imported with Docling. Review the editable letter and saved version.');
       trackAnalyticsEvent('cover_letter_imported', { source: 'docling' });
@@ -141,9 +141,10 @@ export default function CoverLetterPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: coverLetter.body, jobDescription: coverLetter.jobDescription, roleTitle: coverLetter.roleTitle, companyName: coverLetter.companyName }),
       });
-      const payload = await response.json() as { body?: string; message?: string };
-      if (!response.ok || !payload.body) throw new Error(payload.message || 'Unable to tailor this letter.');
-      updateCoverLetter({ body: payload.body });
+      const payload = await response.json() as { updates?: Partial<CoverLetterData> & { body?: string }; message?: string };
+      if (!response.ok || !payload.updates?.body) throw new Error(payload.message || 'Unable to tailor this letter.');
+      const updates = Object.fromEntries(Object.entries(payload.updates).filter(([, value]) => typeof value === 'string' && value.trim())) as Partial<CoverLetterData>;
+      updateCoverLetter(updates);
       setMessage('Tailored draft ready. Please review every claim before exporting.');
       trackAnalyticsEvent('cover_letter_tailored');
     } catch (error) {
