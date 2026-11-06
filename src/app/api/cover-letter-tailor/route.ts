@@ -7,7 +7,7 @@ const model = process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b';
 const encoder = new TextEncoder();
 
 type TailorEvent =
-  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'review'; detail: string }
+  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'applying'; detail: string }
   | { type: 'result'; body: string; model: string }
   | { type: 'error'; message: string };
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         const result = await response.json() as { message?: { content?: string }; error?: string };
         if (!response.ok) throw new Error(result.error || `Server AI returned HTTP ${response.status}.`);
         const tailoredBody = parseTailoredBody(result.message?.content ?? '', body);
-        emit({ type: 'stage', stage: 'review', detail: 'Your complete revised body is ready to review and apply.' });
+        emit({ type: 'stage', stage: 'applying', detail: 'Replacing the complete current letter body with the tailored body…' });
         emit({ type: 'result', body: tailoredBody, model });
       } catch (error) {
         emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to tailor the cover letter with server AI.' });
