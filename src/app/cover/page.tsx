@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useCallback, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, useCallback, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
-import type { CoverLetterData } from '@/types/career';
+import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing } from '@/types/career';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
 const fieldLabels: Array<{ key: keyof CoverLetterData; label: string; placeholder: string; type?: string }> = [
@@ -21,6 +21,14 @@ const fieldLabels: Array<{ key: keyof CoverLetterData; label: string; placeholde
   { key: 'signature', label: 'Signature', placeholder: 'Your name' },
 ];
 
+const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: string }> = [
+  { value: 'classic', label: 'Classic', detail: 'Traditional letterhead' },
+  { value: 'modern', label: 'Modern', detail: 'Bold ruled header' },
+  { value: 'compact', label: 'Compact', detail: 'Dense, space-saving' },
+  { value: 'centered', label: 'Centered', detail: 'Formal centered header' },
+];
+const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
+
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
 }
@@ -35,7 +43,7 @@ function cleanImportedText(value: string) {
 
 export default function CoverLetterPage() {
   const previewRef = useRef<HTMLDivElement>(null);
-  const { coverLetter, coverLetterVersions, updateCoverLetter, replaceCoverLetter, clearCoverLetter, saveCoverLetterVersion, loadCoverLetterVersion, deleteCoverLetterVersion } = useCareerStore();
+  const { coverLetter, coverLetterStyle, coverLetterVersions, updateCoverLetter, updateCoverLetterStyle, replaceCoverLetter, clearCoverLetter, saveCoverLetterVersion, loadCoverLetterVersion, deleteCoverLetterVersion } = useCareerStore();
   const [versionName, setVersionName] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [isTailoring, setIsTailoring] = useState(false);
@@ -51,16 +59,47 @@ export default function CoverLetterPage() {
       window.print();
       return;
     }
-    const headStyles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map((node) => node.outerHTML).join('\n');
     const filename = (coverLetter.senderName || 'CoverLetter').replace(/[^\p{L}\p{N}_-]+/gu, '') || 'CoverLetter';
+    const printCss = `
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      html, body { width: 210mm; min-height: 297mm; margin: 0; padding: 0; background: #fff; }
+      .cover-letter-preview { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 18mm 20mm !important; color: #1d2920; background: #fff; box-shadow: none !important; }
+      .cover-letter-preview, .cover-letter-preview * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      .cover-letter-letterhead { padding-bottom: 8mm; border-bottom: 3px solid var(--cover-accent, #386641); }
+      .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, #386641); font-size: 25px; font-weight: 800; letter-spacing: -.03em; }
+      .cover-letter-letterhead p { margin: 3px 0 0; color: #57695a; font-size: 11px; }
+      .cover-letter-content { padding-top: 9mm; }
+      .cover-letter-content > p { margin: 0 0 2px; white-space: pre-wrap; }
+      .cover-letter-body { margin-top: 8mm; }
+      .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 5mm); white-space: pre-wrap; }
+      .cover-letter-preview[data-font="serif"] { font-family: Georgia, 'Times New Roman', serif; }
+      .cover-letter-preview[data-font="sans-serif"] { font-family: Arial, Helvetica, sans-serif; }
+      .cover-letter-preview[data-font="mono"] { font-family: 'SFMono-Regular', Consolas, monospace; }
+      .cover-letter-preview[data-font-size="sm"] { font-size: 12.5px; }
+      .cover-letter-preview[data-font-size="md"] { font-size: 14px; }
+      .cover-letter-preview[data-font-size="lg"] { font-size: 15.5px; }
+      .cover-letter-preview[data-paragraph-spacing="tight"] { --cover-paragraph-space: 3mm; }
+      .cover-letter-preview[data-paragraph-spacing="normal"] { --cover-paragraph-space: 5mm; }
+      .cover-letter-preview[data-paragraph-spacing="relaxed"] { --cover-paragraph-space: 7mm; }
+      .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; }
+      .cover-letter-preview[data-layout="classic"] { padding: 20mm 23mm !important; }
+      .cover-letter-preview[data-layout="compact"] { padding: 15mm 17mm !important; line-height: 1.48; }
+      .cover-letter-preview[data-layout="compact"] .cover-letter-content { padding-top: 6mm; }
+      .cover-letter-preview[data-layout="compact"] .cover-letter-body { margin-top: 5mm; }
+      .cover-letter-preview[data-layout="centered"] .cover-letter-letterhead { text-align: center; }
+      .cover-letter-preview[data-layout="centered"] .cover-letter-content { text-align: left; }
+    `;
     printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${filename}CoverLetter</title>${headStyles}<style>html,body{margin:0;padding:0;background:#fff}.cover-letter-preview{width:794px!important;min-height:1123px!important;box-shadow:none!important;border:0!important;margin:0!important}.cover-letter-print-only{display:block!important}@page{size:A4;margin:0}</style></head><body>${source.outerHTML}</body></html>`);
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${filename}CoverLetter</title><style>${printCss}</style></head><body>${source.outerHTML}</body></html>`);
     printWindow.document.close();
-    window.setTimeout(() => {
+    const triggerPrint = () => {
       printWindow.focus();
       printWindow.print();
       trackAnalyticsEvent('cover_letter_exported', { method: 'window_print' });
-    }, 80);
+    };
+    if (printWindow.document.readyState === 'complete') window.setTimeout(triggerPrint, 80);
+    else printWindow.addEventListener('load', () => window.setTimeout(triggerPrint, 80), { once: true });
   }, [coverLetter.senderName]);
 
   async function handleImport(event: ChangeEvent<HTMLInputElement>) {
@@ -131,6 +170,14 @@ export default function CoverLetterPage() {
       <div className="career-workspace mx-auto grid max-w-[1650px] gap-5 p-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.1fr)] lg:p-6">
         <section className="career-panel space-y-5" aria-label="Cover letter editor">
           <div><p className="career-kicker">Editor</p><h1 className="text-2xl font-bold">Build your cover letter</h1><p className="mt-1 text-sm opacity-75">Everything is saved only in this browser.</p></div>
+          <div className="career-style-card space-y-3">
+            <div><p className="career-kicker">Layout & style</p><h2 className="font-bold">Match your résumé presentation</h2></div>
+            <div className="grid grid-cols-2 gap-2">
+              {layoutOptions.map((layout) => <button type="button" key={layout.value} onClick={() => updateCoverLetterStyle({ layout: layout.value })} className={`career-layout-option ${coverLetterStyle.layout === layout.value ? 'career-layout-option-active' : ''}`}><span className={`career-layout-thumbnail career-layout-thumbnail-${layout.value}`} style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><i /><b /></span><span className="mt-1 block text-xs font-bold">{layout.label}</span><span className="block text-[11px] opacity-70">{layout.detail}</span></button>)}
+            </div>
+            <div><span className="career-field-label">Accent color</span><div className="flex flex-wrap gap-2">{accentColors.map((color) => <button type="button" aria-label={`Use ${color} as accent color`} key={color} onClick={() => updateCoverLetterStyle({ accentColor: color })} className={`career-color-swatch ${coverLetterStyle.accentColor === color ? 'career-color-swatch-active' : ''}`} style={{ backgroundColor: color }} />)}<input type="color" aria-label="Custom accent color" value={coverLetterStyle.accentColor} onChange={(event) => updateCoverLetterStyle({ accentColor: event.target.value })} className="h-7 w-8 cursor-pointer rounded border-0 bg-transparent p-0" /></div></div>
+            <div className="grid gap-3 sm:grid-cols-3"><div><span className="career-field-label">Font family</span><div className="flex flex-wrap gap-1.5">{(['serif', 'sans-serif', 'mono'] as CoverLetterFontFamily[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontFamily: value })} className={`style-chip ${coverLetterStyle.fontFamily === value ? 'style-chip-active' : ''}`}>{value === 'sans-serif' ? 'Sans' : value === 'mono' ? 'Mono' : 'Serif'}</button>)}</div></div><div><span className="career-field-label">Font size</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterFontSize[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontSize: value })} className={`style-chip ${coverLetterStyle.fontSize === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div><div><span className="career-field-label">Paragraph spacing</span><div className="flex flex-wrap gap-1.5">{(['tight', 'normal', 'relaxed'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ paragraphSpacing: value })} className={`style-chip capitalize ${coverLetterStyle.paragraphSpacing === value ? 'style-chip-active' : ''}`}>{value}</button>)}</div></div></div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {fieldLabels.map(({ key, label, placeholder, type }) => (
               <label key={key} className={key === 'subject' ? 'sm:col-span-2' : ''}><span className="career-field-label">{label}</span><input type={type ?? 'text'} className="input-field" value={coverLetter[key]} onChange={(event) => updateField(key, event.target.value)} placeholder={placeholder} /></label>
@@ -147,7 +194,7 @@ export default function CoverLetterPage() {
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article ref={previewRef} className="cover-letter-preview"><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content"><p>{coverLetter.date}</p>{coverLetter.recipientName && <p>{coverLetter.recipientName}</p>}{coverLetter.companyName && <p>{coverLetter.companyName}</p>}{coverLetter.subject && <p className="mt-7 font-bold">Re: {coverLetter.subject}</p>}<p className="mt-7">{coverLetter.greeting || 'Dear Hiring Manager,'}</p><div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div><p className="mt-7">{coverLetter.closing || 'Sincerely,'}</p><p className="mt-6 font-semibold">{coverLetter.signature || coverLetter.senderName || 'Your Name'}</p></div></article></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content"><p>{coverLetter.date}</p>{coverLetter.recipientName && <p>{coverLetter.recipientName}</p>}{coverLetter.companyName && <p>{coverLetter.companyName}</p>}{coverLetter.subject && <p className="mt-7 font-bold">Re: {coverLetter.subject}</p>}<p className="mt-7">{coverLetter.greeting || 'Dear Hiring Manager,'}</p><div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div><p className="mt-7">{coverLetter.closing || 'Sincerely,'}</p><p className="mt-6 font-semibold">{coverLetter.signature || coverLetter.senderName || 'Your Name'}</p></div></article></div></section>
       </div>
     </main>
   );

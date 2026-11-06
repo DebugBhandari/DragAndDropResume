@@ -15,11 +15,25 @@ export interface CoverLetterData {
   jobDescription: string;
 }
 
+export type CoverLetterLayout = 'classic' | 'modern' | 'compact' | 'centered';
+export type CoverLetterFontFamily = 'serif' | 'sans-serif' | 'mono';
+export type CoverLetterFontSize = 'sm' | 'md' | 'lg';
+export type CoverLetterSpacing = 'tight' | 'normal' | 'relaxed';
+
+export interface CoverLetterStyle {
+  layout: CoverLetterLayout;
+  accentColor: string;
+  fontFamily: CoverLetterFontFamily;
+  fontSize: CoverLetterFontSize;
+  paragraphSpacing: CoverLetterSpacing;
+}
+
 export interface CoverLetterVersion {
   id: string;
   name: string;
   savedAt: string;
   data: CoverLetterData;
+  style: CoverLetterStyle;
 }
 
 export type ApplicationStatus =

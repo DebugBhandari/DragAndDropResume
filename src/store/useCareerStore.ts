@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import type { CoverLetterData, CoverLetterVersion, JobApplication } from '@/types/career';
+import type { CoverLetterData, CoverLetterStyle, CoverLetterVersion, JobApplication } from '@/types/career';
 
 export const CAREER_STORAGE_KEY = 'career-tools-storage-v1';
 
@@ -24,11 +24,21 @@ const defaultCoverLetter = (): CoverLetterData => ({
   jobDescription: '',
 });
 
+const defaultCoverLetterStyle = (): CoverLetterStyle => ({
+  layout: 'modern',
+  accentColor: '#386641',
+  fontFamily: 'sans-serif',
+  fontSize: 'md',
+  paragraphSpacing: 'normal',
+});
+
 interface CareerStore {
   coverLetter: CoverLetterData;
+  coverLetterStyle: CoverLetterStyle;
   coverLetterVersions: CoverLetterVersion[];
   jobApplications: JobApplication[];
   updateCoverLetter: (data: Partial<CoverLetterData>) => void;
+  updateCoverLetterStyle: (data: Partial<CoverLetterStyle>) => void;
   replaceCoverLetter: (data: Partial<CoverLetterData>) => void;
   clearCoverLetter: () => void;
   saveCoverLetterVersion: (name: string) => void;
@@ -43,9 +53,11 @@ export const useCareerStore = create<CareerStore>()(
   persist(
     (set) => ({
       coverLetter: defaultCoverLetter(),
+      coverLetterStyle: defaultCoverLetterStyle(),
       coverLetterVersions: [],
       jobApplications: [],
       updateCoverLetter: (data) => set((state) => ({ coverLetter: { ...state.coverLetter, ...data } })),
+      updateCoverLetterStyle: (data) => set((state) => ({ coverLetterStyle: { ...state.coverLetterStyle, ...data } })),
       replaceCoverLetter: (data) => set((state) => ({ coverLetter: { ...defaultCoverLetter(), ...state.coverLetter, ...data } })),
       clearCoverLetter: () => set({ coverLetter: defaultCoverLetter() }),
       saveCoverLetterVersion: (name) => set((state) => {
@@ -57,12 +69,16 @@ export const useCareerStore = create<CareerStore>()(
             name: trimmedName,
             savedAt: new Date().toISOString(),
             data: structuredClone(state.coverLetter),
+            style: structuredClone(state.coverLetterStyle),
           }, ...state.coverLetterVersions],
         };
       }),
       loadCoverLetterVersion: (id) => set((state) => {
         const version = state.coverLetterVersions.find((item) => item.id === id);
-        return version ? { coverLetter: structuredClone(version.data) } : state;
+        return version ? {
+          coverLetter: structuredClone(version.data),
+          coverLetterStyle: { ...defaultCoverLetterStyle(), ...structuredClone(version.style ?? {}) },
+        } : state;
       }),
       deleteCoverLetterVersion: (id) => set((state) => ({
         coverLetterVersions: state.coverLetterVersions.filter((version) => version.id !== id),
@@ -81,6 +97,21 @@ export const useCareerStore = create<CareerStore>()(
         jobApplications: state.jobApplications.filter((application) => application.id !== id),
       })),
     }),
-    { name: CAREER_STORAGE_KEY },
+    {
+      name: CAREER_STORAGE_KEY,
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<CareerStore>;
+        return {
+          ...currentState,
+          ...persisted,
+          coverLetter: { ...defaultCoverLetter(), ...persisted.coverLetter },
+          coverLetterStyle: { ...defaultCoverLetterStyle(), ...persisted.coverLetterStyle },
+          coverLetterVersions: (persisted.coverLetterVersions ?? []).map((version) => ({
+            ...version,
+            style: { ...defaultCoverLetterStyle(), ...version.style },
+          })),
+        };
+      },
+    },
   ),
 );
