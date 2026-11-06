@@ -22,7 +22,7 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'centered', label: 'Centered', detail: 'Formal centered header' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
-type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'roleTitle' | 'companyName'>;
+type CoverLetterPackage = Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation' | 'companyName' | 'roleTitle' | 'body'>;
 
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
@@ -46,9 +46,27 @@ export default function CoverLetterPage() {
   const [activityStage, setActivityStage] = useState('');
   const [activityDetail, setActivityDetail] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
-  const [pendingTailoredLetter, setPendingTailoredLetter] = useState<PendingTailoredLetter | null>(null);
+  const [pendingTailoredLetter, setPendingTailoredLetter] = useState<CoverLetterPackage | null>(null);
+  const [originalLetter, setOriginalLetter] = useState<CoverLetterPackage | null>(null);
+  const [isTailoredInfoApplied, setIsTailoredInfoApplied] = useState(false);
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
+
+  const coverLetterPackage = (letter: CoverLetterData): CoverLetterPackage => ({
+    senderName: letter.senderName,
+    senderEmail: letter.senderEmail,
+    senderPhone: letter.senderPhone,
+    senderLocation: letter.senderLocation,
+    companyName: letter.companyName,
+    roleTitle: letter.roleTitle,
+    body: letter.body,
+  });
+
+  function clearTailoredCandidate() {
+    setPendingTailoredLetter(null);
+    setOriginalLetter(null);
+    setIsTailoredInfoApplied(false);
+  }
 
   async function readProgressStream(response: Response, onEvent: (event: Record<string, unknown>) => void) {
     if (!response.body) throw new Error('The server did not return a progress stream.');
@@ -154,7 +172,7 @@ export default function CoverLetterPage() {
           const fields = event.fields && typeof event.fields === 'object' ? event.fields as Partial<CoverLetterData> : {};
           replaceCoverLetter({ ...fields, companyName: '', roleTitle: '', body: cleanImportedText(event.text) });
           setPreviewRevision((revision) => revision + 1);
-          setPendingTailoredLetter(null);
+          clearTailoredCandidate();
           imported = true;
         }
         if (event.type === 'complete') setActivityDetail(String(event.message ?? 'Import complete.'));
@@ -180,16 +198,21 @@ export default function CoverLetterPage() {
       return;
     }
     setIsTailoring(true);
-    setPendingTailoredLetter(null);
-    updateCoverLetter({ companyName: '', roleTitle: '' });
-    setPreviewRevision((revision) => revision + 1);
+    clearTailoredCandidate();
     setActivityStage('Preparing server AI');
     setActivityDetail('Sending your current letter and job requirements to the server AI…');
     setMessage('');
     try {
       const response = await fetch('/api/cover-letter-tailor', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: coverLetter.body, jobDescription: coverLetter.jobDescription }),
+        body: JSON.stringify({
+          body: coverLetter.body,
+          jobDescription: coverLetter.jobDescription,
+          senderName: coverLetter.senderName,
+          senderEmail: coverLetter.senderEmail,
+          senderPhone: coverLetter.senderPhone,
+          senderLocation: coverLetter.senderLocation,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({})) as { message?: string };
@@ -204,14 +227,23 @@ export default function CoverLetterPage() {
           setActivityDetail(String(event.detail ?? 'Tailoring your cover letter…'));
         }
         if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
-          setPendingTailoredLetter({ body: event.body.trim(), roleTitle: typeof event.roleTitle === 'string' ? event.roleTitle : '', companyName: typeof event.companyName === 'string' ? event.companyName : '' });
+          setOriginalLetter(coverLetterPackage(coverLetter));
+          setPendingTailoredLetter({
+            body: event.body.trim(),
+            senderName: typeof event.senderName === 'string' ? event.senderName : '',
+            senderEmail: typeof event.senderEmail === 'string' ? event.senderEmail : '',
+            senderPhone: typeof event.senderPhone === 'string' ? event.senderPhone : '',
+            senderLocation: typeof event.senderLocation === 'string' ? event.senderLocation : '',
+            roleTitle: typeof event.roleTitle === 'string' ? event.roleTitle : '',
+            companyName: typeof event.companyName === 'string' ? event.companyName : '',
+          });
           tailored = true;
         }
         if (event.type === 'error') streamError = String(event.message ?? 'Unable to tailor this letter.');
       });
       if (streamError) throw new Error(streamError);
       if (!tailored) throw new Error('The server AI did not return a revised letter body.');
-      setMessage('Choose whether to keep your original text or the complete tailored text below.');
+      setMessage('Tailored information is ready. Use the toggle below to apply it to the preview.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
@@ -221,18 +253,15 @@ export default function CoverLetterPage() {
     }
   }
 
-  function keepOriginalLetter() {
-    setPendingTailoredLetter(null);
-    setMessage('Kept the original letter text and cleared the tailored result.');
-  }
-
-  function keepTailoredLetter() {
-    if (!pendingTailoredLetter) return;
-    updateCoverLetter(pendingTailoredLetter);
+  function toggleTailoredInfo() {
+    if (!pendingTailoredLetter || !originalLetter) return;
+    updateCoverLetter(isTailoredInfoApplied ? originalLetter : pendingTailoredLetter);
     setPreviewRevision((revision) => revision + 1);
-    setPendingTailoredLetter(null);
-    setMessage('Applied the complete tailored body and updated the letterhead from the job description. Please verify every claim before exporting.');
-    trackAnalyticsEvent('cover_letter_tailored');
+    setIsTailoredInfoApplied((applied) => !applied);
+    if (!isTailoredInfoApplied) {
+      setMessage('Applied the tailored body, letterhead, role title, and company to the preview. Please verify every claim before exporting.');
+      trackAnalyticsEvent('cover_letter_tailored');
+    } else setMessage('Restored the original letter body and letterhead in the preview.');
   }
 
   return (
@@ -267,12 +296,12 @@ export default function CoverLetterPage() {
           </div>
           <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor entire letter body'}</button>{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored result ready</p><p className="mt-1 text-sm opacity-75">Detected letterhead: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p><p className="mt-2 text-sm opacity-80">Review the complete tailored text, then choose which version to keep.</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Complete tailored letter body" /><div className="mt-3 flex flex-wrap gap-2"><button type="button" className="career-secondary-button" onClick={keepOriginalLetter}>Keep original</button><button type="button" className="career-primary-button" onClick={keepTailoredLetter}>Keep tailored</button></div></div>}</div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor entire letter body'}</button>{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored information ready</p><p className="mt-1 text-sm opacity-75">Tailored letterhead: {pendingTailoredLetter.senderName || 'Name not found'} · {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p><p className="mt-2 text-sm opacity-80">Use the toggle to apply or restore the complete body and all tailored letterhead details in the preview.</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Complete tailored letter body" /><button type="button" aria-pressed={isTailoredInfoApplied} className={`career-tailored-toggle mt-3 ${isTailoredInfoApplied ? 'career-tailored-toggle-active' : ''}`} onClick={toggleTailoredInfo}>{isTailoredInfoApplied ? 'Show original info in preview' : 'Apply tailored info to preview'}</button></div>}</div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
-          <div className="space-y-3"><div><p className="career-kicker">Versions</p><h2 className="font-bold">Named cover letters</h2></div><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => loadCoverLetterVersion(version.id)}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div>
-          <button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) clearCoverLetter(); }}>Clear current letter</button>
+          <div className="space-y-3"><div><p className="career-kicker">Versions</p><h2 className="font-bold">Named cover letters</h2></div><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => { loadCoverLetterVersion(version.id); clearTailoredCandidate(); }}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div>
+          <button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) { clearCoverLetter(); clearTailoredCandidate(); } }}>Clear current letter</button>
           {(isImporting || isTailoring) && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}
           {message && <p className="career-message" role="status">{message}</p>}
         </section>

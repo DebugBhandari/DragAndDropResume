@@ -8,7 +8,7 @@ const encoder = new TextEncoder();
 
 type TailorEvent =
   | { type: 'stage'; stage: 'validating' | 'server-ai' | 'review'; detail: string }
-  | { type: 'result'; body: string; roleTitle: string; companyName: string; model: string }
+  | { type: 'result'; body: string; senderName: string; senderEmail: string; senderPhone: string; senderLocation: string; roleTitle: string; companyName: string; model: string }
   | { type: 'error'; message: string };
 
 function wordCount(value: string) {
@@ -37,20 +37,28 @@ function parseTailoredResult(content: string, originalBody: string) {
   const trimmed = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
   const json = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? '';
   if (!json) throw new Error('The server AI did not return the tailored letter format.');
-  let result: { body?: unknown; roleTitle?: unknown; companyName?: unknown };
+  let result: { body?: unknown; senderName?: unknown; senderEmail?: unknown; senderPhone?: unknown; senderLocation?: unknown; roleTitle?: unknown; companyName?: unknown };
   try { result = JSON.parse(json) as typeof result; } catch { throw new Error('The server AI returned an invalid tailored letter format.'); }
   return {
     body: assertTailoredBody(text(result.body, MAX_LENGTH), originalBody),
+    senderName: text(result.senderName, 160),
+    senderEmail: text(result.senderEmail, 160),
+    senderPhone: text(result.senderPhone, 80),
+    senderLocation: text(result.senderLocation, 160),
     roleTitle: text(result.roleTitle, 160),
     companyName: text(result.companyName, 160),
   };
 }
 
 export async function POST(request: Request) {
-  let payload: { body?: unknown; jobDescription?: unknown };
+  let payload: { body?: unknown; jobDescription?: unknown; senderName?: unknown; senderEmail?: unknown; senderPhone?: unknown; senderLocation?: unknown };
   try { payload = await request.json() as typeof payload; } catch { return Response.json({ message: 'Add both a letter body and job description first.' }, { status: 400 }); }
   const body = typeof payload.body === 'string' ? payload.body.trim() : '';
   const jobDescription = typeof payload.jobDescription === 'string' ? payload.jobDescription.trim() : '';
+  const senderName = text(payload.senderName, 160);
+  const senderEmail = text(payload.senderEmail, 160);
+  const senderPhone = text(payload.senderPhone, 80);
+  const senderLocation = text(payload.senderLocation, 160);
   if (!body || !jobDescription) return Response.json({ message: 'Add both a letter body and job description first.' }, { status: 400 });
   if (body.length + jobDescription.length > MAX_LENGTH) return Response.json({ message: 'Keep the letter and job description under 12,000 characters combined.' }, { status: 400 });
 
@@ -63,8 +71,8 @@ export async function POST(request: Request) {
         const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(75_000),
           body: JSON.stringify({ model, stream: false, think: false, options: { temperature: 0.25, num_ctx: 8192, num_predict: 2048 }, messages: [
-            { role: 'system', content: 'You tailor cover letters. Return ONLY valid JSON with exactly these string fields: {"body":"...","roleTitle":"...","companyName":"..."}. body must be a COMPLETE replacement for the entire CURRENT LETTER BODY: rewrite every part into 2 to 4 substantive paragraphs with roughly the same detail and length. Never return a summary, excerpt, or only changed sentences. Detect roleTitle and companyName only from the JOB DESCRIPTION; use an empty string when either is not stated. Do not invent facts. The body must not include a greeting, closing, signature, labels, or Markdown.' },
-            { role: 'user', content: `CURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
+            { role: 'system', content: 'You tailor cover letters. Return ONLY valid JSON with exactly these string fields: {"body":"...","senderName":"...","senderEmail":"...","senderPhone":"...","senderLocation":"...","roleTitle":"...","companyName":"..."}. body must be a COMPLETE replacement for the entire CURRENT LETTER BODY: rewrite every part into 2 to 4 substantive paragraphs with roughly the same detail and length. Never return a summary, excerpt, or only changed sentences. Copy senderName, senderEmail, senderPhone, and senderLocation from CURRENT LETTERHEAD exactly; use an empty string only if that supplied field is empty. Detect roleTitle and companyName only from the JOB DESCRIPTION; use an empty string when either is not stated. Do not invent facts. The body must not include a greeting, closing, signature, labels, or Markdown.' },
+            { role: 'user', content: `CURRENT LETTERHEAD:\nName: ${senderName}\nEmail: ${senderEmail}\nPhone: ${senderPhone}\nLocation: ${senderLocation}\n\nCURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
           ] }),
         });
         const result = await response.json() as { message?: { content?: string }; error?: string };
