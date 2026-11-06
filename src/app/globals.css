@@ -365,6 +365,7 @@
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
   .cover-letter-content { padding-top: 1.7rem; }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
+  .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
   .cover-letter-body { margin-top: 1.75rem; }
   .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 1rem); white-space: pre-wrap; }
   .cover-letter-preview[data-layout="classic"] { padding: 72px 76px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead h2 { font-size: 24px; }

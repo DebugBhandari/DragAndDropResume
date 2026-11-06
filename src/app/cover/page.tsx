@@ -11,14 +11,8 @@ const fieldLabels: Array<{ key: keyof CoverLetterData; label: string; placeholde
   { key: 'senderEmail', label: 'Email', placeholder: 'you@example.com', type: 'email' },
   { key: 'senderPhone', label: 'Phone', placeholder: '+1 555 123 4567', type: 'tel' },
   { key: 'senderLocation', label: 'Location', placeholder: 'City, State' },
-  { key: 'recipientName', label: 'Recipient', placeholder: 'Hiring manager name' },
   { key: 'companyName', label: 'Company', placeholder: 'Company name' },
   { key: 'roleTitle', label: 'Role title', placeholder: 'Role you are applying for' },
-  { key: 'date', label: 'Date', placeholder: 'March 1, 2026' },
-  { key: 'subject', label: 'Subject (optional)', placeholder: 'Application for Product Designer' },
-  { key: 'greeting', label: 'Greeting', placeholder: 'Dear Hiring Manager,' },
-  { key: 'closing', label: 'Closing', placeholder: 'Sincerely,' },
-  { key: 'signature', label: 'Signature', placeholder: 'Your name' },
 ];
 
 const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: string }> = [
@@ -250,7 +244,7 @@ export default function CoverLetterPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {fieldLabels.map(({ key, label, placeholder, type }) => (
-              <label key={key} className={key === 'subject' ? 'sm:col-span-2' : ''}><span className="career-field-label">{label}</span><input type={type ?? 'text'} className="input-field" value={coverLetter[key]} onChange={(event) => updateField(key, event.target.value)} placeholder={placeholder} /></label>
+              <label key={key}><span className="career-field-label">{label}</span><input type={type ?? 'text'} className="input-field" value={coverLetter[key]} onChange={(event) => updateField(key, event.target.value)} placeholder={placeholder} /></label>
             ))}
           </div>
           <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
@@ -265,7 +259,7 @@ export default function CoverLetterPage() {
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article key={previewRevision} ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content"><p>{coverLetter.date}</p>{coverLetter.recipientName && <p>{coverLetter.recipientName}</p>}{coverLetter.companyName && <p>{coverLetter.companyName}</p>}{coverLetter.subject && <p className="mt-7 font-bold">Re: {coverLetter.subject}</p>}<p className="mt-7">{coverLetter.greeting || 'Dear Hiring Manager,'}</p><div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div><p className="mt-7">{coverLetter.closing || 'Sincerely,'}</p><p className="mt-6 font-semibold">{coverLetter.signature || coverLetter.senderName || 'Your Name'}</p></div></article></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div className="career-preview-scale"><article key={previewRevision} ref={previewRef} data-layout={coverLetterStyle.layout} data-font={coverLetterStyle.fontFamily} data-font-size={coverLetterStyle.fontSize} data-paragraph-spacing={coverLetterStyle.paragraphSpacing} className="cover-letter-preview" style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{(coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article></div></section>
       </div>
     </main>
   );

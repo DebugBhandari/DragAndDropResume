@@ -12,15 +12,9 @@ const defaultCoverLetter = (): CoverLetterData => ({
   senderEmail: '',
   senderPhone: '',
   senderLocation: '',
-  recipientName: '',
   companyName: '',
   roleTitle: '',
-  date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
-  subject: '',
-  greeting: 'Dear Hiring Manager,',
   body: 'I am writing to express my interest in the role. My experience and motivation would allow me to contribute meaningfully to your team.\n\nI would welcome the opportunity to discuss how I can support your goals.',
-  closing: 'Sincerely,',
-  signature: '',
   jobDescription: '',
 });
 

@@ -3,15 +3,9 @@ export interface CoverLetterData {
   senderEmail: string;
   senderPhone: string;
   senderLocation: string;
-  recipientName: string;
   companyName: string;
   roleTitle: string;
-  date: string;
-  subject: string;
-  greeting: string;
   body: string;
-  closing: string;
-  signature: string;
   jobDescription: string;
 }
 
