@@ -7,27 +7,32 @@ const model = process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b';
 const encoder = new TextEncoder();
 
 type TailorEvent =
-  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'applying'; detail: string }
+  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'review'; detail: string }
   | { type: 'result'; body: string; model: string }
   | { type: 'error'; message: string };
 
-function assertTailoredBody(body: string) {
+function wordCount(value: string) {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function assertTailoredBody(body: string, originalBody: string) {
   const normalized = body.toLowerCase().replace(/[–—-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const minimumWords = Math.max(80, Math.floor(wordCount(originalBody) * 0.6));
   if (
-    normalized.length < 80
+    wordCount(body) < minimumWords
     || /^(?:2|two) (?:to )?4 concise revised paragraphs?\.?$/.test(normalized)
     || /^(?:revised|tailored) (?:cover )?letter (?:body|paragraphs?)\.?$/.test(normalized)
     || /^(?:write|provide|insert) .*(?:paragraph|letter|body)/.test(normalized)
   ) {
-    throw new Error('The server AI returned an instruction instead of a revised letter. Your current letter was not changed; please try again.');
+    throw new Error(`The server AI returned an incomplete letter body. It must rewrite the full letter with at least ${minimumWords} words; your current letter was not changed.`);
   }
   return body;
 }
 
-function parseTailoredBody(content: string) {
+function parseTailoredBody(content: string, originalBody: string) {
   const trimmed = content.trim().replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '');
   if (!trimmed) throw new Error('Ollama returned no tailored letter content.');
-  return assertTailoredBody(trimmed);
+  return assertTailoredBody(trimmed, originalBody);
 }
 
 export async function POST(request: Request) {
@@ -48,15 +53,15 @@ export async function POST(request: Request) {
         emit({ type: 'stage', stage: 'server-ai', detail: 'The server AI is tailoring the letter to the job requirements…' });
         const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(75_000),
-          body: JSON.stringify({ model, stream: false, think: false, options: { temperature: 0.25, num_ctx: 8192, num_predict: 1000 }, messages: [
-            { role: 'system', content: 'You tailor cover letters. Return ONLY the complete rewritten letter body as plain text: 2 to 4 substantive paragraphs, at least 80 characters. Do not return JSON, labels, instructions, placeholders, Markdown fences, a greeting, a closing, or a signature. Preserve only claims supported by the supplied draft. Emphasize requirements from the job description without inventing metrics, employers, skills, or experience.' },
+          body: JSON.stringify({ model, stream: false, think: false, options: { temperature: 0.25, num_ctx: 8192, num_predict: 2048 }, messages: [
+            { role: 'system', content: 'You tailor cover letters. Return ONLY a COMPLETE replacement for the entire CURRENT LETTER BODY as plain text. Rewrite every part of the draft into 2 to 4 substantive paragraphs and preserve roughly the same amount of detail and length (never return a summary, a single paragraph, an excerpt, or only changed sentences). Do not return JSON, labels, explanations, instructions, placeholders, Markdown fences, a greeting, a closing, or a signature. Preserve only claims supported by the supplied draft. Emphasize requirements from the job description without inventing metrics, employers, skills, or experience.' },
             { role: 'user', content: `Role: ${roleTitle || 'Not provided'}\nCompany: ${companyName || 'Not provided'}\n\nCURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
           ] }),
         });
         const result = await response.json() as { message?: { content?: string }; error?: string };
         if (!response.ok) throw new Error(result.error || `Server AI returned HTTP ${response.status}.`);
-        const tailoredBody = parseTailoredBody(result.message?.content ?? '');
-        emit({ type: 'stage', stage: 'applying', detail: 'Applying the revised letter to your current draft…' });
+        const tailoredBody = parseTailoredBody(result.message?.content ?? '', body);
+        emit({ type: 'stage', stage: 'review', detail: 'Your complete revised body is ready to review and apply.' });
         emit({ type: 'result', body: tailoredBody, model });
       } catch (error) {
         emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to tailor the cover letter with server AI.' });

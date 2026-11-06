@@ -51,6 +51,7 @@ export default function CoverLetterPage() {
   const [activityStage, setActivityStage] = useState('');
   const [activityDetail, setActivityDetail] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
+  const [pendingTailoredBody, setPendingTailoredBody] = useState('');
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
 
@@ -159,6 +160,7 @@ export default function CoverLetterPage() {
           replaceCoverLetter({ ...fields, body: cleanImportedText(event.text) });
           setPreviewRevision((revision) => revision + 1);
           imported = true;
+          setPendingTailoredBody('');
         }
         if (event.type === 'complete') setActivityDetail(String(event.message ?? 'Import complete.'));
         if (event.type === 'error') streamError = String(event.message ?? 'Could not import this PDF.');
@@ -199,21 +201,19 @@ export default function CoverLetterPage() {
       let streamError = '';
       await readProgressStream(response, (event) => {
         if (event.type === 'stage') {
-          const labels: Record<string, string> = { validating: 'Preparing server AI', 'server-ai': 'Server AI tailoring', applying: 'Updating current letter' };
+          const labels: Record<string, string> = { validating: 'Preparing server AI', 'server-ai': 'Server AI tailoring', review: 'Ready to review' };
           setActivityStage(labels[String(event.stage)] ?? 'Server AI');
           setActivityDetail(String(event.detail ?? 'Tailoring your cover letter…'));
         }
         if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
-          updateCoverLetter({ body: event.body });
-          setPreviewRevision((revision) => revision + 1);
+          setPendingTailoredBody(event.body);
           tailored = true;
         }
         if (event.type === 'error') streamError = String(event.message ?? 'Unable to tailor this letter.');
       });
       if (streamError) throw new Error(streamError);
       if (!tailored) throw new Error('The server AI did not return a revised letter body.');
-      setMessage('Tailored draft ready. Please review every claim before exporting.');
-      trackAnalyticsEvent('cover_letter_tailored');
+      setMessage('Complete tailored body ready. Review it below, then choose Update entire letter body to replace your current body.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
@@ -221,6 +221,15 @@ export default function CoverLetterPage() {
       setActivityStage('');
       setActivityDetail('');
     }
+  }
+
+  function applyTailoredBody() {
+    if (!pendingTailoredBody.trim()) return;
+    updateCoverLetter({ body: pendingTailoredBody.trim() });
+    setPreviewRevision((revision) => revision + 1);
+    setPendingTailoredBody('');
+    setMessage('Updated the entire letter body with the reviewed server AI draft. Please verify every claim before exporting.');
+    trackAnalyticsEvent('cover_letter_tailored');
   }
 
   return (
@@ -255,7 +264,7 @@ export default function CoverLetterPage() {
           </div>
           <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste job requirements here. The server AI will revise only the body and preserve claims from your draft." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter to this job'}</button></div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste job requirements here. The server AI will rewrite the complete letter body and preserve claims from your draft." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Create full tailored body'}</button>{pendingTailoredBody && <div className="career-tailored-review space-y-2"><div><p className="career-kicker">Tailored body ready</p><p className="mt-1 text-sm opacity-75">Review or edit this complete replacement before applying it. Your current letter remains unchanged until you use the button below.</p></div><textarea className="input-field min-h-64 resize-y" value={pendingTailoredBody} onChange={(event) => setPendingTailoredBody(event.target.value)} aria-label="Tailored letter body to review" /><div className="flex flex-wrap gap-2"><button type="button" className="career-primary-button" onClick={applyTailoredBody}>Update entire letter body</button><button type="button" className="career-secondary-button" onClick={() => { setPendingTailoredBody(''); setMessage('Discarded the tailored body. Your current letter was not changed.'); }}>Discard tailored body</button></div></div>}</div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
