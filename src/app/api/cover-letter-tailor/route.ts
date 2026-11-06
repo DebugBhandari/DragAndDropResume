@@ -7,8 +7,8 @@ const model = process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b';
 const encoder = new TextEncoder();
 
 type TailorEvent =
-  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'applying'; detail: string }
-  | { type: 'result'; body: string; model: string }
+  | { type: 'stage'; stage: 'validating' | 'server-ai' | 'review'; detail: string }
+  | { type: 'result'; body: string; roleTitle: string; companyName: string; model: string }
   | { type: 'error'; message: string };
 
 function wordCount(value: string) {
@@ -29,19 +29,28 @@ function assertTailoredBody(body: string, originalBody: string) {
   return body;
 }
 
-function parseTailoredBody(content: string, originalBody: string) {
-  const trimmed = content.trim().replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '');
-  if (!trimmed) throw new Error('Ollama returned no tailored letter content.');
-  return assertTailoredBody(trimmed, originalBody);
+function text(value: unknown, maxLength: number) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function parseTailoredResult(content: string, originalBody: string) {
+  const trimmed = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  const json = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? '';
+  if (!json) throw new Error('The server AI did not return the tailored letter format.');
+  let result: { body?: unknown; roleTitle?: unknown; companyName?: unknown };
+  try { result = JSON.parse(json) as typeof result; } catch { throw new Error('The server AI returned an invalid tailored letter format.'); }
+  return {
+    body: assertTailoredBody(text(result.body, MAX_LENGTH), originalBody),
+    roleTitle: text(result.roleTitle, 160),
+    companyName: text(result.companyName, 160),
+  };
 }
 
 export async function POST(request: Request) {
-  let payload: { body?: unknown; jobDescription?: unknown; roleTitle?: unknown; companyName?: unknown };
+  let payload: { body?: unknown; jobDescription?: unknown };
   try { payload = await request.json() as typeof payload; } catch { return Response.json({ message: 'Add both a letter body and job description first.' }, { status: 400 }); }
   const body = typeof payload.body === 'string' ? payload.body.trim() : '';
   const jobDescription = typeof payload.jobDescription === 'string' ? payload.jobDescription.trim() : '';
-  const roleTitle = typeof payload.roleTitle === 'string' ? payload.roleTitle.trim() : '';
-  const companyName = typeof payload.companyName === 'string' ? payload.companyName.trim() : '';
   if (!body || !jobDescription) return Response.json({ message: 'Add both a letter body and job description first.' }, { status: 400 });
   if (body.length + jobDescription.length > MAX_LENGTH) return Response.json({ message: 'Keep the letter and job description under 12,000 characters combined.' }, { status: 400 });
 
@@ -54,15 +63,15 @@ export async function POST(request: Request) {
         const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(75_000),
           body: JSON.stringify({ model, stream: false, think: false, options: { temperature: 0.25, num_ctx: 8192, num_predict: 2048 }, messages: [
-            { role: 'system', content: 'You tailor cover letters. Return ONLY a COMPLETE replacement for the entire CURRENT LETTER BODY as plain text. Rewrite every part of the draft into 2 to 4 substantive paragraphs and preserve roughly the same amount of detail and length (never return a summary, a single paragraph, an excerpt, or only changed sentences). Do not return JSON, labels, explanations, instructions, placeholders, Markdown fences, a greeting, a closing, or a signature. Preserve only claims supported by the supplied draft. Emphasize requirements from the job description without inventing metrics, employers, skills, or experience.' },
-            { role: 'user', content: `Role: ${roleTitle || 'Not provided'}\nCompany: ${companyName || 'Not provided'}\n\nCURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
+            { role: 'system', content: 'You tailor cover letters. Return ONLY valid JSON with exactly these string fields: {"body":"...","roleTitle":"...","companyName":"..."}. body must be a COMPLETE replacement for the entire CURRENT LETTER BODY: rewrite every part into 2 to 4 substantive paragraphs with roughly the same detail and length. Never return a summary, excerpt, or only changed sentences. Detect roleTitle and companyName only from the JOB DESCRIPTION; use an empty string when either is not stated. Do not invent facts. The body must not include a greeting, closing, signature, labels, or Markdown.' },
+            { role: 'user', content: `CURRENT LETTER BODY:\n${body}\n\nJOB DESCRIPTION:\n${jobDescription}` },
           ] }),
         });
         const result = await response.json() as { message?: { content?: string }; error?: string };
         if (!response.ok) throw new Error(result.error || `Server AI returned HTTP ${response.status}.`);
-        const tailoredBody = parseTailoredBody(result.message?.content ?? '', body);
-        emit({ type: 'stage', stage: 'applying', detail: 'Replacing the complete current letter body with the tailored body…' });
-        emit({ type: 'result', body: tailoredBody, model });
+        const tailored = parseTailoredResult(result.message?.content ?? '', body);
+        emit({ type: 'stage', stage: 'review', detail: 'The tailored body and detected letterhead details are ready to choose.' });
+        emit({ type: 'result', ...tailored, model });
       } catch (error) {
         emit({ type: 'error', message: error instanceof Error ? error.message : 'Unable to tailor the cover letter with server AI.' });
       } finally { controller.close(); }
