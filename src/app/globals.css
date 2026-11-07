@@ -351,7 +351,7 @@
   .career-text-palette button[aria-label="Center text"] { text-align: center; }
   .career-text-palette button[aria-label="Align right"] { text-align: right; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
-  .career-preview-pages { position: relative; align-items: center; flex-direction: column; gap: 2rem; }
+  .career-preview-pages { position: relative; display: flex; align-items: center; flex-direction: column; gap: 4.5rem; padding: 1.5rem 0 4.5rem; }
   .career-style-card { padding: 0; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
   .career-disclosure { border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
   .career-disclosure-summary { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem; cursor: pointer; list-style: none; }
@@ -395,9 +395,14 @@
   .cover-letter-body { margin-top: 1.75rem; }
   .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 1rem); white-space: pre-wrap; }
   .cover-letter-body p[data-cover-paragraph-continuation="true"] { margin-top: 0; }
-  .cover-letter-page .cover-letter-body p[contenteditable="true"] { cursor: text; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
-  .cover-letter-page .cover-letter-body p[contenteditable="true"]:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
-  .cover-letter-page .cover-letter-body p[contenteditable="true"]:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph] { position: relative; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph] > span[contenteditable="true"] { cursor: text; }
+  .cover-letter-paragraph-handle { position: absolute; top: .1rem; left: -1.75rem; width: 1.2rem; min-height: 1.75rem; padding: 0; border: 0; border-radius: .3rem; color: #78907c; background: transparent; font-size: .95rem; font-weight: 900; letter-spacing: -.2rem; line-height: 1; cursor: grab; opacity: 0; transition: opacity 150ms ease, background 150ms ease, color 150ms ease; }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-handle, .cover-letter-paragraph-handle:focus-visible { opacity: 1; outline: none; color: var(--cover-accent, var(--hunter-green)); background: color-mix(in srgb, var(--yellow-green) 32%, transparent); }
+  .cover-letter-paragraph-handle:active { cursor: grabbing; }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph-dragging="true"] { opacity: .45; }
   .cover-letter-preview[data-layout="classic"] { padding: 72px 76px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead h2 { font-size: 24px; }
   .cover-letter-preview[data-layout="compact"] { height: 900px; min-height: 900px; padding: 48px 54px; line-height: 1.48; } .cover-letter-preview[data-layout="compact"] .cover-letter-letterhead { padding-bottom: 1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-content { padding-top: 1.1rem; } .cover-letter-preview[data-layout="compact"] .cover-letter-body { margin-top: 1.1rem; }
   .cover-letter-preview[data-layout="centered"] .cover-letter-letterhead { text-align: center; } .cover-letter-preview[data-layout="centered"] .cover-letter-content { padding-top: 2rem; }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, type CSSProperties, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, type DragEvent, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
 import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
 import { trackAnalyticsEvent } from '@/utils/analytics';
