@@ -383,9 +383,12 @@
   .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, var(--hunter-green)); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
   .cover-letter-editable-field { display: inline; cursor: text; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
-  .cover-letter-editable-field:empty::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
+  .cover-letter-editable-field[data-empty="true"]::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
   .cover-letter-page .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
   .cover-letter-page .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
+  .cover-letter-page [data-preview-active="true"] { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 62%, transparent); outline-offset: .16rem; background: color-mix(in srgb, var(--yellow-green) 11%, transparent); }
+  .cover-letter-preview [data-preview-caret="true"] { display: inline-block; width: 1px; height: 1.2em; margin: 0 -0.5px; vertical-align: -.2em; background: currentColor; animation: cover-letter-caret-blink 1s steps(1) infinite; pointer-events: none; }
+  @keyframes cover-letter-caret-blink { 50% { opacity: 0; } }
   .cover-letter-content { padding-top: 1.7rem; }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
