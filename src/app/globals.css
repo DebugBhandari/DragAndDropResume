@@ -382,11 +382,16 @@
   .cover-letter-letterhead { padding-bottom: 1.5rem; border-bottom: 3px solid var(--cover-accent, var(--hunter-green)); }
   .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, var(--hunter-green)); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
+  .cover-letter-editable-field { display: inline; cursor: text; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
+  .cover-letter-editable-field:empty::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
+  .cover-letter-page .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
+  .cover-letter-page .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
   .cover-letter-content { padding-top: 1.7rem; }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
   .cover-letter-body { margin-top: 1.75rem; }
   .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 1rem); white-space: pre-wrap; }
+  .cover-letter-body p[data-cover-paragraph-continuation="true"] { margin-top: 0; }
   .cover-letter-page .cover-letter-body p[contenteditable="true"] { cursor: text; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
   .cover-letter-page .cover-letter-body p[contenteditable="true"]:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
   .cover-letter-page .cover-letter-body p[contenteditable="true"]:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
