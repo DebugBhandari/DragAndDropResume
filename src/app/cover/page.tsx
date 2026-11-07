@@ -41,7 +41,17 @@ function escapeHtml(value: string) {
 }
 
 function plainTextToBodyHtml(value: string) {
-  return value.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`).join('');
+  const paragraphBoundary = '\u0000';
+  const paragraphs = value
+    .replace(/\r\n?/g, '\n')
+    // Docling may wrap ordinary prose after every visual PDF line. Treat a paragraph
+    // break only as a terminal punctuation mark followed by two spaces or two lines.
+    .replace(/([.!?])(?:[ \t]{2,}|(?:[ \t]*\n[ \t]*){2,})/g, `$1${paragraphBoundary}`)
+    .replace(/[ \t]*\n[ \t]*/g, ' ')
+    .split(paragraphBoundary)
+    .map((paragraph) => paragraph.replace(/[ \t]{2,}/g, ' ').trim())
+    .filter(Boolean);
+  return paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('');
 }
 
 function bodyHtmlToPlainText(value: string) {
