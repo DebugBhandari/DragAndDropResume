@@ -70,7 +70,23 @@ function bodyHtmlToPlainText(value: string) {
 
 function bodyHtmlToParagraphs(value: string) {
   const paragraphMatches = [...value.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)].map((match) => match[1].trim()).filter(Boolean);
-  return paragraphMatches.length ? paragraphMatches : plainTextToBodyHtml(value).match(/<p>([\s\S]*?)<\/p>/g)?.map((paragraph) => paragraph.replace(/^<p>|<\/p>$/g, '')) ?? [];
+  const fragments = paragraphMatches.length
+    ? paragraphMatches
+    : plainTextToBodyHtml(value).match(/<p>([\s\S]*?)<\/p>/g)?.map((paragraph) => paragraph.replace(/^<p>|<\/p>$/g, '')) ?? [];
+  const textOnly = (markup: string) => bodyHtmlToPlainText(`<p>${markup}</p>`).replace(/\s+/g, ' ').trim();
+  return fragments.reduce<string[]>((paragraphs, fragment) => {
+    const current = fragment.replace(/\s+/g, ' ').trim();
+    if (!current) return paragraphs;
+    const previous = paragraphs.at(-1);
+    if (!previous || /[.!?]["')\]]?$/.test(textOnly(previous))) {
+      paragraphs.push(current);
+      return paragraphs;
+    }
+    paragraphs[paragraphs.length - 1] = /-\s*$/.test(previous)
+      ? `${previous.replace(/\s+$/, '')}${current}`
+      : `${previous.replace(/\s+$/, '')} ${current}`;
+    return paragraphs;
+  }, []);
 }
 
 function sanitizeEditableMarkup(value: string) {
