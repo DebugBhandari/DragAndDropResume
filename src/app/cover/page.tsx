@@ -36,9 +36,57 @@ function cleanImportedText(value: string) {
     .trim();
 }
 
-function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number }) {
+function escapeHtml(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function plainTextToBodyHtml(value: string) {
+  return value.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`).join('');
+}
+
+function bodyHtmlToPlainText(value: string) {
+  return value
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/gi, "'")
+    .trim();
+}
+
+function bodyHtmlToParagraphs(value: string) {
+  const paragraphMatches = [...value.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)].map((match) => match[1].trim()).filter(Boolean);
+  return paragraphMatches.length ? paragraphMatches : plainTextToBodyHtml(value).match(/<p>([\s\S]*?)<\/p>/g)?.map((paragraph) => paragraph.replace(/^<p>|<\/p>$/g, '')) ?? [];
+}
+
+function sanitizeEditableMarkup(value: string) {
+  const source = new DOMParser().parseFromString(value, 'text/html');
+  const sanitizeNode = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent ?? '');
+    if (!(node instanceof HTMLElement)) return '';
+    const content = Array.from(node.childNodes).map(sanitizeNode).join('');
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'br') return '<br />';
+    if (tag === 'b' || tag === 'strong') return `<strong>${content}</strong>`;
+    if (tag === 'i' || tag === 'em') return `<em>${content}</em>`;
+    if (tag === 'u') return `<u>${content}</u>`;
+    if (tag === 'span' && /^#[0-9a-f]{6}$/i.test(node.style.color)) return `<span style="color: ${node.style.color}">${content}</span>`;
+    if (tag === 'font' && /^#[0-9a-f]{6}$/i.test(node.getAttribute('color') ?? '')) return `<span style="color: ${node.getAttribute('color')}">${content}</span>`;
+    return content;
+  };
+  return Array.from(source.body.querySelectorAll<HTMLElement>('.cover-letter-page p[data-cover-paragraph]')).map((paragraph) => {
+    const alignment = ['left', 'center', 'right', 'justify'].includes(paragraph.style.textAlign) ? ` style="text-align: ${paragraph.style.textAlign}"` : '';
+    return `<p${alignment}>${Array.from(paragraph.childNodes).map(sanitizeNode).join('')}</p>`;
+  }).filter((paragraph) => bodyHtmlToPlainText(paragraph)).join('');
+}
+
+function CoverLetterPages({ coverLetter, coverLetterStyle, revision, onBodyBlur }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number; onBodyBlur: () => void }) {
   const measureRef = useRef<HTMLElement>(null);
-  const paragraphs = (coverLetter.body || 'Your cover letter body will appear here.').split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  const paragraphs = bodyHtmlToParagraphs(coverLetter.body || 'Your cover letter body will appear here.');
   const [pages, setPages] = useState<string[][]>([paragraphs]);
   const previewProps = { 'data-layout': coverLetterStyle.layout, 'data-font': coverLetterStyle.fontFamily, 'data-font-size': coverLetterStyle.fontSize, 'data-paragraph-spacing': coverLetterStyle.paragraphSpacing, style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties };
 
@@ -80,8 +128,8 @@ function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLe
   }, [coverLetter.body, coverLetter.companyName, coverLetter.roleTitle, coverLetter.senderName, coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation, coverLetterStyle, revision, paragraphs]);
 
   return <>
-    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article>
-    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}>{pageIndex === 0 && (coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{page.map((paragraph, index) => <p key={`${pageIndex}-${paragraph}-${index}`}>{paragraph}</p>)}</div></div></article>)}
+    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>
+    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}>{pageIndex === 0 && (coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{page.map((paragraph, index) => <p contentEditable suppressContentEditableWarning data-cover-paragraph key={`${pageIndex}-${paragraph}-${index}`} onBlur={onBodyBlur} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>)}
   </>;
 }
 
@@ -99,6 +147,19 @@ export default function CoverLetterPage() {
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
   const clearTailoredCandidate = () => setPendingTailoredLetter(null);
+  const persistPreviewBody = useCallback(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    const body = sanitizeEditableMarkup(preview.innerHTML);
+    if (body && body !== coverLetter.body) {
+      updateCoverLetter({ body });
+      setPreviewRevision((revision) => revision + 1);
+    }
+  }, [coverLetter.body, updateCoverLetter]);
+  const applyTextCommand = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    window.setTimeout(persistPreviewBody, 0);
+  };
 
   async function readProgressStream(response: Response, onEvent: (event: Record<string, unknown>) => void) {
     if (!response.body) throw new Error('The server did not return a progress stream.');
@@ -242,7 +303,7 @@ export default function CoverLetterPage() {
       const response = await fetch('/api/cover-letter-tailor', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          body: coverLetter.body,
+          body: bodyHtmlToPlainText(coverLetter.body),
           jobDescription: coverLetter.jobDescription,
           senderName: coverLetter.senderName,
           senderEmail: coverLetter.senderEmail,
@@ -328,7 +389,7 @@ export default function CoverLetterPage() {
                   <label key={key}><span className="career-field-label">{label}</span><input type={type ?? 'text'} className="input-field" value={coverLetter[key]} onChange={(event) => updateField(key, event.target.value)} placeholder={placeholder} /></label>
                 ))}
               </div>
-              <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={coverLetter.body} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
+              <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={bodyHtmlToPlainText(coverLetter.body)} onChange={(event) => updateField('body', event.target.value)} placeholder="Write the main body of your cover letter." /></label>
             </div>
           </details>
           <div className="career-divider" />
@@ -342,7 +403,7 @@ export default function CoverLetterPage() {
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><p className="career-kicker mb-3">Live preview</p><div ref={previewRef} className="career-preview-scale career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} /></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><div className="career-preview-toolbar"><div><p className="career-kicker">Live preview</p><p className="mt-1 text-xs opacity-70">Click a letter paragraph to edit it directly.</p></div><div className="career-text-palette" role="toolbar" aria-label="Text formatting"><button type="button" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('bold')}><strong>B</strong></button><button type="button" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('italic')}><em>I</em></button><button type="button" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('underline')}><u>U</u></button><span className="career-palette-divider" aria-hidden="true" />{['#1d2920', '#386641', '#2563eb', '#dc2626', '#7c3aed'].map((color) => <button type="button" key={color} aria-label={`Use ${color} text color`} className="career-palette-color" style={{ '--palette-color': color } as CSSProperties} onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('foreColor', color)} />)}<span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyLeft')}>≡</button><button type="button" aria-label="Center text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyCenter')}>≡</button><button type="button" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyRight')}>≡</button><span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('undo')}>↶</button><button type="button" aria-label="Redo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('redo')}>↷</button></div></div><div ref={previewRef} className="career-preview-scale career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} onBodyBlur={persistPreviewBody} /></div></section>
       </div>
     </main>
   );
