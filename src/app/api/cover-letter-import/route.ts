@@ -37,6 +37,7 @@ function repairSplitWords(value: string) {
 }
 
 function normalizeDoclingMarkdown(value: string) {
+  const paragraphBoundary = '\u0000';
   return value
     .replace(/\r\n?/g, '\n')
     .replace(/[\u00a0\u2007\u202f]/g, ' ')
@@ -45,9 +46,12 @@ function normalizeDoclingMarkdown(value: string) {
     .replace(/`([^`]+)`/g, '$1')
     // A hyphen at the end of a PDF-wrapped line is generally a split word.
     .replace(/([A-Za-z])-[ \t]*\n[ \t]*([a-z])/g, '$1$2')
-    .replace(/\n{3,}/g, '\n\n')
-    .split(/\n\n+/)
-    .map((paragraph) => repairSplitWords(paragraph.replace(/[ \t]*\n[ \t]*/g, ' ').replace(/[ \t]{2,}/g, ' ').trim()))
+    // Preserve a paragraph only when a sentence terminator is followed by a
+    // substantial whitespace gap. All other Docling PDF wraps are prose wraps.
+    .replace(/([.!?])\s{2,}/g, `$1${paragraphBoundary}`)
+    .replace(/\s+/g, ' ')
+    .split(paragraphBoundary)
+    .map((paragraph) => repairSplitWords(paragraph.trim()))
     .filter(Boolean)
     .join('\n\n')
     .trim();

@@ -44,12 +44,12 @@ function plainTextToBodyHtml(value: string) {
   const paragraphBoundary = '\u0000';
   const paragraphs = value
     .replace(/\r\n?/g, '\n')
-    // Docling may wrap ordinary prose after every visual PDF line. Treat a paragraph
-    // break only as a terminal punctuation mark followed by two spaces or two lines.
-    .replace(/([.!?])(?:[ \t]{2,}|(?:[ \t]*\n[ \t]*){2,})/g, `$1${paragraphBoundary}`)
-    .replace(/[ \t]*\n[ \t]*/g, ' ')
+    // Docling may create blank visual wraps inside an unfinished sentence.
+    // Keep a paragraph break only after . ! or ? followed by a whitespace gap.
+    .replace(/([.!?])\s{2,}/g, `$1${paragraphBoundary}`)
+    .replace(/\s+/g, ' ')
     .split(paragraphBoundary)
-    .map((paragraph) => paragraph.replace(/[ \t]{2,}/g, ' ').trim())
+    .map((paragraph) => paragraph.trim())
     .filter(Boolean);
   return paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('');
 }
