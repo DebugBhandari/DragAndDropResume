@@ -23,6 +23,7 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
 type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'companyName' | 'roleTitle'>;
+type CoverLetterSegment = { html: string; sourceIndex: number; partIndex: number; continuation: boolean };
 
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
@@ -104,46 +105,128 @@ function sanitizeEditableMarkup(value: string) {
     if (tag === 'font' && /^#[0-9a-f]{6}$/i.test(node.getAttribute('color') ?? '')) return `<span style="color: ${node.getAttribute('color')}">${content}</span>`;
     return content;
   };
-  return Array.from(source.body.querySelectorAll<HTMLElement>('.cover-letter-page p[data-cover-paragraph]')).map((paragraph) => {
-    const alignment = ['left', 'center', 'right', 'justify'].includes(paragraph.style.textAlign) ? ` style="text-align: ${paragraph.style.textAlign}"` : '';
-    return `<p${alignment}>${Array.from(paragraph.childNodes).map(sanitizeNode).join('')}</p>`;
-  }).filter((paragraph) => bodyHtmlToPlainText(paragraph)).join('');
+  const groupedParagraphs = new Map<string, { alignment: string; content: string }>();
+  Array.from(source.body.querySelectorAll<HTMLElement>('.cover-letter-page p[data-cover-paragraph]')).forEach((paragraph, index) => {
+    const key = paragraph.dataset.coverSourceIndex ?? String(index);
+    const current = groupedParagraphs.get(key);
+    const content = Array.from(paragraph.childNodes).map(sanitizeNode).join('');
+    if (current) current.content += content;
+    else groupedParagraphs.set(key, { alignment: ['left', 'center', 'right', 'justify'].includes(paragraph.style.textAlign) ? ` style="text-align: ${paragraph.style.textAlign}"` : '', content });
+  });
+  return Array.from(groupedParagraphs.values()).map(({ alignment, content }) => `<p${alignment}>${content}</p>`).filter((paragraph) => bodyHtmlToPlainText(paragraph)).join('');
 }
 
-function CoverLetterPages({ coverLetter, coverLetterStyle, revision, onBodyBlur }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number; onBodyBlur: () => void }) {
+function splitMarkupAtTextOffset(markup: string, offset: number) {
+  const container = document.createElement('div');
+  container.innerHTML = markup;
+  const text = container.textContent ?? '';
+  const wordBoundary = Math.max(text.lastIndexOf(' ', offset), text.lastIndexOf('\n', offset));
+  const splitOffset = wordBoundary > 0 ? wordBoundary + 1 : offset;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let consumed = 0;
+  let node = walker.nextNode();
+  while (node) {
+    const length = node.textContent?.length ?? 0;
+    if (consumed + length >= splitOffset) {
+      const range = document.createRange();
+      range.setStart(container, 0);
+      range.setEnd(node, Math.max(0, splitOffset - consumed));
+      const prefixContainer = document.createElement('div');
+      prefixContainer.appendChild(range.extractContents());
+      return [prefixContainer.innerHTML, container.innerHTML] as const;
+    }
+    consumed += length;
+    node = walker.nextNode();
+  }
+  return [markup, ''] as const;
+}
+
+function CoverLetterPages({ coverLetter, coverLetterStyle, revision, onBodyBlur, onFieldBlur }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number; onBodyBlur: () => void; onFieldBlur: (key: keyof CoverLetterData, value: string) => void }) {
   const measureRef = useRef<HTMLElement>(null);
   const paragraphs = bodyHtmlToParagraphs(coverLetter.body || 'Your cover letter body will appear here.');
-  const [pages, setPages] = useState<string[][]>([paragraphs]);
+  const [pages, setPages] = useState<CoverLetterSegment[][]>(() => [paragraphs.map((html, sourceIndex) => ({ html, sourceIndex, partIndex: 0, continuation: false }))]);
   const previewProps = { 'data-layout': coverLetterStyle.layout, 'data-font': coverLetterStyle.fontFamily, 'data-font-size': coverLetterStyle.fontSize, 'data-paragraph-spacing': coverLetterStyle.paragraphSpacing, style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties };
+  const editableField = (key: keyof CoverLetterData, value: string, placeholder: string, className?: string) => <span contentEditable suppressContentEditableWarning data-cover-field={key} data-placeholder={placeholder} className={className} onBlur={(event) => onFieldBlur(key, event.currentTarget.textContent ?? '')}>{value}</span>;
+  const contactFields = (editable: boolean) => <p className="cover-letter-contact">{(['senderEmail', 'senderPhone', 'senderLocation'] as const).map((key, index) => <span key={key}>{index > 0 && <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>}{editable ? editableField(key, coverLetter[key], fieldLabels.find((field) => field.key === key)?.label ?? key, 'cover-letter-editable-field') : (coverLetter[key] || fieldLabels.find((field) => field.key === key)?.label)}</span>)}</p>;
+  const roleFields = (editable: boolean) => <p className="cover-letter-role">{editable ? <>{editableField('roleTitle', coverLetter.roleTitle, 'Role title', 'cover-letter-editable-field')}&nbsp;·&nbsp;{editableField('companyName', coverLetter.companyName, 'Company name', 'cover-letter-editable-field')}</> : `${coverLetter.roleTitle || 'Role title'} · ${coverLetter.companyName || 'Company name'}`}</p>;
 
   useLayoutEffect(() => {
     const measure = () => {
       const sheet = measureRef.current;
       if (!sheet) return;
       const items = Array.from(sheet.querySelectorAll<HTMLElement>('[data-cover-paragraph]'));
-      if (!items.length) return;
+      const body = sheet.querySelector<HTMLElement>('.cover-letter-body');
+      if (!items.length || !body) return;
       const styles = window.getComputedStyle(sheet);
       const topPadding = Number.parseFloat(styles.paddingTop) || 0;
       const bottomPadding = Number.parseFloat(styles.paddingBottom) || 0;
       const pageHeight = sheet.offsetWidth * (297 / 210);
       const firstPageBottom = pageHeight - bottomPadding;
-      const continuationCapacity = pageHeight - topPadding - bottomPadding;
-      const nextPages: string[][] = [[]];
-      let continuationUsed = 0;
-
-      items.forEach((item, index) => {
-        const itemStyles = window.getComputedStyle(item);
-        const itemHeight = item.getBoundingClientRect().height + (Number.parseFloat(itemStyles.marginTop) || 0) + (Number.parseFloat(itemStyles.marginBottom) || 0);
-        const itemBottom = item.offsetTop + item.offsetHeight + (Number.parseFloat(itemStyles.marginBottom) || 0);
-        const currentPage = nextPages.length - 1;
-        const overflowsFirstPage = currentPage === 0 && nextPages[0].length > 0 && itemBottom > firstPageBottom;
-        const overflowsContinuation = currentPage > 0 && nextPages[currentPage].length > 0 && continuationUsed + itemHeight > continuationCapacity;
-        if (overflowsFirstPage || overflowsContinuation) {
-          nextPages.push([]);
-          continuationUsed = 0;
+      const bodyStyles = window.getComputedStyle(body);
+      const bodyTopMargin = Number.parseFloat(bodyStyles.marginTop) || 0;
+      const firstCapacity = Math.max(0, firstPageBottom - items[0].offsetTop);
+      const continuationCapacity = Math.max(0, pageHeight - topPadding - bottomPadding - bodyTopMargin);
+      const measureMarkup = (markup: string) => {
+        const probe = document.createElement('p');
+        probe.dataset.coverParagraph = 'probe';
+        probe.style.cssText = `position:absolute; visibility:hidden; pointer-events:none; left:0; width:${body.clientWidth}px; box-sizing:border-box;`;
+        probe.innerHTML = markup;
+        body.appendChild(probe);
+        const probeStyles = window.getComputedStyle(probe);
+        const height = probe.getBoundingClientRect().height + (Number.parseFloat(probeStyles.marginTop) || 0) + (Number.parseFloat(probeStyles.marginBottom) || 0);
+        probe.remove();
+        return height;
+      };
+      const fitMarkup = (markup: string, capacity: number) => {
+        if (measureMarkup(markup) <= capacity) return [markup, ''] as const;
+        const textLength = (new DOMParser().parseFromString(markup, 'text/html').body.textContent ?? '').length;
+        let low = 1;
+        let high = textLength;
+        let best = 0;
+        while (low <= high) {
+          const middle = Math.floor((low + high) / 2);
+          const [candidate] = splitMarkupAtTextOffset(markup, middle);
+          if (candidate && measureMarkup(candidate) <= capacity) {
+            best = middle;
+            low = middle + 1;
+          } else high = middle - 1;
         }
-        nextPages[nextPages.length - 1].push(paragraphs[index]);
-        if (nextPages.length > 1) continuationUsed += itemHeight;
+        return best > 0 ? splitMarkupAtTextOffset(markup, best) : ['', markup] as const;
+      };
+      const nextPages: CoverLetterSegment[][] = [[]];
+      let remaining = firstCapacity;
+
+      paragraphs.forEach((paragraph, sourceIndex) => {
+        let remainder = paragraph;
+        let partIndex = 0;
+        while (remainder.trim()) {
+          const fullHeight = measureMarkup(remainder);
+          if (fullHeight <= remaining) {
+            nextPages.at(-1)?.push({ html: remainder, sourceIndex, partIndex, continuation: partIndex > 0 });
+            remaining -= fullHeight;
+            break;
+          }
+          const pageHasContent = nextPages.at(-1)?.length;
+          const freshPageCapacity = nextPages.length === 1 ? firstCapacity : continuationCapacity;
+          if (pageHasContent && fullHeight <= freshPageCapacity) {
+            nextPages.push([]);
+            remaining = continuationCapacity;
+            continue;
+          }
+          const [fittingMarkup, remainingMarkup] = fitMarkup(remainder, remaining);
+          if (!fittingMarkup) {
+            nextPages.push([]);
+            remaining = continuationCapacity;
+            continue;
+          }
+          nextPages.at(-1)?.push({ html: fittingMarkup, sourceIndex, partIndex, continuation: partIndex > 0 });
+          remainder = remainingMarkup;
+          partIndex += 1;
+          if (remainder) {
+            nextPages.push([]);
+            remaining = continuationCapacity;
+          }
+        }
       });
       setPages((current) => JSON.stringify(current) === JSON.stringify(nextPages) ? current : nextPages);
     };
@@ -154,8 +237,8 @@ function CoverLetterPages({ coverLetter, coverLetterStyle, revision, onBodyBlur 
   }, [coverLetter.body, coverLetter.companyName, coverLetter.roleTitle, coverLetter.senderName, coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation, coverLetterStyle, revision, paragraphs]);
 
   return <>
-    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header><div className="cover-letter-content">{(coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>
-    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your Name'}</h2><p>{[coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation].filter(Boolean).join(' · ') || 'Email · Phone · Location'}</p></header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}>{pageIndex === 0 && (coverLetter.companyName || coverLetter.roleTitle) && <p className="cover-letter-role">{[coverLetter.roleTitle, coverLetter.companyName].filter(Boolean).join(' · ')}</p>}<div className="cover-letter-body">{page.map((paragraph, index) => <p contentEditable suppressContentEditableWarning data-cover-paragraph key={`${pageIndex}-${paragraph}-${index}`} onBlur={onBodyBlur} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>)}
+    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}><header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your name'}</h2>{contactFields(false)}</header><div className="cover-letter-content">{roleFields(false)}<div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>
+    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && <header className="cover-letter-letterhead"><h2>{editableField('senderName', coverLetter.senderName, 'Your name', 'cover-letter-editable-field')}</h2>{contactFields(true)}</header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}>{pageIndex === 0 && roleFields(true)}<div className="cover-letter-body">{page.map((segment) => <p contentEditable suppressContentEditableWarning data-cover-paragraph data-cover-source-index={segment.sourceIndex} data-cover-paragraph-continuation={segment.continuation || undefined} key={`${pageIndex}-${segment.sourceIndex}-${segment.partIndex}`} onBlur={onBodyBlur} dangerouslySetInnerHTML={{ __html: segment.html }} />)}</div></div></article>)}
   </>;
 }
 
@@ -182,6 +265,13 @@ export default function CoverLetterPage() {
       setPreviewRevision((revision) => revision + 1);
     }
   }, [coverLetter.body, updateCoverLetter]);
+  const persistPreviewField = useCallback((key: keyof CoverLetterData, value: string) => {
+    const normalizedValue = value.replace(/\s+/g, ' ').trim();
+    if (normalizedValue !== coverLetter[key]) {
+      updateCoverLetter({ [key]: normalizedValue });
+      setPreviewRevision((revision) => revision + 1);
+    }
+  }, [coverLetter, updateCoverLetter]);
   const applyTextCommand = (command: string, value?: string) => {
     document.execCommand(command, false, value);
     window.setTimeout(persistPreviewBody, 0);
@@ -429,7 +519,7 @@ export default function CoverLetterPage() {
           {message && <p className="career-message" role="status">{message}</p>}
         </section>
 
-        <section className="career-preview-shell" aria-label="Cover letter preview"><div className="career-preview-toolbar"><div><p className="career-kicker">Live preview</p><p className="mt-1 text-xs opacity-70">Click a letter paragraph to edit it directly.</p></div><div className="career-text-palette" role="toolbar" aria-label="Text formatting"><button type="button" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('bold')}><strong>B</strong></button><button type="button" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('italic')}><em>I</em></button><button type="button" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('underline')}><u>U</u></button><span className="career-palette-divider" aria-hidden="true" />{['#1d2920', '#386641', '#2563eb', '#dc2626', '#7c3aed'].map((color) => <button type="button" key={color} aria-label={`Use ${color} text color`} className="career-palette-color" style={{ '--palette-color': color } as CSSProperties} onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('foreColor', color)} />)}<span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyLeft')}>≡</button><button type="button" aria-label="Center text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyCenter')}>≡</button><button type="button" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyRight')}>≡</button><span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('undo')}>↶</button><button type="button" aria-label="Redo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('redo')}>↷</button></div></div><div ref={previewRef} className="career-preview-scale career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} onBodyBlur={persistPreviewBody} /></div></section>
+        <section className="career-preview-shell" aria-label="Cover letter preview"><div className="career-preview-toolbar"><div><p className="career-kicker">Live preview</p><p className="mt-1 text-xs opacity-70">Click any letter detail or paragraph to edit it directly.</p></div><div className="career-text-palette" role="toolbar" aria-label="Text formatting"><button type="button" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('bold')}><strong>B</strong></button><button type="button" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('italic')}><em>I</em></button><button type="button" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('underline')}><u>U</u></button><span className="career-palette-divider" aria-hidden="true" />{['#1d2920', '#386641', '#2563eb', '#dc2626', '#7c3aed'].map((color) => <button type="button" key={color} aria-label={`Use ${color} text color`} className="career-palette-color" style={{ '--palette-color': color } as CSSProperties} onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('foreColor', color)} />)}<span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyLeft')}>≡</button><button type="button" aria-label="Center text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyCenter')}>≡</button><button type="button" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyRight')}>≡</button><span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('undo')}>↶</button><button type="button" aria-label="Redo" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('redo')}>↷</button></div></div><div ref={previewRef} className="career-preview-scale career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} onBodyBlur={persistPreviewBody} onFieldBlur={persistPreviewField} /></div></section>
       </div>
     </main>
   );
