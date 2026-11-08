@@ -357,6 +357,7 @@
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
   .career-preview-pages { position: relative; display: flex; align-items: center; flex-direction: column; gap: 4.5rem; padding: 1.5rem 0 4.5rem; }
   .career-style-card { padding: 0; border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
+  .career-details-card.career-disclosure { padding: 0; border: 1px solid color-mix(in srgb, var(--hunter-green) 28%, var(--form-border)); border-radius: .9rem; background: color-mix(in srgb, var(--yellow-green) 9%, var(--form-surface-strong)); }
   .career-disclosure { border: 1px solid var(--form-border); border-radius: .9rem; background: color-mix(in srgb, var(--form-surface-strong) 34%, transparent); }
   .career-disclosure-summary { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem; cursor: pointer; list-style: none; }
   .career-disclosure-summary::-webkit-details-marker { display: none; }
