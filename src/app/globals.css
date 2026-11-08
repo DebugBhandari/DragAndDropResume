@@ -370,6 +370,7 @@
   .career-layout-thumbnail-classic { align-items: center; } .career-layout-thumbnail-classic b { width: 84%; }
   .career-layout-thumbnail-modern i { width: 100%; height: .55rem; border-radius: .12rem; }
   .career-layout-thumbnail-compact { gap: .13rem; } .career-layout-thumbnail-compact i { height: .2rem; } .career-layout-thumbnail-compact b { background: repeating-linear-gradient(to bottom, #dce6dc 0 3px, transparent 3px 6px); }
+  .career-layout-thumbnail-centered { align-items: center; } .career-layout-thumbnail-centered b { width: 78%; }
   .career-layout-thumbnail-minimal { justify-content: flex-end; } .career-layout-thumbnail-minimal i { display: none; } .career-layout-thumbnail-minimal b { height: 100%; background: repeating-linear-gradient(to bottom, #dce6dc 0 3px, transparent 3px 7px); }
   .career-color-swatch { width: 1.65rem; height: 1.65rem; border: 2px solid transparent; border-radius: 999px; transition: transform 150ms ease, border-color 150ms ease; }
   .career-color-swatch:hover { transform: scale(1.08); } .career-color-swatch-active { border-color: var(--ink); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--form-border); }
@@ -387,7 +388,7 @@
   .cover-letter-editable-field[data-empty="true"]::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
   .cover-letter-page .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
   .cover-letter-page .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
-  .cover-letter-content { padding-top: var(--cover-header-space, 1.7rem); }
+  .cover-letter-content { padding-top: 1.7rem; }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
   .cover-letter-body { margin-top: 0; }
@@ -397,7 +398,7 @@
   .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within { background: color-mix(in srgb, #f3f5f2 72%, transparent); }
   .cover-letter-page .cover-letter-body p[data-cover-paragraph] > span[contenteditable="true"] { cursor: text; }
   .cover-letter-paragraph-actions { position: absolute; top: .1rem; left: -2.85rem; display: flex; gap: .15rem; opacity: 0; transition: opacity 150ms ease; }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-actions, .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within .cover-letter-paragraph-actions, .cover-letter-paragraph-actions:focus-within { opacity: 1; }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-actions, .cover-letter-paragraph-actions:focus-within { opacity: 1; }
   .cover-letter-paragraph-actions button, .career-preview-add-paragraph { border: 1px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 28%, transparent); border-radius: .35rem; color: var(--cover-accent, var(--hunter-green)); background: color-mix(in srgb, var(--yellow-green) 19%, #fff); font-weight: 800; line-height: 1; transition: filter 150ms ease, opacity 150ms ease; }
   .cover-letter-paragraph-actions button { width: 1.2rem; height: 1.45rem; padding: 0; font-size: .8rem; }
   .cover-letter-paragraph-actions button:hover:not(:disabled), .career-preview-add-paragraph:hover { filter: brightness(.96); }
@@ -406,6 +407,7 @@
   .career-preview-add-paragraph { padding: .42rem .62rem; font-size: .75rem; white-space: nowrap; }
   .cover-letter-preview[data-layout="classic"] { padding: 72px 76px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead h2 { font-size: 24px; }
   .cover-letter-preview[data-layout="compact"] { height: 900px; min-height: 900px; padding: 48px 54px; line-height: 1.48; } .cover-letter-preview[data-layout="compact"] .cover-letter-letterhead { padding-bottom: 1rem; }
+  .cover-letter-preview[data-layout="centered"] .cover-letter-letterhead { text-align: center; }
   .cover-letter-preview[data-layout="minimal"] .cover-letter-content { padding-top: 0; }
   .tracking-table-wrap { overflow-x: auto; border: 1px solid var(--form-border); border-radius: .85rem; }
   .tracking-table { width: 100%; min-width: 1160px; border-collapse: collapse; background: color-mix(in srgb, #fffaf0 75%, var(--form-surface)); }
