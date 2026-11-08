@@ -341,12 +341,13 @@
   .career-activity { padding: .75rem .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 52%, var(--form-border)); border-radius: .7rem; color: #234b2a; background: color-mix(in srgb, var(--yellow-green) 21%, var(--form-surface)); font-size: .82rem; }
   .career-activity-title { display: flex; align-items: center; gap: .45rem; font-weight: 800; }
   .career-tailored-choice { padding: .8rem; border: 1px solid color-mix(in srgb, var(--hunter-green) 38%, var(--form-border)); border-radius: .75rem; background: color-mix(in srgb, var(--yellow-green) 12%, var(--form-surface)); }
-  .career-letter-version-switcher { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
-  .career-letter-version-button { min-height: 2.4rem; padding: .5rem .7rem; border: 1px solid var(--form-border); border-radius: .6rem; color: var(--form-text); background: color-mix(in srgb, #fff 72%, var(--form-surface)); font-size: .82rem; font-weight: 800; transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
-  .career-letter-version-button:hover, .career-letter-version-button:focus-visible { border-color: var(--sage-green); outline: none; transform: translateY(-1px); }
-  .career-letter-version-button-active { border-color: var(--hunter-green); color: #18351f; background: var(--yellow-green); }
   .career-preview-shell { min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid color-mix(in srgb, var(--hunter-green) 26%, var(--form-border)); border-radius: 1.25rem; background: color-mix(in srgb, var(--form-surface-strong) 45%, transparent); overflow: auto; }
   .career-preview-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; min-width: 650px; }
+  .career-preview-version-toggle { display: inline-flex; overflow: hidden; border: 1px solid var(--form-border); border-radius: .4rem; background: color-mix(in srgb, #fff 72%, var(--form-surface)); }
+  .career-preview-version-toggle button { min-height: 2rem; padding: .42rem .6rem; color: var(--form-text); font-size: .75rem; font-weight: 800; transition: background-color 150ms ease, color 150ms ease; }
+  .career-preview-version-toggle button + button { border-left: 1px solid var(--form-border); }
+  .career-preview-version-toggle button:hover, .career-preview-version-toggle button:focus-visible { background: color-mix(in srgb, var(--yellow-green) 22%, transparent); outline: none; }
+  .career-preview-version-toggle .career-preview-version-toggle-active { color: #18351f; background: var(--yellow-green); }
   .career-text-palette { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; padding: .35rem; border: 1px solid var(--form-border); border-radius: .65rem; background: color-mix(in srgb, #fff 78%, var(--form-surface)); box-shadow: 0 8px 18px -16px rgba(28,45,32,.7); }
   .career-text-palette button { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border: 1px solid transparent; border-radius: .4rem; color: var(--form-text); background: transparent; font-size: .82rem; transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease; }
   .career-text-palette button:hover, .career-text-palette button:focus-visible { border-color: var(--sage-green); background: color-mix(in srgb, var(--yellow-green) 26%, transparent); outline: none; transform: translateY(-1px); }
