@@ -556,6 +556,19 @@ export default function CoverLetterPage() {
       <div className="career-workspace mx-auto grid max-w-[1650px] gap-5 p-4 lg:grid-cols-[minmax(280px,0.52fr)_minmax(0,1.48fr)] lg:p-6">
         <section className="career-panel space-y-5" aria-label="Cover letter settings">
           <div><p className="career-kicker">Editor</p><h1 className="text-2xl font-bold">Build your cover letter</h1><p className="mt-1 text-sm opacity-75">Everything is saved only in this browser.</p></div>
+          <details className="career-details-card career-disclosure" open>
+            <summary className="career-disclosure-summary"><span><p className="career-kicker">Letter details</p><h2 className="font-bold">Contact information and letter text</h2></span><span className="career-disclosure-icon" aria-hidden="true" /></summary>
+            <div className="career-disclosure-content space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label><span className="career-field-label">Your name</span><input className="input-field" value={coverLetter.senderName} onChange={(event) => updateField('senderName', event.target.value)} placeholder="Your name" autoComplete="name" /></label>
+                <label><span className="career-field-label">Email</span><input className="input-field" type="email" value={coverLetter.senderEmail} onChange={(event) => updateField('senderEmail', event.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
+                <label><span className="career-field-label">Phone</span><input className="input-field" type="tel" value={coverLetter.senderPhone} onChange={(event) => updateField('senderPhone', event.target.value)} placeholder="(555) 555-5555" autoComplete="tel" /></label>
+                <label><span className="career-field-label">Location</span><input className="input-field" value={coverLetter.senderLocation} onChange={(event) => updateField('senderLocation', event.target.value)} placeholder="City, State" autoComplete="address-level2" /></label>
+              </div>
+              <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={bodyHtmlToPlainText(coverLetter.body)} onChange={(event) => { updateDisplayedLetterBody(plainTextToBodyHtml(event.target.value)); setPreviewRevision((revision) => revision + 1); }} placeholder="Write the main body of your cover letter." /></label>
+              <p className="text-xs opacity-70">Use blank lines to start a new paragraph. You can also format and reorder paragraphs directly in the preview.</p>
+            </div>
+          </details>
           <details className="career-style-card career-disclosure" open>
             <summary className="career-disclosure-summary"><span><p className="career-kicker">Layout & style</p><h2 className="font-bold">Match your résumé presentation</h2></span><span className="career-disclosure-icon" aria-hidden="true" /></summary>
             <div className="career-disclosure-content space-y-3">
