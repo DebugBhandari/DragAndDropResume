@@ -9,7 +9,7 @@ export interface CoverLetterData {
   jobDescription: string;
 }
 
-export type CoverLetterLayout = 'classic' | 'modern' | 'compact' | 'centered' | 'minimal';
+export type CoverLetterLayout = 'classic' | 'modern' | 'compact' | 'minimal';
 export type CoverLetterFontFamily = 'serif' | 'sans-serif' | 'mono';
 export type CoverLetterFontSize = 'sm' | 'md' | 'lg';
 export type CoverLetterSpacing = 'tight' | 'normal' | 'relaxed';
