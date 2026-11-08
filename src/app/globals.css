@@ -388,7 +388,7 @@
   .cover-letter-editable-field[data-empty="true"]::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
   .cover-letter-page .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
   .cover-letter-page .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
-  .cover-letter-content { padding-top: var(--cover-header-space, 1.7rem); }
+  .cover-letter-content { padding-top: 1.7rem; }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
   .cover-letter-body { margin-top: 0; }
@@ -398,7 +398,7 @@
   .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within { background: color-mix(in srgb, #f3f5f2 72%, transparent); }
   .cover-letter-page .cover-letter-body p[data-cover-paragraph] > span[contenteditable="true"] { cursor: text; }
   .cover-letter-paragraph-actions { position: absolute; top: .1rem; left: -2.85rem; display: flex; gap: .15rem; opacity: 0; transition: opacity 150ms ease; }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-actions, .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within .cover-letter-paragraph-actions, .cover-letter-paragraph-actions:focus-within { opacity: 1; }
+  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-actions, .cover-letter-paragraph-actions:focus-within { opacity: 1; }
   .cover-letter-paragraph-actions button, .career-preview-add-paragraph { border: 1px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 28%, transparent); border-radius: .35rem; color: var(--cover-accent, var(--hunter-green)); background: color-mix(in srgb, var(--yellow-green) 19%, #fff); font-weight: 800; line-height: 1; transition: filter 150ms ease, opacity 150ms ease; }
   .cover-letter-paragraph-actions button { width: 1.2rem; height: 1.45rem; padding: 0; font-size: .8rem; }
   .cover-letter-paragraph-actions button:hover:not(:disabled), .career-preview-add-paragraph:hover { filter: brightness(.96); }
