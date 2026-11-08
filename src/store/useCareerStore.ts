@@ -24,6 +24,7 @@ const defaultCoverLetterStyle = (): CoverLetterStyle => ({
   fontFamily: 'sans-serif',
   fontSize: 'md',
   paragraphSpacing: 'normal',
+  headerSpacing: 'normal',
 });
 
 interface CareerStore {
