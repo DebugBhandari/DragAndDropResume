@@ -11,6 +11,7 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'modern', label: 'Modern', detail: 'Bold ruled header' },
   { value: 'compact', label: 'Compact', detail: 'Dense, space-saving' },
   { value: 'centered', label: 'Centered', detail: 'Formal centered header' },
+  { value: 'minimal', label: 'Minimal', detail: 'Letter body only' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
 type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'companyName' | 'roleTitle'>;
