@@ -13,7 +13,8 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'minimal', label: 'Minimal', detail: 'Letter body only' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
-type PendingTailoredLetter = Pick<CoverLetterData, 'body' | 'companyName' | 'roleTitle'>;
+type PendingTailoredLetter = Pick<CoverLetterData, 'companyName' | 'roleTitle'> & { originalBody: string; tailoredBody: string };
+type LetterBodyVersion = 'original' | 'tailored';
 type CoverLetterSegment = { html: string; sourceIndex: number; sourceOffset: number; partIndex: number; continuation: boolean };
 
 function formatSavedAt(savedAt: string) {
@@ -252,29 +253,37 @@ export default function CoverLetterPage() {
   const [activityDetail, setActivityDetail] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
   const [pendingTailoredLetter, setPendingTailoredLetter] = useState<PendingTailoredLetter | null>(null);
+  const [activeLetterBodyVersion, setActiveLetterBodyVersion] = useState<LetterBodyVersion | null>(null);
 
   const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
+  const updateDisplayedLetterBody = useCallback((body: string) => {
+    updateCoverLetter({ body });
+    setPendingTailoredLetter((current) => {
+      if (!current || !activeLetterBodyVersion) return current;
+      return activeLetterBodyVersion === 'original' ? { ...current, originalBody: body } : { ...current, tailoredBody: body };
+    });
+  }, [activeLetterBodyVersion, updateCoverLetter]);
   const movePreviewParagraph = useCallback((sourceIndex: number, targetIndex: number) => {
     const paragraphs = bodyHtmlToParagraphs(coverLetter.body || 'Your cover letter body will appear here.');
     if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0 || sourceIndex >= paragraphs.length || targetIndex >= paragraphs.length) return;
     const reordered = [...paragraphs];
     const [moved] = reordered.splice(sourceIndex, 1);
     reordered.splice(targetIndex, 0, moved);
-    updateCoverLetter({ body: reordered.map((paragraph) => `<p>${paragraph}</p>`).join('') });
+    updateDisplayedLetterBody(reordered.map((paragraph) => `<p>${paragraph}</p>`).join(''));
     setPreviewRevision((revision) => revision + 1);
-  }, [coverLetter.body, updateCoverLetter]);
+  }, [coverLetter.body, updateDisplayedLetterBody]);
   const deletePreviewParagraph = useCallback((sourceIndex: number) => {
     const paragraphs = bodyHtmlToParagraphs(coverLetter.body || '');
     if (sourceIndex < 0 || sourceIndex >= paragraphs.length) return;
     const remaining = paragraphs.filter((_, index) => index !== sourceIndex);
     const nextParagraphs = remaining.length ? remaining : [''];
-    updateCoverLetter({ body: nextParagraphs.map((paragraph) => `<p>${paragraph}</p>`).join('') });
+    updateDisplayedLetterBody(nextParagraphs.map((paragraph) => `<p>${paragraph}</p>`).join(''));
     setPreviewRevision((revision) => revision + 1);
-  }, [coverLetter.body, updateCoverLetter]);
+  }, [coverLetter.body, updateDisplayedLetterBody]);
   const addPreviewParagraph = useCallback(() => {
     const paragraphs = bodyHtmlToParagraphs(coverLetter.body || '');
     const sourceIndex = paragraphs.length;
-    updateCoverLetter({ body: [...paragraphs, 'New paragraph'].map((paragraph) => `<p>${paragraph}</p>`).join('') });
+    updateDisplayedLetterBody([...paragraphs, 'New paragraph'].map((paragraph) => `<p>${paragraph}</p>`).join(''));
     setPreviewRevision((revision) => revision + 1);
     window.requestAnimationFrame(() => {
       const paragraph = previewRef.current?.querySelector<HTMLElement>(`[data-cover-source-index="${sourceIndex}"] > span[contenteditable="true"]`);
@@ -287,17 +296,17 @@ export default function CoverLetterPage() {
       selection.removeAllRanges();
       selection.addRange(range);
     });
-  }, [coverLetter.body, updateCoverLetter]);
-  const clearTailoredCandidate = () => setPendingTailoredLetter(null);
+  }, [coverLetter.body, updateDisplayedLetterBody]);
+  const clearTailoredCandidate = () => { setPendingTailoredLetter(null); setActiveLetterBodyVersion(null); };
   const persistPreviewBody = useCallback(() => {
     const preview = previewRef.current;
     if (!preview) return;
     const body = sanitizeEditableMarkup(preview.innerHTML);
     if (body && body !== coverLetter.body) {
-      updateCoverLetter({ body });
+      updateDisplayedLetterBody(body);
       setPreviewRevision((revision) => revision + 1);
     }
-  }, [coverLetter.body, updateCoverLetter]);
+  }, [coverLetter.body, updateDisplayedLetterBody]);
   const persistPreviewField = useCallback((key: keyof CoverLetterData, value: string) => {
     const normalizedValue = value.replace(/\s+/g, ' ').trim();
     if (normalizedValue !== coverLetter[key]) {
@@ -448,6 +457,7 @@ export default function CoverLetterPage() {
     setActivityStage('Preparing server AI');
     setActivityDetail('Sending your current letter and job requirements to the server AI…');
     setMessage('');
+    const originalBody = coverLetter.body;
     try {
       const response = await fetch('/api/cover-letter-tailor', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -474,17 +484,19 @@ export default function CoverLetterPage() {
         }
         if (event.type === 'result' && typeof event.body === 'string' && event.body.trim()) {
           setPendingTailoredLetter({
-            body: event.body.trim(),
+            originalBody,
+            tailoredBody: plainTextToBodyHtml(event.body),
             roleTitle: typeof event.roleTitle === 'string' ? event.roleTitle : '',
             companyName: typeof event.companyName === 'string' ? event.companyName : '',
           });
+          setActiveLetterBodyVersion('original');
           tailored = true;
         }
         if (event.type === 'error') streamError = String(event.message ?? 'Unable to tailor this letter.');
       });
       if (streamError) throw new Error(streamError);
-      if (!tailored) throw new Error('The server AI did not return a revised letter body.');
-      setMessage('Tailored letter is ready. Review it, then update the saved letter body and preview.');
+      if (!tailored) throw new Error('The server AI did not return a complete tailored letter.');
+      setMessage('Tailored letter is ready. Choose Original or Tailored to show that complete version in the preview.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this letter.');
     } finally {
@@ -494,13 +506,14 @@ export default function CoverLetterPage() {
     }
   }
 
-  function updateTailoredInfo() {
+  function showLetterBodyVersion(version: LetterBodyVersion) {
     if (!pendingTailoredLetter) return;
-    updateCoverLetter({ body: pendingTailoredLetter.body, companyName: pendingTailoredLetter.companyName, roleTitle: pendingTailoredLetter.roleTitle });
+    const body = version === 'original' ? pendingTailoredLetter.originalBody : pendingTailoredLetter.tailoredBody;
+    updateCoverLetter({ body });
+    setActiveLetterBodyVersion(version);
     setPreviewRevision((revision) => revision + 1);
-    clearTailoredCandidate();
-    setMessage('Updated the saved letter body, company, and role title from the tailored result.');
-    trackAnalyticsEvent('cover_letter_tailored');
+    setMessage(`${version === 'original' ? 'Original' : 'Tailored'} letter is now shown in the preview.`);
+    if (version === 'tailored') trackAnalyticsEvent('cover_letter_tailored');
   }
 
   return (
@@ -531,7 +544,7 @@ export default function CoverLetterPage() {
             </div>
           </details>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the full letter body and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter body'}</button>{isTailoring && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Tailored letter ready</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div><textarea className="input-field mt-3 min-h-56 resize-y" value={pendingTailoredLetter.body} readOnly aria-label="Tailored letter body" /><button type="button" className="career-primary-button mt-3" onClick={updateTailoredInfo}>Update tailored info</button></div>}<p className="text-sm opacity-75">Review the server AI result before replacing the saved letter body. Your name, email, phone, and location stay unchanged.</p></div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the complete letter and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter'}</button>{isTailoring && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{pendingTailoredLetter && <div className="career-tailored-choice"><div><p className="career-kicker">Two letter versions ready</p><p className="mt-1 text-sm opacity-75">Choose the complete version to show in the preview. Switching replaces the current letter; it never appends text.</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" className={`style-chip ${activeLetterBodyVersion === 'original' ? 'style-chip-active' : ''}`} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={`style-chip ${activeLetterBodyVersion === 'tailored' ? 'style-chip-active' : ''}`} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div></div>}<p className="text-sm opacity-75">Tailoring keeps two complete versions available for this session: your original letter and the tailored letter. Edit the version currently shown in the preview.</p></div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
