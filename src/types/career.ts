@@ -6,16 +6,19 @@ export interface CoverLetterData {
   companyName: string;
   roleTitle: string;
   body: string;
+  footer: string;
   jobDescription: string;
 }
 
 export type CoverLetterLayout = 'classic' | 'modern' | 'compact' | 'minimal';
+export type CoverLetterDocumentFormat = 'header-body-footer' | 'body-only' | 'body-footer';
 export type CoverLetterFontFamily = 'serif' | 'sans-serif' | 'mono';
 export type CoverLetterFontSize = 'sm' | 'md' | 'lg';
 export type CoverLetterSpacing = 'sm' | 'md' | 'lg';
 
 export interface CoverLetterStyle {
   layout: CoverLetterLayout;
+  documentFormat: CoverLetterDocumentFormat;
   accentColor: string;
   fontFamily: CoverLetterFontFamily;
   fontSize: CoverLetterFontSize;
