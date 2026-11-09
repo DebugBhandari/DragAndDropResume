@@ -23,9 +23,24 @@ const defaultCoverLetterStyle = (): CoverLetterStyle => ({
   accentColor: '#386641',
   fontFamily: 'sans-serif',
   fontSize: 'md',
-  paragraphSpacing: 'normal',
-  headerSpacing: 'normal',
+  paragraphSpacing: 'md',
+  headerSpacing: 'md',
 });
+
+function normalizeCoverLetterSpacing(value: unknown): CoverLetterStyle['paragraphSpacing'] {
+  if (value === 'tight' || value === 'sm') return 'sm';
+  if (value === 'relaxed' || value === 'lg') return 'lg';
+  return 'md';
+}
+
+function normalizeCoverLetterStyle(style?: Partial<CoverLetterStyle>): CoverLetterStyle {
+  return {
+    ...defaultCoverLetterStyle(),
+    ...style,
+    paragraphSpacing: normalizeCoverLetterSpacing(style?.paragraphSpacing),
+    headerSpacing: normalizeCoverLetterSpacing(style?.headerSpacing),
+  };
+}
 
 interface CareerStore {
   coverLetter: CoverLetterData;
@@ -100,10 +115,10 @@ export const useCareerStore = create<CareerStore>()(
           ...currentState,
           ...persisted,
           coverLetter: { ...defaultCoverLetter(), ...persisted.coverLetter },
-          coverLetterStyle: { ...defaultCoverLetterStyle(), ...persisted.coverLetterStyle },
+          coverLetterStyle: normalizeCoverLetterStyle(persisted.coverLetterStyle),
           coverLetterVersions: (persisted.coverLetterVersions ?? []).map((version) => ({
             ...version,
-            style: { ...defaultCoverLetterStyle(), ...version.style },
+            style: normalizeCoverLetterStyle(version.style),
           })),
         };
       },

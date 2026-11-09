@@ -12,7 +12,7 @@ export interface CoverLetterData {
 export type CoverLetterLayout = 'classic' | 'modern' | 'compact' | 'minimal';
 export type CoverLetterFontFamily = 'serif' | 'sans-serif' | 'mono';
 export type CoverLetterFontSize = 'sm' | 'md' | 'lg';
-export type CoverLetterSpacing = 'tight' | 'normal' | 'relaxed';
+export type CoverLetterSpacing = 'sm' | 'md' | 'lg';
 
 export interface CoverLetterStyle {
   layout: CoverLetterLayout;
