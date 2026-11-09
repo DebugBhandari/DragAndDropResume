@@ -392,6 +392,11 @@
   .cover-letter-letterhead { padding-bottom: 1.5rem; border-bottom: 3px solid var(--cover-accent, var(--hunter-green)); }
   .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, var(--hunter-green)); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
+  .career-preview-pages[contenteditable="true"] { outline: none; }
+  .career-preview-pages[contenteditable="true"] .cover-letter-editable-field { border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
+  .career-preview-pages[contenteditable="true"] .cover-letter-editable-field[data-empty="true"]::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
+  .career-preview-pages[contenteditable="true"] .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
+  .career-preview-pages[contenteditable="true"] .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
   .cover-letter-content { padding-top: var(--cover-header-space, 1.7rem); }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }

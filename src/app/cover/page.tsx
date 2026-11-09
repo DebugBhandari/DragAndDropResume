@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import FeedbackWidget from '@/components/FeedbackWidget';
-import { ChangeEvent, type CSSProperties, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, type FocusEvent, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
 import { useUIStore } from '@/store/useUIStore';
 import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
@@ -84,6 +84,32 @@ function bodyHtmlToParagraphs(value: string) {
   }, []);
 }
 
+function sanitizeEditableMarkup(value: string) {
+  const source = new DOMParser().parseFromString(value, 'text/html');
+  const sanitizeNode = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent ?? '');
+    if (!(node instanceof HTMLElement)) return '';
+    const content = Array.from(node.childNodes).map(sanitizeNode).join('');
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'br') return '<br />';
+    if (tag === 'b' || tag === 'strong') return `<strong>${content}</strong>`;
+    if (tag === 'i' || tag === 'em') return `<em>${content}</em>`;
+    if (tag === 'u') return `<u>${content}</u>`;
+    if (tag === 'span' && /^#[0-9a-f]{6}$/i.test(node.style.color)) return `<span style="color: ${node.style.color}">${content}</span>`;
+    if (tag === 'font' && /^#[0-9a-f]{6}$/i.test(node.getAttribute('color') ?? '')) return `<span style="color: ${node.getAttribute('color')}">${content}</span>`;
+    return content;
+  };
+  const groupedParagraphs = new Map<string, { alignment: string; content: string }>();
+  Array.from(source.body.querySelectorAll<HTMLElement>('.cover-letter-page p[data-cover-paragraph]')).forEach((paragraph, index) => {
+    const key = paragraph.dataset.coverSourceIndex ?? String(index);
+    const current = groupedParagraphs.get(key);
+    const content = Array.from(paragraph.childNodes).map(sanitizeNode).join('');
+    if (current) current.content += content;
+    else groupedParagraphs.set(key, { alignment: ['left', 'center', 'right', 'justify'].includes(paragraph.style.textAlign) ? ` style="text-align: ${paragraph.style.textAlign}"` : '', content });
+  });
+  return Array.from(groupedParagraphs.values()).map(({ alignment, content }) => `<p${alignment}>${content}</p>`).join('');
+}
+
 function splitMarkupAtTextOffset(markup: string, offset: number) {
   const container = document.createElement('div');
   container.innerHTML = markup;
@@ -118,8 +144,9 @@ function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLe
   const paragraphs = bodyHtmlToParagraphs(coverLetter.body || 'Your cover letter body will appear here.');
   const [pages, setPages] = useState<CoverLetterSegment[][]>(() => [paragraphs.map((html, sourceIndex) => ({ html, sourceIndex, sourceOffset: 0, partIndex: 0, continuation: false }))]);
   const previewProps = { 'data-layout': coverLetterStyle.layout, 'data-font': coverLetterStyle.fontFamily, 'data-font-size': coverLetterStyle.fontSize, 'data-paragraph-spacing': coverLetterStyle.paragraphSpacing, 'data-header-spacing': coverLetterStyle.headerSpacing, style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties };
+  const editableField = (key: keyof Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation'>, value: string, placeholder: string, className?: string) => <span data-cover-field={key} data-empty={value ? undefined : 'true'} data-placeholder={placeholder} className={className}>{value}</span>;
   const contactPlaceholders: Record<'senderEmail' | 'senderPhone' | 'senderLocation', string> = { senderEmail: 'Email', senderPhone: 'Phone', senderLocation: 'Location' };
-  const contactFields = () => <p className="cover-letter-contact">{(['senderEmail', 'senderPhone', 'senderLocation'] as const).map((key, index) => <span key={key}>{index > 0 && <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>}{coverLetter[key] || contactPlaceholders[key]}</span>)}</p>;
+  const contactFields = (editable = false) => <p className="cover-letter-contact">{(['senderEmail', 'senderPhone', 'senderLocation'] as const).map((key, index) => <span key={key}>{index > 0 && <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>}{editable ? editableField(key, coverLetter[key], contactPlaceholders[key], 'cover-letter-editable-field') : (coverLetter[key] || contactPlaceholders[key])}</span>)}</p>;
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -211,7 +238,7 @@ function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLe
 
   return <>
     <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}>{coverLetterStyle.layout !== 'minimal' && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your name'}</h2>{contactFields()}</header>}<div className="cover-letter-content"><div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>
-    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && coverLetterStyle.layout !== 'minimal' && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your name'}</h2>{contactFields()}</header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}><div className="cover-letter-body">{page.map((segment) => <p data-cover-paragraph data-cover-source-index={segment.sourceIndex} data-cover-paragraph-continuation={segment.continuation || undefined} key={`${pageIndex}-${segment.sourceIndex}-${segment.partIndex}`} dangerouslySetInnerHTML={{ __html: segment.html }} />)}</div></div></article>)}
+    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && coverLetterStyle.layout !== 'minimal' && <header className="cover-letter-letterhead"><h2>{editableField('senderName', coverLetter.senderName, 'Your name', 'cover-letter-editable-field')}</h2>{contactFields(true)}</header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}><div className="cover-letter-body">{page.map((segment) => <p data-cover-paragraph data-cover-source-index={segment.sourceIndex} data-cover-paragraph-continuation={segment.continuation || undefined} key={`${pageIndex}-${segment.sourceIndex}-${segment.partIndex}`} dangerouslySetInnerHTML={{ __html: segment.html }} />)}</div></div></article>)}
   </>;
 }
 
@@ -239,6 +266,30 @@ export default function CoverLetterPage() {
     });
   }, [activeLetterBodyVersion, updateCoverLetter]);
   const clearTailoredCandidate = () => { setPendingTailoredLetter(null); setActiveLetterBodyVersion(null); };
+  const persistPreviewEdits = useCallback((event: FocusEvent<HTMLElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+    const preview = previewRef.current;
+    if (!preview) return;
+    const readField = (key: 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation') => {
+      const field = preview.querySelector<HTMLElement>(`[data-cover-field="${key}"]`);
+      return field ? field.textContent?.replace(/\s+/g, ' ').trim() ?? '' : undefined;
+    };
+    const body = sanitizeEditableMarkup(preview.innerHTML);
+    const fields = {
+      senderName: readField('senderName'),
+      senderEmail: readField('senderEmail'),
+      senderPhone: readField('senderPhone'),
+      senderLocation: readField('senderLocation'),
+    };
+    const changes = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation'>>;
+    if (body !== coverLetter.body) updateDisplayedLetterBody(body);
+    const fieldsChanged = Object.entries(changes).some(([key, value]) => coverLetter[key as keyof CoverLetterData] !== value);
+    if (fieldsChanged) updateCoverLetter(changes);
+    if (body !== coverLetter.body || fieldsChanged) {
+      setPreviewRevision((revision) => revision + 1);
+    }
+  }, [coverLetter, updateCoverLetter, updateDisplayedLetterBody]);
   async function copyPreviewLetter() {
     const text = bodyHtmlToPlainText(coverLetter.body);
     if (!text) {
@@ -487,19 +538,6 @@ export default function CoverLetterPage() {
               <div className="grid gap-3 sm:grid-cols-2"><div><span className="career-field-label">Font family</span><div className="flex flex-wrap gap-1.5">{(['serif', 'sans-serif', 'mono'] as CoverLetterFontFamily[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontFamily: value })} className={`style-chip ${coverLetterStyle.fontFamily === value ? 'style-chip-active' : ''}`}>{value === 'sans-serif' ? 'Sans' : value === 'mono' ? 'Mono' : 'Serif'}</button>)}</div></div><div><span className="career-field-label">Font size</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterFontSize[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontSize: value })} className={`style-chip ${coverLetterStyle.fontSize === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div><div><span className="career-field-label">Paragraph spacing</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ paragraphSpacing: value })} className={`style-chip ${coverLetterStyle.paragraphSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div><div><span className="career-field-label">Header-to-body spacing</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ headerSpacing: value })} className={`style-chip ${coverLetterStyle.headerSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div></div>
             </div>
           </details>
-          <details className="career-details-card career-disclosure" open>
-            <summary className="career-disclosure-summary"><span><p className="career-kicker">Letter details</p><h2 className="font-bold">Contact information and letter text</h2></span><span className="career-disclosure-icon" aria-hidden="true" /></summary>
-            <div className="career-disclosure-content space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label><span className="career-field-label">Your name</span><input className="input-field" value={coverLetter.senderName} onChange={(event) => updateField('senderName', event.target.value)} placeholder="Your name" autoComplete="name" /></label>
-                <label><span className="career-field-label">Email</span><input className="input-field" type="email" value={coverLetter.senderEmail} onChange={(event) => updateField('senderEmail', event.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
-                <label><span className="career-field-label">Phone</span><input className="input-field" type="tel" value={coverLetter.senderPhone} onChange={(event) => updateField('senderPhone', event.target.value)} placeholder="(555) 555-5555" autoComplete="tel" /></label>
-                <label><span className="career-field-label">Location</span><input className="input-field" value={coverLetter.senderLocation} onChange={(event) => updateField('senderLocation', event.target.value)} placeholder="City, State" autoComplete="address-level2" /></label>
-              </div>
-              <label><span className="career-field-label">Letter body</span><textarea className="input-field min-h-64 resize-y" value={bodyHtmlToPlainText(coverLetter.body)} onChange={(event) => { updateDisplayedLetterBody(plainTextToBodyHtml(event.target.value)); setPreviewRevision((revision) => revision + 1); }} placeholder="Write the main body of your cover letter." /></label>
-              <p className="text-xs opacity-70">Use blank lines to start a new paragraph. You can also format and reorder paragraphs directly in the preview.</p>
-            </div>
-          </details>
           <div className="career-divider" />
           <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the complete letter and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter'}</button>{isTailoring && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{pendingTailoredLetter ? <div className="career-tailored-choice"><p className="career-kicker">Two letter versions ready</p><p className="mt-1 text-sm opacity-75">Use the Original and Tailored toggle above the preview to switch the complete letter. Switching never appends text.</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div> : <p className="text-sm opacity-75">Tailor the current preview letter to create an Original and a Tailored version you can switch between.</p>}</div>
           <div className="career-divider" />
@@ -513,7 +551,7 @@ export default function CoverLetterPage() {
 
         </section>
 
-        <section ref={previewShellRef} className="career-preview-shell" aria-label="Cover letter preview"><div className="career-preview-toolbar"><div><p className="career-kicker">Live preview</p><p className="mt-1 text-xs opacity-70">Drag across the full letter to select and copy text, or edit the letter from the form.</p></div><div className="flex items-center gap-2">{pendingTailoredLetter && <div className="career-preview-version-toggle" role="group" aria-label="Choose the letter shown in the preview"><button type="button" className={activeLetterBodyVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={activeLetterBodyVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div>}<button type="button" className="career-preview-copy-letter" onClick={copyPreviewLetter}>Copy letter</button></div></div><div className="career-preview-scale"><div ref={previewRef} className="career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} /></div></div></section>
+        <section ref={previewShellRef} className="career-preview-shell" aria-label="Cover letter editor"><div className="career-preview-toolbar"><div><p className="career-kicker">Cover letter</p><p className="mt-1 text-xs opacity-70">Edit, paste, select, copy, or delete directly in the letter. Changes save when you leave the document.</p></div><div className="flex items-center gap-2">{pendingTailoredLetter && <div className="career-preview-version-toggle" role="group" aria-label="Choose the letter shown in the preview"><button type="button" className={activeLetterBodyVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={activeLetterBodyVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div>}<button type="button" className="career-preview-copy-letter" onClick={copyPreviewLetter}>Copy letter</button></div></div><div className="career-preview-scale"><div ref={previewRef} contentEditable suppressContentEditableWarning onBlur={persistPreviewEdits} className="career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} /></div></div></section>
       </div>
     </main>
   );
