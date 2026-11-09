@@ -387,8 +387,8 @@
   .cover-letter-continuation-content { padding-top: 0; }
   .cover-letter-preview[data-font="serif"] { font-family: Georgia, 'Times New Roman', serif; } .cover-letter-preview[data-font="sans-serif"] { font-family: Arial, Helvetica, sans-serif; } .cover-letter-preview[data-font="mono"] { font-family: 'SFMono-Regular', Consolas, monospace; }
   .cover-letter-preview[data-font-size="sm"] { font-size: 12.5px; } .cover-letter-preview[data-font-size="md"] { font-size: 14px; } .cover-letter-preview[data-font-size="lg"] { font-size: 15.5px; }
-  .cover-letter-preview[data-paragraph-spacing="tight"] { --cover-paragraph-space: .6rem; } .cover-letter-preview[data-paragraph-spacing="normal"] { --cover-paragraph-space: 1rem; } .cover-letter-preview[data-paragraph-spacing="relaxed"] { --cover-paragraph-space: 1.4rem; }
-  .cover-letter-preview[data-header-spacing="tight"] { --cover-header-space: .8rem; } .cover-letter-preview[data-header-spacing="normal"] { --cover-header-space: 1.7rem; } .cover-letter-preview[data-header-spacing="relaxed"] { --cover-header-space: 2.6rem; }
+  .cover-letter-preview[data-paragraph-spacing="sm"] { --cover-paragraph-space: .6rem; } .cover-letter-preview[data-paragraph-spacing="md"] { --cover-paragraph-space: 1rem; } .cover-letter-preview[data-paragraph-spacing="lg"] { --cover-paragraph-space: 1.4rem; }
+  .cover-letter-preview[data-header-spacing="sm"] { --cover-header-space: .8rem; } .cover-letter-preview[data-header-spacing="md"] { --cover-header-space: 1.7rem; } .cover-letter-preview[data-header-spacing="lg"] { --cover-header-space: 2.6rem; }
   .cover-letter-letterhead { padding-bottom: 1.5rem; border-bottom: 3px solid var(--cover-accent, var(--hunter-green)); }
   .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, var(--hunter-green)); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
