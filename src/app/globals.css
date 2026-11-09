@@ -392,27 +392,15 @@
   .cover-letter-letterhead { padding-bottom: 1.5rem; border-bottom: 3px solid var(--cover-accent, var(--hunter-green)); }
   .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, var(--hunter-green)); font-size: 27px; font-weight: 800; letter-spacing: -.03em; }
   .cover-letter-letterhead p { margin: .2rem 0 0; color: #57695a; font-size: 12px; }
-  .cover-letter-editable-field { display: inline; cursor: text; border-radius: .18rem; outline: 1px dashed transparent; outline-offset: .15rem; }
-  .cover-letter-editable-field[data-empty="true"]::before { content: attr(data-placeholder); color: currentColor; opacity: .62; }
-  .cover-letter-page .cover-letter-editable-field:hover { outline-color: color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 42%, transparent); }
-  .cover-letter-page .cover-letter-editable-field:focus { outline: 2px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 65%, transparent); background: color-mix(in srgb, var(--yellow-green) 8%, transparent); }
   .cover-letter-content { padding-top: var(--cover-header-space, 1.7rem); }
   .cover-letter-content > p { margin: 0 0 .25rem; white-space: pre-wrap; }
   .cover-letter-role { color: #57695a; font-size: .92em; font-weight: 700; }
   .cover-letter-body { margin-top: 0; }
   .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 1rem); white-space: pre-wrap; }
   .cover-letter-body p[data-cover-paragraph-continuation="true"] { margin-top: 0; }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph] { position: relative; border-radius: .18rem; }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:focus-within { background: color-mix(in srgb, #f3f5f2 72%, transparent); }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph] > span[contenteditable="true"] { cursor: text; }
-  .cover-letter-paragraph-actions { position: absolute; top: .1rem; left: -2.85rem; display: flex; gap: .15rem; opacity: 0; transition: opacity 150ms ease; }
-  .cover-letter-page .cover-letter-body p[data-cover-paragraph]:hover .cover-letter-paragraph-actions, .cover-letter-paragraph-actions:focus-within { opacity: 1; }
-  .cover-letter-paragraph-actions button, .career-preview-add-paragraph, .career-preview-copy-letter { border: 1px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 28%, transparent); border-radius: .35rem; color: var(--cover-accent, var(--hunter-green)); background: color-mix(in srgb, var(--yellow-green) 19%, #fff); font-weight: 800; line-height: 1; transition: filter 150ms ease, opacity 150ms ease; }
-  .cover-letter-paragraph-actions button { width: 1.2rem; height: 1.45rem; padding: 0; font-size: .8rem; }
-  .cover-letter-paragraph-actions button:hover:not(:disabled), .career-preview-add-paragraph:hover, .career-preview-copy-letter:hover { filter: brightness(.96); }
-  .cover-letter-paragraph-actions button:disabled { cursor: not-allowed; opacity: .4; }
-  .cover-letter-paragraph-actions .cover-letter-paragraph-delete { color: #b42318; }
-  .career-preview-add-paragraph { padding: .42rem .62rem; font-size: .75rem; white-space: nowrap; }
+  .cover-letter-page { user-select: text; -webkit-user-select: text; }
+  .career-preview-copy-letter { border: 1px solid color-mix(in srgb, var(--cover-accent, var(--hunter-green)) 28%, transparent); border-radius: .35rem; color: var(--cover-accent, var(--hunter-green)); background: color-mix(in srgb, var(--yellow-green) 19%, #fff); font-weight: 800; line-height: 1; transition: filter 150ms ease, opacity 150ms ease; }
+  .career-preview-copy-letter:hover { filter: brightness(.96); }
   .career-preview-copy-letter { padding: .42rem .62rem; font-size: .75rem; white-space: nowrap; }
   .cover-letter-preview[data-layout="classic"] { padding: 72px 76px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead { border-bottom-width: 1px; } .cover-letter-preview[data-layout="classic"] .cover-letter-letterhead h2 { font-size: 24px; }
   .cover-letter-preview[data-layout="compact"] { height: 900px; min-height: 900px; padding: 48px 54px; line-height: 1.48; } .cover-letter-preview[data-layout="compact"] .cover-letter-letterhead { padding-bottom: 1rem; }
