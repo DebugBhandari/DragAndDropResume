@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import FeedbackWidget from '@/components/FeedbackWidget';
-import { ChangeEvent, type CSSProperties, type FocusEvent, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, type FocusEvent, useCallback, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
 import { useUIStore } from '@/store/useUIStore';
-import type { CoverLetterData, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
+import type { CoverLetterData, CoverLetterDocumentFormat, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
 const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: string }> = [
@@ -14,10 +13,14 @@ const layoutOptions: Array<{ value: CoverLetterLayout; label: string; detail: st
   { value: 'compact', label: 'Compact', detail: 'Dense, space-saving' },
   { value: 'minimal', label: 'Minimal', detail: 'Letter body only' },
 ];
+const documentFormatOptions: Array<{ value: CoverLetterDocumentFormat; label: string; detail: string }> = [
+  { value: 'header-body-footer', label: 'Full letter', detail: 'Header, body & footer' },
+  { value: 'body-only', label: 'Body only', detail: 'Clean document page' },
+  { value: 'body-footer', label: 'Body & footer', detail: 'Closing without a header' },
+];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
 type PendingTailoredLetter = Pick<CoverLetterData, 'companyName' | 'roleTitle'> & { originalBody: string; tailoredBody: string };
 type LetterBodyVersion = 'original' | 'tailored';
-type CoverLetterSegment = { html: string; sourceIndex: number; sourceOffset: number; partIndex: number; continuation: boolean };
 
 function formatSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt));
@@ -63,27 +66,6 @@ function bodyHtmlToPlainText(value: string) {
     .trim();
 }
 
-function bodyHtmlToParagraphs(value: string) {
-  const paragraphMatches = [...value.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)].map((match) => match[1].trim()).filter(Boolean);
-  const fragments = paragraphMatches.length
-    ? paragraphMatches
-    : plainTextToBodyHtml(value).match(/<p>([\s\S]*?)<\/p>/g)?.map((paragraph) => paragraph.replace(/^<p>|<\/p>$/g, '')) ?? [];
-  const textOnly = (markup: string) => bodyHtmlToPlainText(`<p>${markup}</p>`).replace(/\s+/g, ' ').trim();
-  return fragments.reduce<string[]>((paragraphs, fragment) => {
-    const current = fragment.replace(/\s+/g, ' ').trim();
-    if (!current) return paragraphs;
-    const previous = paragraphs.at(-1);
-    if (!previous || /[.!?]["')\]]?$/.test(textOnly(previous))) {
-      paragraphs.push(current);
-      return paragraphs;
-    }
-    paragraphs[paragraphs.length - 1] = /-\s*$/.test(previous)
-      ? `${previous.replace(/\s+$/, '')}${current}`
-      : `${previous.replace(/\s+$/, '')} ${current}`;
-    return paragraphs;
-  }, []);
-}
-
 function sanitizeEditableMarkup(value: string) {
   const source = new DOMParser().parseFromString(value, 'text/html');
   const sanitizeNode = (node: Node): string => {
@@ -99,152 +81,68 @@ function sanitizeEditableMarkup(value: string) {
     if (tag === 'font' && /^#[0-9a-f]{6}$/i.test(node.getAttribute('color') ?? '')) return `<span style="color: ${node.getAttribute('color')}">${content}</span>`;
     return content;
   };
-  const groupedParagraphs = new Map<string, { alignment: string; content: string }>();
-  Array.from(source.body.querySelectorAll<HTMLElement>('.cover-letter-page p[data-cover-paragraph]')).forEach((paragraph, index) => {
-    const key = paragraph.dataset.coverSourceIndex ?? String(index);
-    const current = groupedParagraphs.get(key);
-    const content = Array.from(paragraph.childNodes).map(sanitizeNode).join('');
-    if (current) current.content += content;
-    else groupedParagraphs.set(key, { alignment: ['left', 'center', 'right', 'justify'].includes(paragraph.style.textAlign) ? ` style="text-align: ${paragraph.style.textAlign}"` : '', content });
-  });
-  return Array.from(groupedParagraphs.values()).map(({ alignment, content }) => `<p${alignment}>${content}</p>`).join('');
-}
-
-function splitMarkupAtTextOffset(markup: string, offset: number) {
-  const container = document.createElement('div');
-  container.innerHTML = markup;
-  const text = container.textContent ?? '';
-  const wordBoundary = Math.max(text.lastIndexOf(' ', offset), text.lastIndexOf('\n', offset));
-  const splitOffset = wordBoundary > 0 ? wordBoundary + 1 : offset;
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let consumed = 0;
-  let node = walker.nextNode();
-  while (node) {
-    const length = node.textContent?.length ?? 0;
-    if (consumed + length >= splitOffset) {
-      const range = document.createRange();
-      range.setStart(container, 0);
-      range.setEnd(node, Math.max(0, splitOffset - consumed));
-      const prefixContainer = document.createElement('div');
-      prefixContainer.appendChild(range.extractContents());
-      return [prefixContainer.innerHTML, container.innerHTML] as const;
+  const blocks = Array.from(source.body.children).flatMap((node) => {
+    if (node instanceof HTMLParagraphElement || node.tagName === 'DIV') {
+      const content = Array.from(node.childNodes).map(sanitizeNode).join('');
+      const alignment = ['left', 'center', 'right', 'justify'].includes((node as HTMLElement).style.textAlign)
+        ? ` style="text-align: ${(node as HTMLElement).style.textAlign}"`
+        : '';
+      return content || node.tagName === 'DIV' ? [`<p${alignment}>${content}</p>`] : [];
     }
-    consumed += length;
-    node = walker.nextNode();
-  }
-  return [markup, ''] as const;
+    const content = sanitizeNode(node);
+    return content.trim() ? [`<p>${content}</p>`] : [];
+  });
+  return blocks.length ? blocks.join('') : '<p></p>';
 }
 
-function markupTextLength(markup: string) {
-  return bodyHtmlToPlainText(`<p>${markup}</p>`).length;
+function sanitizeFooterMarkup(value: string) {
+  return sanitizeEditableMarkup(value).replace(/^<p>|<\/p>$/g, '');
 }
 
-function CoverLetterPages({ coverLetter, coverLetterStyle, revision }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle; revision: number }) {
-  const measureRef = useRef<HTMLElement>(null);
-  const paragraphs = bodyHtmlToParagraphs(coverLetter.body || 'Your cover letter body will appear here.');
-  const [pages, setPages] = useState<CoverLetterSegment[][]>(() => [paragraphs.map((html, sourceIndex) => ({ html, sourceIndex, sourceOffset: 0, partIndex: 0, continuation: false }))]);
-  const previewProps = { 'data-layout': coverLetterStyle.layout, 'data-font': coverLetterStyle.fontFamily, 'data-font-size': coverLetterStyle.fontSize, 'data-paragraph-spacing': coverLetterStyle.paragraphSpacing, 'data-header-spacing': coverLetterStyle.headerSpacing, style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties };
-  const editableField = (key: keyof Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation'>, value: string, placeholder: string, className?: string) => <span data-cover-field={key} data-empty={value ? undefined : 'true'} data-placeholder={placeholder} className={className}>{value}</span>;
-  const contactPlaceholders: Record<'senderEmail' | 'senderPhone' | 'senderLocation', string> = { senderEmail: 'Email', senderPhone: 'Phone', senderLocation: 'Location' };
-  const contactFields = (editable = false) => <p className="cover-letter-contact">{(['senderEmail', 'senderPhone', 'senderLocation'] as const).map((key, index) => <span key={key}>{index > 0 && <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>}{editable ? editableField(key, coverLetter[key], contactPlaceholders[key], 'cover-letter-editable-field') : (coverLetter[key] || contactPlaceholders[key])}</span>)}</p>;
+function storedBodyMarkup(value: string) {
+  return /<p(?:\s[^>]*)?>[\s\S]*<\/p>/i.test(value) ? value : plainTextToBodyHtml(value);
+}
 
-  useLayoutEffect(() => {
-    const measure = () => {
-      const sheet = measureRef.current;
-      if (!sheet) return;
-      const items = Array.from(sheet.querySelectorAll<HTMLElement>('[data-cover-paragraph]'));
-      const body = sheet.querySelector<HTMLElement>('.cover-letter-body');
-      if (!items.length || !body) return;
-      const styles = window.getComputedStyle(sheet);
-      const topPadding = Number.parseFloat(styles.paddingTop) || 0;
-      const bottomPadding = Number.parseFloat(styles.paddingBottom) || 0;
-      const pageHeight = sheet.offsetWidth * (297 / 210);
-      const firstPageBottom = pageHeight - bottomPadding;
-      const bodyStyles = window.getComputedStyle(body);
-      const bodyTopMargin = Number.parseFloat(bodyStyles.marginTop) || 0;
-      const firstCapacity = Math.max(0, firstPageBottom - items[0].offsetTop);
-      const continuationCapacity = Math.max(0, pageHeight - topPadding - bottomPadding - bodyTopMargin);
-      const measureMarkup = (markup: string) => {
-        const probe = document.createElement('p');
-        probe.dataset.coverParagraph = 'probe';
-        probe.style.cssText = `position:absolute; visibility:hidden; pointer-events:none; left:0; width:${body.clientWidth}px; box-sizing:border-box;`;
-        probe.innerHTML = markup;
-        body.appendChild(probe);
-        const probeStyles = window.getComputedStyle(probe);
-        const height = probe.getBoundingClientRect().height + (Number.parseFloat(probeStyles.marginTop) || 0) + (Number.parseFloat(probeStyles.marginBottom) || 0);
-        probe.remove();
-        return height;
-      };
-      const fitMarkup = (markup: string, capacity: number) => {
-        if (measureMarkup(markup) <= capacity) return [markup, ''] as const;
-        const textLength = (new DOMParser().parseFromString(markup, 'text/html').body.textContent ?? '').length;
-        let low = 1;
-        let high = textLength;
-        let best = 0;
-        while (low <= high) {
-          const middle = Math.floor((low + high) / 2);
-          const [candidate] = splitMarkupAtTextOffset(markup, middle);
-          if (candidate && measureMarkup(candidate) <= capacity) {
-            best = middle;
-            low = middle + 1;
-          } else high = middle - 1;
-        }
-        return best > 0 ? splitMarkupAtTextOffset(markup, best) : ['', markup] as const;
-      };
-      const nextPages: CoverLetterSegment[][] = [[]];
-      let remaining = firstCapacity;
+function storedFooterMarkup(value: string) {
+  return /<[^>]+>/.test(value) ? value : escapeHtml(value).replace(/\n/g, '<br />');
+}
 
-      paragraphs.forEach((paragraph, sourceIndex) => {
-        let remainder = paragraph;
-        let partIndex = 0;
-        let sourceOffset = 0;
-        while (remainder.trim()) {
-          const fullHeight = measureMarkup(remainder);
-          if (fullHeight <= remaining) {
-            nextPages.at(-1)?.push({ html: remainder, sourceIndex, sourceOffset, partIndex, continuation: partIndex > 0 });
-            remaining -= fullHeight;
-            break;
-          }
-          const pageHasContent = nextPages.at(-1)?.length;
-          const freshPageCapacity = nextPages.length === 1 ? firstCapacity : continuationCapacity;
-          if (pageHasContent && fullHeight <= freshPageCapacity) {
-            nextPages.push([]);
-            remaining = continuationCapacity;
-            continue;
-          }
-          const [fittingMarkup, remainingMarkup] = fitMarkup(remainder, remaining);
-          if (!fittingMarkup) {
-            nextPages.push([]);
-            remaining = continuationCapacity;
-            continue;
-          }
-          nextPages.at(-1)?.push({ html: fittingMarkup, sourceIndex, sourceOffset, partIndex, continuation: partIndex > 0 });
-          sourceOffset += markupTextLength(fittingMarkup);
-          remainder = remainingMarkup;
-          partIndex += 1;
-          if (remainder) {
-            nextPages.push([]);
-            remaining = continuationCapacity;
-          }
-        }
-      });
-      setPages((current) => JSON.stringify(current) === JSON.stringify(nextPages) ? current : nextPages);
-    };
-    const frame = window.requestAnimationFrame(measure);
-    const observer = new ResizeObserver(measure);
-    if (measureRef.current) observer.observe(measureRef.current);
-    return () => { window.cancelAnimationFrame(frame); observer.disconnect(); };
-  }, [coverLetter.body, coverLetter.senderName, coverLetter.senderEmail, coverLetter.senderPhone, coverLetter.senderLocation, coverLetterStyle, revision, paragraphs]);
+function CoverLetterDocument({ coverLetter, coverLetterStyle }: { coverLetter: CoverLetterData; coverLetterStyle: CoverLetterStyle }) {
+  const hasHeader = coverLetterStyle.documentFormat === 'header-body-footer';
+  const hasFooter = coverLetterStyle.documentFormat !== 'body-only';
+  const previewProps = {
+    'data-layout': coverLetterStyle.layout,
+    'data-document-format': coverLetterStyle.documentFormat,
+    'data-font': coverLetterStyle.fontFamily,
+    'data-font-size': coverLetterStyle.fontSize,
+    'data-paragraph-spacing': coverLetterStyle.paragraphSpacing,
+    'data-header-spacing': coverLetterStyle.headerSpacing,
+    style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties,
+  };
+  const editableField = (key: keyof Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation'>, value: string, placeholder: string, className?: string) => (
+    <span data-cover-field={key} data-empty={value ? undefined : 'true'} data-placeholder={placeholder} className={className}>{value}</span>
+  );
 
-  return <>
-    <article ref={measureRef} aria-hidden="true" className="cover-letter-preview cover-letter-measure" {...previewProps}>{coverLetterStyle.layout !== 'minimal' && <header className="cover-letter-letterhead"><h2>{coverLetter.senderName || 'Your name'}</h2>{contactFields()}</header>}<div className="cover-letter-content"><div className="cover-letter-body">{paragraphs.map((paragraph, index) => <p data-cover-paragraph key={`${paragraph}-${index}`} dangerouslySetInnerHTML={{ __html: paragraph }} />)}</div></div></article>
-    {pages.map((page, pageIndex) => <article key={`${revision}-${pageIndex}`} className="cover-letter-preview cover-letter-page" {...previewProps}>{pageIndex === 0 && coverLetterStyle.layout !== 'minimal' && <header className="cover-letter-letterhead"><h2>{editableField('senderName', coverLetter.senderName, 'Your name', 'cover-letter-editable-field')}</h2>{contactFields(true)}</header>}<div className={`cover-letter-content ${pageIndex > 0 ? 'cover-letter-continuation-content' : ''}`}><div className="cover-letter-body">{page.map((segment) => <p data-cover-paragraph data-cover-source-index={segment.sourceIndex} data-cover-paragraph-continuation={segment.continuation || undefined} key={`${pageIndex}-${segment.sourceIndex}-${segment.partIndex}`} dangerouslySetInnerHTML={{ __html: segment.html }} />)}</div></div></article>)}
-  </>;
+  return <article className="cover-letter-preview cover-letter-page cover-letter-document" {...previewProps}>
+    {hasHeader && <header className="cover-letter-letterhead" data-cover-section="header">
+      <h2>{editableField('senderName', coverLetter.senderName, 'Your name', 'cover-letter-editable-field')}</h2>
+      <p className="cover-letter-contact">
+        {editableField('senderEmail', coverLetter.senderEmail, 'Email', 'cover-letter-editable-field')}
+        <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>
+        {editableField('senderPhone', coverLetter.senderPhone, 'Phone', 'cover-letter-editable-field')}
+        <span className="cover-letter-contact-separator" aria-hidden="true"> · </span>
+        {editableField('senderLocation', coverLetter.senderLocation, 'Location', 'cover-letter-editable-field')}
+      </p>
+    </header>}
+    <div className="cover-letter-content">
+      <div className="cover-letter-body" data-cover-body dangerouslySetInnerHTML={{ __html: storedBodyMarkup(coverLetter.body) }} />
+    </div>
+    {hasFooter && <footer className="cover-letter-footer" data-cover-footer data-empty={coverLetter.footer ? undefined : 'true'} data-placeholder="Add a closing, signature, or portfolio link" dangerouslySetInnerHTML={{ __html: storedFooterMarkup(coverLetter.footer) }} />}
+  </article>;
 }
 
 export default function CoverLetterPage() {
   const previewRef = useRef<HTMLDivElement>(null);
-  const previewShellRef = useRef<HTMLElement>(null);
   const { coverLetter, coverLetterStyle, coverLetterVersions, updateCoverLetter, updateCoverLetterStyle, replaceCoverLetter, clearCoverLetter, saveCoverLetterVersion, loadCoverLetterVersion, deleteCoverLetterVersion } = useCareerStore();
   const [versionName, setVersionName] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -252,12 +150,10 @@ export default function CoverLetterPage() {
   const [message, setMessage] = useState('');
   const [activityStage, setActivityStage] = useState('');
   const [activityDetail, setActivityDetail] = useState('');
-  const [previewRevision, setPreviewRevision] = useState(0);
   const [pendingTailoredLetter, setPendingTailoredLetter] = useState<PendingTailoredLetter | null>(null);
   const [activeLetterBodyVersion, setActiveLetterBodyVersion] = useState<LetterBodyVersion | null>(null);
-  const { studioTheme, toggleStudioTheme } = useUIStore();
+  const { studioTheme } = useUIStore();
 
-  const updateField = (key: keyof CoverLetterData, value: string) => updateCoverLetter({ [key]: value });
   const updateDisplayedLetterBody = useCallback((body: string) => {
     updateCoverLetter({ body });
     setPendingTailoredLetter((current) => {
@@ -275,7 +171,8 @@ export default function CoverLetterPage() {
       const field = preview.querySelector<HTMLElement>(`[data-cover-field="${key}"]`);
       return field ? field.textContent?.replace(/\s+/g, ' ').trim() ?? '' : undefined;
     };
-    const body = sanitizeEditableMarkup(preview.innerHTML);
+    const body = sanitizeEditableMarkup(preview.querySelector<HTMLElement>('[data-cover-body]')?.innerHTML ?? '');
+    const footer = sanitizeFooterMarkup(preview.querySelector<HTMLElement>('[data-cover-footer]')?.innerHTML ?? '');
     const fields = {
       senderName: readField('senderName'),
       senderEmail: readField('senderEmail'),
@@ -284,11 +181,9 @@ export default function CoverLetterPage() {
     };
     const changes = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<Pick<CoverLetterData, 'senderName' | 'senderEmail' | 'senderPhone' | 'senderLocation'>>;
     if (body !== coverLetter.body) updateDisplayedLetterBody(body);
+    if (footer !== coverLetter.footer) updateCoverLetter({ footer });
     const fieldsChanged = Object.entries(changes).some(([key, value]) => coverLetter[key as keyof CoverLetterData] !== value);
     if (fieldsChanged) updateCoverLetter(changes);
-    if (body !== coverLetter.body || fieldsChanged) {
-      setPreviewRevision((revision) => revision + 1);
-    }
   }, [coverLetter, updateCoverLetter, updateDisplayedLetterBody]);
   async function copyPreviewLetter() {
     const text = bodyHtmlToPlainText(coverLetter.body);
@@ -349,10 +244,8 @@ export default function CoverLetterPage() {
       * { box-sizing: border-box; }
       html, body { width: 210mm; min-height: 297mm; margin: 0; padding: 0; background: #fff; }
       .cover-letter-preview { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 18mm 20mm !important; color: #1d2920; background: #fff; box-shadow: none !important; }
-      .cover-letter-measure { display: none !important; }
       .career-preview-pages { display: block !important; min-width: 0 !important; gap: 0 !important; padding: 0 !important; }
-      .cover-letter-page { height: 297mm !important; min-height: 297mm !important; overflow: hidden !important; break-after: page; page-break-after: always; }
-      .cover-letter-page:last-child { break-after: auto; page-break-after: auto; }
+      .cover-letter-page { height: auto !important; min-height: 297mm !important; overflow: visible !important; }
       .cover-letter-preview, .cover-letter-preview * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .cover-letter-letterhead { padding-bottom: 8mm; border-bottom: 3px solid var(--cover-accent, #386641); }
       .cover-letter-letterhead h2 { margin: 0; color: var(--cover-accent, #386641); font-size: 25px; font-weight: 800; letter-spacing: -.03em; }
@@ -364,6 +257,7 @@ export default function CoverLetterPage() {
       .cover-letter-content > p { margin: 0 0 2px; white-space: pre-wrap; }
       .cover-letter-body { margin-top: 0; }
       .cover-letter-body p { margin: 0 0 var(--cover-paragraph-space, 5mm); white-space: pre-wrap; }
+      .cover-letter-footer { margin-top: 12mm; white-space: pre-wrap; }
       .cover-letter-preview[data-font="serif"] { font-family: Georgia, 'Times New Roman', serif; }
       .cover-letter-preview[data-font="sans-serif"] { font-family: Arial, Helvetica, sans-serif; }
       .cover-letter-preview[data-font="mono"] { font-family: 'SFMono-Regular', Consolas, monospace; }
@@ -379,7 +273,7 @@ export default function CoverLetterPage() {
       .cover-letter-preview[data-layout="minimal"] .cover-letter-content { padding-top: 0; }
     `;
     printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${filename}CoverLetter</title><style>${printCss}</style></head><body>${source.outerHTML}</body></html>`);
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${filename}</title><style>${printCss}</style></head><body>${source.innerHTML}</body></html>`);
     printWindow.document.close();
     const triggerPrint = () => {
       printWindow.focus();
@@ -421,7 +315,6 @@ export default function CoverLetterPage() {
         if (event.type === 'result' && typeof event.text === 'string') {
           const fields = event.fields && typeof event.fields === 'object' ? event.fields as Partial<CoverLetterData> : {};
           replaceCoverLetter({ ...fields, companyName: '', roleTitle: '', body: cleanImportedText(event.text) });
-          setPreviewRevision((revision) => revision + 1);
           clearTailoredCandidate();
           imported = true;
         }
@@ -506,7 +399,6 @@ export default function CoverLetterPage() {
     const body = version === 'original' ? pendingTailoredLetter.originalBody : pendingTailoredLetter.tailoredBody;
     updateCoverLetter({ body });
     setActiveLetterBodyVersion(version);
-    setPreviewRevision((revision) => revision + 1);
     setMessage('');
     if (version === 'tailored') trackAnalyticsEvent('cover_letter_tailored');
   }
@@ -527,10 +419,11 @@ export default function CoverLetterPage() {
 
       <div className="career-workspace mx-auto grid max-w-[1650px] gap-5 p-4 lg:grid-cols-[minmax(360px,0.72fr)_minmax(0,1.28fr)] lg:p-6">
         <section className="career-panel space-y-5" aria-label="Cover letter settings">
-          <div><p className="career-kicker">Editor</p><h1 className="text-2xl font-bold">Build your cover letter</h1><p className="mt-1 text-sm opacity-75">Everything is saved only in this browser.</p></div>
+          <div><p className="career-kicker">Document tools</p><h1 className="text-2xl font-bold">Your editable letter</h1><p className="mt-1 text-sm opacity-75">Write directly on the page. Everything is saved in this browser.</p></div>
           <details className="career-style-card career-disclosure" open>
             <summary className="career-disclosure-summary"><span><p className="career-kicker">Layout & style</p><h2 className="font-bold">Match your résumé presentation</h2></span><span className="career-disclosure-icon" aria-hidden="true" /></summary>
             <div className="career-disclosure-content space-y-3">
+              <div><span className="career-field-label">Document parts</span><div className="grid grid-cols-1 gap-2">{documentFormatOptions.map((format) => <button type="button" key={format.value} onClick={() => updateCoverLetterStyle({ documentFormat: format.value })} className={`career-document-format-option ${coverLetterStyle.documentFormat === format.value ? 'career-document-format-option-active' : ''}`}><span className="font-bold">{format.label}</span><span>{format.detail}</span></button>)}</div></div>
               <div className="grid grid-cols-2 gap-2">
                 {layoutOptions.map((layout) => <button type="button" key={layout.value} onClick={() => updateCoverLetterStyle({ layout: layout.value })} className={`career-layout-option ${coverLetterStyle.layout === layout.value ? 'career-layout-option-active' : ''}`}><span className={`career-layout-thumbnail career-layout-thumbnail-${layout.value}`} style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><i /><b /></span><span className="mt-1 block text-xs font-bold">{layout.label}</span><span className="block text-[11px] opacity-70">{layout.detail}</span></button>)}
               </div>
@@ -539,7 +432,7 @@ export default function CoverLetterPage() {
             </div>
           </details>
           <div className="career-divider" />
-          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateField('jobDescription', event.target.value)} placeholder="Paste the job description. The server AI will tailor the complete letter and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter'}</button>{isTailoring && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{pendingTailoredLetter ? <div className="career-tailored-choice"><p className="career-kicker">Two letter versions ready</p><p className="mt-1 text-sm opacity-75">Use the Original and Tailored toggle above the preview to switch the complete letter. Switching never appends text.</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div> : <p className="text-sm opacity-75">Tailor the current preview letter to create an Original and a Tailored version you can switch between.</p>}</div>
+          <div className="space-y-2"><div><p className="career-kicker">Tailor to a role</p><h2 className="font-bold">Paste the job description</h2></div><textarea className="input-field min-h-44 resize-y" value={coverLetter.jobDescription} onChange={(event) => updateCoverLetter({ jobDescription: event.target.value })} placeholder="Paste the job description. The server AI will tailor the complete letter and detect the role and company." /><button type="button" className="career-primary-button" onClick={tailorCoverLetter} disabled={isTailoring || isImporting}>{isTailoring ? 'Tailoring…' : 'Tailor letter'}</button>{isTailoring && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{pendingTailoredLetter ? <div className="career-tailored-choice"><p className="career-kicker">Two letter versions ready</p><p className="mt-1 text-sm opacity-75">Use the Original and Tailored toggle above the document to switch the complete letter. Switching never appends text.</p><p className="mt-1 text-sm opacity-75">Detected: {pendingTailoredLetter.roleTitle || 'Role not found'}{pendingTailoredLetter.companyName ? ` · ${pendingTailoredLetter.companyName}` : ''}</p></div> : <p className="text-sm opacity-75">Tailor the letter on the page to create Original and Tailored versions.</p>}</div>
           <div className="career-divider" />
           <div className="space-y-3"><div><p className="career-kicker">Import</p><h2 className="font-bold">Import an existing cover letter</h2><p className="mt-1 text-sm opacity-75">PDF extraction uses Docling only; it does not use AI.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div>
           <div className="career-divider" />
@@ -551,7 +444,7 @@ export default function CoverLetterPage() {
 
         </section>
 
-        <section ref={previewShellRef} className="career-preview-shell" aria-label="Cover letter editor"><div className="career-preview-toolbar"><div><p className="career-kicker">Cover letter</p><p className="mt-1 text-xs opacity-70">Edit, paste, select, copy, or delete directly in the letter. Changes save when you leave the document.</p></div><div className="flex items-center gap-2">{pendingTailoredLetter && <div className="career-preview-version-toggle" role="group" aria-label="Choose the letter shown in the preview"><button type="button" className={activeLetterBodyVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={activeLetterBodyVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div>}<button type="button" className="career-preview-copy-letter" onClick={copyPreviewLetter}>Copy letter</button></div></div><div className="career-preview-scale"><div ref={previewRef} contentEditable suppressContentEditableWarning onBlur={persistPreviewEdits} className="career-preview-pages"><CoverLetterPages coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} revision={previewRevision} /></div></div></section>
+        <section className="career-preview-shell career-document-shell" aria-label="Cover letter document editor"><div className="career-preview-toolbar"><div><p className="career-kicker">Editable document</p><p className="mt-1 text-xs opacity-70">Click anywhere on the page to type, paste, select, copy, or delete. Changes save when you leave the document.</p></div><div className="flex items-center gap-2">{pendingTailoredLetter && <div className="career-preview-version-toggle" role="group" aria-label="Choose the letter shown in the document"><button type="button" className={activeLetterBodyVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={activeLetterBodyVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div>}<button type="button" className="career-preview-copy-letter" onClick={copyPreviewLetter}>Copy letter</button></div></div><div className="career-preview-scale"><div ref={previewRef} contentEditable suppressContentEditableWarning onBlur={persistPreviewEdits} className="career-preview-pages career-document-pages"><CoverLetterDocument coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} /></div></div></section>
       </div>
     </main>
   );

@@ -15,11 +15,13 @@ const defaultCoverLetter = (): CoverLetterData => ({
   companyName: '',
   roleTitle: '',
   body: 'I am writing to express my interest in the role. My experience and motivation would allow me to contribute meaningfully to your team.\n\nI would welcome the opportunity to discuss how I can support your goals.',
+  footer: '',
   jobDescription: '',
 });
 
 const defaultCoverLetterStyle = (): CoverLetterStyle => ({
   layout: 'modern',
+  documentFormat: 'header-body-footer',
   accentColor: '#386641',
   fontFamily: 'sans-serif',
   fontSize: 'md',
@@ -37,6 +39,7 @@ function normalizeCoverLetterStyle(style?: Partial<CoverLetterStyle>): CoverLett
   return {
     ...defaultCoverLetterStyle(),
     ...style,
+    documentFormat: style?.documentFormat === 'body-only' || style?.documentFormat === 'body-footer' ? style.documentFormat : 'header-body-footer',
     paragraphSpacing: normalizeCoverLetterSpacing(style?.paragraphSpacing),
     headerSpacing: normalizeCoverLetterSpacing(style?.headerSpacing),
   };
