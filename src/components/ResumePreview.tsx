@@ -66,6 +66,37 @@ export function getFontFamily(font: StyleConfig["fontFamily"]) {
   }
 }
 
+function EditableText({
+  value,
+  onChange,
+  className,
+  style,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  placeholder?: string;
+}) {
+  return (
+    <span
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      tabIndex={0}
+      className={`resume-editable-text ${className ?? ''}`}
+      style={style}
+      data-placeholder={placeholder}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onBlur={(event) => onChange(event.currentTarget.textContent?.replace(/\n+/g, ' ').trim() ?? '')}
+    >
+      {value}
+    </span>
+  );
+}
+
 // ─── Section Content ───
 function SectionContent({
   type,
@@ -96,6 +127,16 @@ function SectionContent({
     references,
     interests,
     style,
+    updateEducation,
+    updateExperience,
+    updateProject,
+    updateLanguage,
+    updateSkill,
+    updateCertificate,
+    updateAward,
+    updateVolunteer,
+    updateReference,
+    updateInterest,
   } = useResumeStore();
   // Use [inherit] for body text so it respects the page-level fontSize; use [1.15em] for titles
   switch (type) {
@@ -112,26 +153,26 @@ function SectionContent({
             <div key={edu.id} className="mb-2">
               <div className="flex justify-between items-baseline">
                 <strong style={{ fontSize: "1.05em" }}>
-                  {edu.institution || "Institution"}
+                  <EditableText value={edu.institution} placeholder="Institution" onChange={(institution) => updateEducation(edu.id, { institution })} />
                 </strong>
                 <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                  {edu.startDate}
-                  {edu.endDate && ` – ${edu.endDate}`}
+                  <EditableText value={edu.startDate} placeholder="Start date" onChange={(startDate) => updateEducation(edu.id, { startDate })} />
+                  {" – "}<EditableText value={edu.endDate} placeholder="End date" onChange={(endDate) => updateEducation(edu.id, { endDate })} />
                 </span>
               </div>
               <div
                 className="italic text-gray-700"
                 style={{ fontSize: "0.9em" }}
               >
-                {edu.degree}
-                {edu.field && ` in ${edu.field}`}
+                  <EditableText value={edu.degree} placeholder="Degree" onChange={(degree) => updateEducation(edu.id, { degree })} />
+                  {" in "}<EditableText value={edu.field} placeholder="Field" onChange={(field) => updateEducation(edu.id, { field })} />
               </div>
               {edu.description && (
                 <p
                   className="mt-0.5 text-gray-600"
                   style={{ fontSize: "0.9em" }}
                 >
-                  {edu.description}
+                  <EditableText value={edu.description} placeholder="Description" onChange={(description) => updateEducation(edu.id, { description })} />
                 </p>
               )}
             </div>
@@ -164,21 +205,21 @@ function SectionContent({
               <div key={exp.id} data-exp-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
                 <div className="flex justify-between items-baseline">
                   <strong style={{ fontSize: "1.05em" }}>
-                    {exp.position || "Position"}
+                    <EditableText value={exp.position} placeholder="Position" onChange={(position) => updateExperience(exp.id, { position })} />
                   </strong>
                   <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                    {exp.startDate}
-                    {exp.endDate && ` – ${exp.endDate}`}
+                    <EditableText value={exp.startDate} placeholder="Start date" onChange={(startDate) => updateExperience(exp.id, { startDate })} />
+                    {" – "}<EditableText value={exp.endDate} placeholder="End date" onChange={(endDate) => updateExperience(exp.id, { endDate })} />
                   </span>
                 </div>
                 <div className="italic text-gray-700" style={{ fontSize: "0.9em" }}>
-                  {exp.company}
+                  <EditableText value={exp.company} placeholder="Company" onChange={(company) => updateExperience(exp.id, { company })} />
                 </div>
 
                 {bullets.length > 0 && (
                   <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
                     {bullets.map((bullet, index) => (
-                      <li key={`${exp.id}-preview-bullet-${index}`}>{bullet}</li>
+                      <li key={`${exp.id}-preview-bullet-${index}`}><EditableText value={bullet} placeholder="Achievement" onChange={(value) => { const descriptionBullets = [...bullets]; descriptionBullets[index] = value; updateExperience(exp.id, { descriptionBullets, description: descriptionBullets.join('\n') }); }} /></li>
                     ))}
                   </ul>
                 )}
@@ -214,37 +255,27 @@ function SectionContent({
               <div key={proj.id} data-project-item className="mb-2 border border-slate-200 rounded-md px-2.5 py-2 break-inside-avoid">
                 <div className="flex items-baseline gap-2">
                   <strong style={{ fontSize: "1.05em" }}>
-                    {proj.name || "Project"}
+                    <EditableText value={proj.name} placeholder="Project" onChange={(name) => updateProject(proj.id, { name })} />
                   </strong>
                   {proj.completionDate && (
                     <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                      • {proj.completionDate}
+                      • <EditableText value={proj.completionDate} placeholder="Date" onChange={(completionDate) => updateProject(proj.id, { completionDate })} />
                     </span>
                   )}
                   {proj.technologies && (
                     <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                      ({proj.technologies})
+                      (<EditableText value={proj.technologies} placeholder="Technologies" onChange={(technologies) => updateProject(proj.id, { technologies })} />)
                     </span>
                   )}
                 </div>
                 {bullets.length > 0 && (
                   <ul className="mt-1.5 pl-4 list-disc text-gray-600" style={{ fontSize: "0.9em" }}>
                     {bullets.map((bullet, index) => (
-                      <li key={`${proj.id}-preview-bullet-${index}`}>{bullet}</li>
+                      <li key={`${proj.id}-preview-bullet-${index}`}><EditableText value={bullet} placeholder="Project detail" onChange={(value) => { const descriptionBullets = [...bullets]; descriptionBullets[index] = value; updateProject(proj.id, { descriptionBullets, description: descriptionBullets.join('\n') }); }} /></li>
                     ))}
                   </ul>
                 )}
-                {proj.link && (
-                  <a
-                    href={proj.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-block"
-                    style={{ color: style.accentColor, fontSize: "0.85em" }}
-                  >
-                    {proj.link}
-                  </a>
-                )}
+                <div className="mt-1 inline-block" style={{ color: style.accentColor, fontSize: "0.85em" }}><EditableText value={proj.link} placeholder="Project link" onChange={(link) => updateProject(proj.id, { link })} /></div>
               </div>
             );
           })}
@@ -264,9 +295,9 @@ function SectionContent({
         <div className="space-y-1">
           {languageList.map((lang) => (
             <div key={lang.id} data-lang-item>
-              <span>{lang.name}{" "}</span>
+              <EditableText value={lang.name} placeholder="Language" onChange={(name) => updateLanguage(lang.id, { name })} />{" "}
               <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                ({lang.proficiency})
+                (<EditableText value={lang.proficiency} placeholder="Level" onChange={(proficiency) => updateLanguage(lang.id, { proficiency: proficiency as Language['proficiency'] })} />)
               </span>
             </div>
           ))}
@@ -295,7 +326,7 @@ function SectionContent({
                 fontSize: "0.85em",
               }}
             >
-              {sk.name}
+              <EditableText value={sk.name} placeholder="Skill" onChange={(name) => updateSkill(sk.id, { name })} />
             </div>
           ))}
         </div>
@@ -313,11 +344,10 @@ function SectionContent({
           {certificates.map((cert) => (
             <div key={cert.id} className="mb-2">
               <strong style={{ fontSize: "1.05em" }}>
-                {cert.name || "Certificate"}
+                  <EditableText value={cert.name} placeholder="Certificate" onChange={(name) => updateCertificate(cert.id, { name })} />
               </strong>
               <div className="text-gray-600" style={{ fontSize: "0.9em" }}>
-                {cert.issuer}
-                {cert.date && ` • ${cert.date}`}
+                  <EditableText value={cert.issuer} placeholder="Issuer" onChange={(issuer) => updateCertificate(cert.id, { issuer })} /> {" • "}<EditableText value={cert.date} placeholder="Date" onChange={(date) => updateCertificate(cert.id, { date })} />
               </div>
               {cert.link && (
                 <a
@@ -347,15 +377,15 @@ function SectionContent({
             <div key={award.id} className="mb-2">
               <div className="flex justify-between items-baseline">
                 <strong style={{ fontSize: "1.05em" }}>
-                  {award.title || "Award"}
+                  <EditableText value={award.title} placeholder="Award" onChange={(title) => updateAward(award.id, { title })} />
                 </strong>
                 <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                  {award.date}
+                  <EditableText value={award.date} placeholder="Date" onChange={(date) => updateAward(award.id, { date })} />
                 </span>
               </div>
               {award.issuer && (
                 <div className="text-gray-700" style={{ fontSize: "0.9em" }}>
-                  {award.issuer}
+                  <EditableText value={award.issuer} placeholder="Issuer" onChange={(issuer) => updateAward(award.id, { issuer })} />
                 </div>
               )}
               {award.description && (
@@ -363,7 +393,7 @@ function SectionContent({
                   className="mt-0.5 text-gray-600"
                   style={{ fontSize: "0.9em" }}
                 >
-                  {award.description}
+                  <EditableText value={award.description} placeholder="Description" onChange={(description) => updateAward(award.id, { description })} />
                 </p>
               )}
             </div>
@@ -383,25 +413,24 @@ function SectionContent({
             <div key={vol.id} className="mb-2">
               <div className="flex justify-between items-baseline">
                 <strong style={{ fontSize: "1.05em" }}>
-                  {vol.role || "Role"}
+                  <EditableText value={vol.role} placeholder="Role" onChange={(role) => updateVolunteer(vol.id, { role })} />
                 </strong>
                 <span className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                  {vol.startDate}
-                  {vol.endDate && ` – ${vol.endDate}`}
+                  <EditableText value={vol.startDate} placeholder="Start date" onChange={(startDate) => updateVolunteer(vol.id, { startDate })} /> {" – "}<EditableText value={vol.endDate} placeholder="End date" onChange={(endDate) => updateVolunteer(vol.id, { endDate })} />
                 </span>
               </div>
               <div
                 className="italic text-gray-700"
                 style={{ fontSize: "0.9em" }}
               >
-                {vol.organization}
+                <EditableText value={vol.organization} placeholder="Organization" onChange={(organization) => updateVolunteer(vol.id, { organization })} />
               </div>
               {vol.description && (
                 <p
                   className="mt-0.5 text-gray-600 whitespace-pre-line"
                   style={{ fontSize: "0.9em" }}
                 >
-                  {vol.description}
+                  <EditableText value={vol.description} placeholder="Description" onChange={(description) => updateVolunteer(vol.id, { description })} />
                 </p>
               )}
             </div>
@@ -420,15 +449,14 @@ function SectionContent({
           {references.map((ref) => (
             <div key={ref.id} className="mb-2">
               <strong style={{ fontSize: "1.05em" }}>
-                {ref.name || "Reference"}
+                <EditableText value={ref.name} placeholder="Reference" onChange={(name) => updateReference(ref.id, { name })} />
               </strong>
               <div className="text-gray-700" style={{ fontSize: "0.9em" }}>
-                {ref.position}
-                {ref.company && ` at ${ref.company}`}
+                <EditableText value={ref.position} placeholder="Position" onChange={(position) => updateReference(ref.id, { position })} /> at <EditableText value={ref.company} placeholder="Company" onChange={(company) => updateReference(ref.id, { company })} />
               </div>
               {ref.contact && (
                 <div className="text-gray-500" style={{ fontSize: "0.85em" }}>
-                  {ref.contact}
+                  <EditableText value={ref.contact} placeholder="Contact" onChange={(contact) => updateReference(ref.id, { contact })} />
                 </div>
               )}
             </div>
@@ -453,7 +481,7 @@ function SectionContent({
               className="px-2 py-0.5 rounded bg-gray-100 text-gray-700"
               style={{ fontSize: "0.85em", display: "inline-block" }}
             >
-              {i.name}
+              <EditableText value={i.name} placeholder="Interest" onChange={(name) => updateInterest(i.id, { name })} />
             </div>
           ))}
         </div>
@@ -475,6 +503,7 @@ function ContactRow({
   alignment: HeaderAlignment;
 }) {
   const { showHeaderIcons } = useUIStore();
+  const { updatePersonalInfo } = useResumeStore();
   const linkStyle = light ? {} : { color: accentColor };
   const withProtocol = (value: string) => {
     const trimmed = String(value ?? '').trim();
@@ -500,12 +529,12 @@ function ContactRow({
   };
 
   const items = [
-    personalInfo.email && <span key="email">{iconNode('email')}{personalInfo.email}</span>,
-    personalInfo.phone && <span key="phone">{iconNode('phone')}{personalInfo.phone}</span>,
-    personalInfo.location && <span key="location">{iconNode('location')}{personalInfo.location}</span>,
-    personalInfo.linkedin && <a key="linkedin" href={withProtocol(personalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{iconNode('linkedin')}{personalInfo.linkedin}</a>,
-    personalInfo.website && <a key="website" href={withProtocol(personalInfo.website)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{iconNode('website')}{personalInfo.website}</a>,
-  ].filter(Boolean);
+    <span key="email">{iconNode('email')}<EditableText value={personalInfo.email} placeholder="Email" onChange={(email) => updatePersonalInfo({ email })} /></span>,
+    <span key="phone">{iconNode('phone')}<EditableText value={personalInfo.phone} placeholder="Phone" onChange={(phone) => updatePersonalInfo({ phone })} /></span>,
+    <span key="location">{iconNode('location')}<EditableText value={personalInfo.location} placeholder="Location" onChange={(location) => updatePersonalInfo({ location })} /></span>,
+    <span key="linkedin" style={linkStyle}>{iconNode('linkedin')}<EditableText value={personalInfo.linkedin} placeholder="LinkedIn" onChange={(linkedin) => updatePersonalInfo({ linkedin })} /></span>,
+    <span key="website" style={linkStyle}>{iconNode('website')}<EditableText value={personalInfo.website} placeholder="Website" onChange={(website) => updatePersonalInfo({ website })} /></span>,
+  ];
 
   const row1 = items.slice(0, 3);
   const row2 = items.slice(3);
@@ -618,7 +647,7 @@ export function PersonalHeader({
   photo: PhotoConfig;
   onPreviewInteract?: () => void;
 }) {
-  const { personalInfo, setPhoto } = useResumeStore();
+  const { personalInfo, setPhoto, updatePersonalInfo } = useResumeStore();
   const { focusPanel } = useUIStore();
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
   const [activePhotoDropTarget, setActivePhotoDropTarget] = useState<string | null>(null);
@@ -814,7 +843,7 @@ export function PersonalHeader({
         {renderPhotoLayout(
           <div className={textAlign}>
             {personalInfo.fullName && (
-              <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
+              <h1 className="font-bold" style={{ fontSize: '1.8em' }}><EditableText value={personalInfo.fullName} placeholder="Your name" onChange={(fullName) => updatePersonalInfo({ fullName })} /></h1>
             )}
             <ContactRow
               personalInfo={personalInfo}
@@ -826,7 +855,7 @@ export function PersonalHeader({
               <p
                 className={`mt-2 w-full opacity-90 ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
               >
-                {personalInfo.summary}
+                <EditableText value={personalInfo.summary} placeholder="Professional summary" onChange={(summary) => updatePersonalInfo({ summary })} />
               </p>
             )}
           </div>
@@ -885,16 +914,12 @@ export function PersonalHeader({
           <div>
             <div className="flex items-baseline justify-between gap-3">
               {personalInfo.fullName && (
-                <h1 className="font-bold" style={{ fontSize: '1.3em' }}>{personalInfo.fullName}</h1>
+                <h1 className="font-bold" style={{ fontSize: '1.3em' }}><EditableText value={personalInfo.fullName} placeholder="Your name" onChange={(fullName) => updatePersonalInfo({ fullName })} /></h1>
               )}
-              <div className="text-xs text-gray-600 flex gap-2 flex-wrap justify-end">
-                {personalInfo.email && <span>{personalInfo.email}</span>}
-                {personalInfo.phone && <span>| {personalInfo.phone}</span>}
-                {personalInfo.location && <span>| {personalInfo.location}</span>}
-              </div>
+              <div className="text-xs text-gray-600 flex gap-2 flex-wrap justify-end"><EditableText value={personalInfo.email} placeholder="Email" onChange={(email) => updatePersonalInfo({ email })} /><EditableText value={personalInfo.phone} placeholder="Phone" onChange={(phone) => updatePersonalInfo({ phone })} /><EditableText value={personalInfo.location} placeholder="Location" onChange={(location) => updatePersonalInfo({ location })} /></div>
             </div>
             {personalInfo.summary && (
-              <p className="mt-1 text-gray-600">{personalInfo.summary}</p>
+              <p className="mt-1 text-gray-600"><EditableText value={personalInfo.summary} placeholder="Professional summary" onChange={(summary) => updatePersonalInfo({ summary })} /></p>
             )}
           </div>
         )}
@@ -958,7 +983,7 @@ export function PersonalHeader({
       {renderPhotoLayout(
         <div className={textAlign}>
           {personalInfo.fullName && (
-            <h1 className="font-bold" style={{ fontSize: '1.8em' }}>{personalInfo.fullName}</h1>
+            <h1 className="font-bold" style={{ fontSize: '1.8em' }}><EditableText value={personalInfo.fullName} placeholder="Your name" onChange={(fullName) => updatePersonalInfo({ fullName })} /></h1>
           )}
           <ContactRow
             personalInfo={personalInfo}
@@ -969,7 +994,7 @@ export function PersonalHeader({
             <p
               className={`mt-2 w-full text-gray-700 ${align === "center" ? "mx-auto" : align === "right" ? "ml-auto" : ""}`}
             >
-              {personalInfo.summary}
+              <EditableText value={personalInfo.summary} placeholder="Professional summary" onChange={(summary) => updatePersonalInfo({ summary })} />
             </p>
           )}
         </div>
@@ -996,7 +1021,7 @@ export function ResumeDraggableSection({
   interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
-  const { style, layout, removeSectionFromResume, sectionOrder, reorderSections, moveSectionToZone } = useResumeStore();
+  const { style, layout, removeSectionFromResume, sectionOrder, reorderSections, moveSectionToZone, updateSectionTitle } = useResumeStore();
   const { focusPanel } = useUIStore();
   const {
     attributes,
@@ -1140,7 +1165,7 @@ export function ResumeDraggableSection({
         {iconVisible && (
           <span className="mr-1">{SECTION_ICONS[section.type]}</span>
         )}
-        {section.title}
+        <EditableText value={section.title} placeholder="Section title" onChange={(title) => updateSectionTitle(section.id, title)} />
       </h2>
       <SectionContent
         type={section.type}
@@ -1171,7 +1196,7 @@ export function ResumeStaticSection({
   interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
-  const { style } = useResumeStore();
+  const { style, updateSectionTitle } = useResumeStore();
   const { showBodyIcons, sectionIcons, focusPanel } = useUIStore();
   const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
   const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
@@ -1198,7 +1223,7 @@ export function ResumeStaticSection({
         }}
       >
         {iconVisible && <span className="mr-1">{SECTION_ICONS[section.type]}</span>}
-        {section.title}
+        <EditableText value={section.title} placeholder="Section title" onChange={(title) => updateSectionTitle(section.id, title)} />
       </h2>
       <SectionContent
         type={section.type}
@@ -1231,7 +1256,7 @@ export function ResumeProxyDraggableSection({
   interestItems?: Interest[];
   onPreviewInteract?: (section: ResumeSection) => void;
 }) {
-  const { style, layout, sectionOrder, reorderSections, moveSectionToZone, removeSectionFromResume } = useResumeStore();
+  const { style, layout, sectionOrder, reorderSections, moveSectionToZone, removeSectionFromResume, updateSectionTitle } = useResumeStore();
   const { showBodyIcons, sectionIcons, focusPanel } = useUIStore();
   const headingClass = `${getHeadingSizeClass(style.headingSize)} font-bold uppercase tracking-wider pb-1 mb-2`;
   const iconVisible = showBodyIcons && (sectionIcons[section.id] ?? true);
@@ -1360,7 +1385,7 @@ export function ResumeProxyDraggableSection({
         }}
       >
         {iconVisible && <span className="mr-1">{SECTION_ICONS[section.type]}</span>}
-        {section.title}
+        <EditableText value={section.title} placeholder="Section title" onChange={(title) => updateSectionTitle(section.id, title)} />
       </h2>
       <SectionContent
         type={section.type}

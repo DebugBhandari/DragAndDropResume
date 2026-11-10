@@ -23,14 +23,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
-import SectionEditor from "@/components/SectionEditor";
-import StyleEditor from "@/components/StyleEditor";
-import CollapsiblePanel from "@/components/CollapsiblePanel";
 import FeedbackWidget from "@/components/FeedbackWidget";
-import ResumeVersionsWidget from "@/components/ResumeVersionsWidget";
-import HeaderImageContent from "@/components/HeaderImageContent";
-import { LanguagePickerContent, LayoutPickerContent, LOCALE_OPTIONS, PersonalInfoContent } from "@/components/ResumeSettingsControls";
-import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, SECTION_ICONS, getFontFamily } from "@/components/ResumePreview";
+import ResumeToolMenu from "@/components/ResumeToolMenu";
+import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, getFontFamily } from "@/components/ResumePreview";
 import { RESUME_STORAGE_KEY, useResumeStore } from "@/store/useResumeStore";
 import { useUIStore } from "@/store/useUIStore";
 import {
@@ -45,11 +40,6 @@ import { sortProjectsByDateDesc, sortWorkExperienceByDateDesc } from "@/utils/da
 import { trackAnalyticsEvent } from "@/utils/analytics";
 import { getSectionLabel } from "@/utils/sectionTranslations";
 import { getUiText } from "@/utils/uiTranslations";
-
-const DEFAULT_HEADER_IMAGE_URL = "/default-profile.svg";
-
-
-
 
 const ALL_SECTION_TYPES: SectionType[] = [
   "experience",
@@ -182,68 +172,6 @@ function sectionHasData(type: SectionType, store: SectionDataSnapshot) {
   }
 }
 
-// ─── Sidebar Draggable Panel (clean left-accent style with icon) ───
-function SidebarDraggablePanel({
-  section,
-  showBodyIcons,
-  hasData,
-}: {
-  section: ResumeSection;
-  showBodyIcons: boolean;
-  hasData: boolean;
-}) {
-  const { style, activeLocale } = useResumeStore();
-  const { sectionIcons, setSectionIcon } = useUIStore();
-  const ui = getUiText(activeLocale);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `sidebar-${section.id}`,
-    data: { origin: "sidebar", sectionId: section.id, type: section.type },
-  });
-  const iconEnabled = showBodyIcons && (sectionIcons[section.id] ?? true);
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      data-panel-id={`sec-${section.id}`}
-      className={`rounded-lg shadow-sm overflow-hidden cursor-grab active:cursor-grabbing transition-all ${
-        hasData ? "bg-emerald-50/60 border border-emerald-200" : "bg-white"
-      } ${
-        isDragging ? "opacity-40 scale-[0.98] shadow-lg" : "hover:shadow-md"
-      }`}
-      style={{ borderLeft: `4px solid ${style.accentColor}` }}
-    >
-      <div className="flex items-center justify-between pr-3">
-        <CollapsiblePanel
-          title={`${SECTION_ICONS[section.type]} ${section.title}`}
-          persistId={`sec-${section.id}`}
-          defaultOpen={false}
-        >
-          <div className="mb-2 flex items-center gap-2">
-            <label
-              className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <input
-                type="checkbox"
-                checked={iconEnabled}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setSectionIcon(section.id, e.target.checked);
-                }}
-                className="w-3 h-3"
-              />
-              {ui.showIconOnResume}
-            </label>
-          </div>
-          <SectionEditor type={section.type} />
-        </CollapsiblePanel>
-      </div>
-    </div>
-  );
-}
-
 // ─── Droppable Zone ───
 function DroppableZone({
   id,
@@ -296,20 +224,19 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
 export default function Home() {
   const resumeRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const mainLayoutRef = useRef<HTMLElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
-  const [editorPaneWidth, setEditorPaneWidth] = useState(520);
-  const [isResizingEditor, setIsResizingEditor] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [isTailoring, setIsTailoring] = useState(false);
+  const [message, setMessage] = useState("");
+  const [tailoredResume, setTailoredResume] = useState<ResumeData | null>(null);
+  const [activeResumeVersion, setActiveResumeVersion] = useState<"original" | "tailored">("tailored");
   const [persistedSectionFlags, setPersistedSectionFlags] =
     useState<Record<SectionType, boolean>>(EMPTY_SECTION_FLAGS);
   const {
     activeLocale,
     personalInfo,
     sectionOrder,
-    clearResume,
     reorderSections,
     moveSectionToZone,
     removeSectionFromResume,
@@ -317,7 +244,6 @@ export default function Home() {
     layout,
     style: s,
     photo,
-    setPhoto,
     education,
     experience,
     experienceManualOrder,
@@ -332,20 +258,10 @@ export default function Home() {
     interests,
   } = useResumeStore();
   const ui = getUiText(activeLocale);
-  const selectedLocaleFlag = LOCALE_OPTIONS.find((option) => option.code === activeLocale)?.flag ?? "🇬🇧";
   const {
     showHeaderIcons,
     showBodyIcons,
     sectionIcons,
-    setSectionIcon,
-    toggleHeaderIcons,
-    toggleBodyIcons,
-    settingsCollapsed,
-    toggleSettings,
-    sectionsCollapsed,
-    toggleSections,
-    activePanelId,
-    focusPanel,
     studioTheme,
     toggleStudioTheme,
   } = useUIStore();
@@ -355,147 +271,50 @@ export default function Home() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleAddPhotoFromPill = () => {
-    setPhoto({ url: DEFAULT_HEADER_IMAGE_URL });
-    focusPanel("panel-header-image");
-  };
+  const applyResumeData = useCallback((data: ResumeData) => {
+    useResumeStore.setState({ ...data });
+  }, []);
 
-  const handleOpenResumeImport = () => {
-    focusPanel("panel-header");
-    setIsMobileEditorOpen(true);
-    window.setTimeout(() => {
-      document.querySelector(".resume-import-card")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 100);
-  };
+  const handleTailoredResume = useCallback((original: ResumeData, tailored: ResumeData) => {
+    setTailoredResume({ ...original, __tailored: tailored } as ResumeData & { __tailored: ResumeData });
+    applyResumeData(tailored);
+    setActiveResumeVersion("tailored");
+  }, [applyResumeData]);
 
-  const handleClearResume = () => {
-    if (!window.confirm('Clear this résumé? This permanently removes all current résumé content from this browser.')) {
-      return;
-    }
-
-    clearResume();
-    focusPanel('panel-header');
-  };
+  const showResumeVersion = useCallback((version: "original" | "tailored") => {
+    if (!tailoredResume) return;
+    const candidate = version === "tailored" ? (tailoredResume as ResumeData & { __tailored: ResumeData }).__tailored : tailoredResume;
+    applyResumeData(candidate);
+    setActiveResumeVersion(version);
+  }, [applyResumeData, tailoredResume]);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (activePanelId.startsWith("sec-")) {
-      const stillExists = sectionOrder.some((section) => `sec-${section.id}` === activePanelId);
-      if (!stillExists) focusPanel("panel-header");
-    }
-  }, [activePanelId, sectionOrder, focusPanel]);
-
-  useEffect(() => {
-    if (!isMobileEditorOpen) return;
-    if (!sidebarRef.current) return;
-
-    const target = sidebarRef.current.querySelector(`[data-panel-id="${activePanelId}"]`) as HTMLElement | null;
-    if (!target) return;
-
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [isMobileEditorOpen, activePanelId]);
-
-  useEffect(() => {
-    if (!isResizingEditor) return;
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (!mainLayoutRef.current) return;
-      const rect = mainLayoutRef.current.getBoundingClientRect();
-
-      const minWidth = 420;
-      const maxWidth = Math.min(860, rect.width - 420);
-      const next = Math.max(minWidth, Math.min(maxWidth, event.clientX - rect.left));
-      setEditorPaneWidth(next);
-    };
-
-    const onPointerUp = () => {
-      setIsResizingEditor(false);
-    };
-
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-
-    return () => {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [isResizingEditor]);
-
-  useEffect(() => {
     const persisted = parsePersistedResumeData();
     const persistedSnapshot: SectionDataSnapshot = {
-      experience: asArray(persisted.experience),
-      education: asArray(persisted.education),
-      projects: asArray(persisted.projects),
-      skills: asArray(persisted.skills),
-      languages: asArray(persisted.languages),
-      certificates: asArray(persisted.certificates),
-      awards: asArray(persisted.awards),
-      volunteer: asArray(persisted.volunteer),
-      references: asArray(persisted.references),
-      interests: asArray(persisted.interests),
+      experience: asArray(persisted.experience), education: asArray(persisted.education), projects: asArray(persisted.projects),
+      skills: asArray(persisted.skills), languages: asArray(persisted.languages), certificates: asArray(persisted.certificates),
+      awards: asArray(persisted.awards), volunteer: asArray(persisted.volunteer), references: asArray(persisted.references), interests: asArray(persisted.interests),
     };
-
     setPersistedSectionFlags({
-      experience: sectionHasData("experience", persistedSnapshot),
-      education: sectionHasData("education", persistedSnapshot),
-      projects: sectionHasData("projects", persistedSnapshot),
-      skills: sectionHasData("skills", persistedSnapshot),
-      languages: sectionHasData("languages", persistedSnapshot),
-      certificates: sectionHasData("certificates", persistedSnapshot),
-      awards: sectionHasData("awards", persistedSnapshot),
-      volunteer: sectionHasData("volunteer", persistedSnapshot),
-      references: sectionHasData("references", persistedSnapshot),
-      interests: sectionHasData("interests", persistedSnapshot),
+      experience: sectionHasData("experience", persistedSnapshot), education: sectionHasData("education", persistedSnapshot),
+      projects: sectionHasData("projects", persistedSnapshot), skills: sectionHasData("skills", persistedSnapshot),
+      languages: sectionHasData("languages", persistedSnapshot), certificates: sectionHasData("certificates", persistedSnapshot),
+      awards: sectionHasData("awards", persistedSnapshot), volunteer: sectionHasData("volunteer", persistedSnapshot),
+      references: sectionHasData("references", persistedSnapshot), interests: sectionHasData("interests", persistedSnapshot),
     });
   }, []);
 
   const trackExportSuccess = useCallback((method: "react_to_print" | "window_print") => {
-    trackAnalyticsEvent("pdf_export_success", {
-      method,
-      layout,
-    });
-
-    // Keep a server-side app-wide counter for successful PDF exports.
-    void fetch("/api/analytics/export-pdf", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        method,
-        layout,
-        email: personalInfo.email,
-      }),
-    }).catch(() => {
-      // Avoid blocking the export flow if analytics logging fails.
-    });
+    trackAnalyticsEvent("pdf_export_success", { method, layout });
+    void fetch("/api/analytics/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method, layout, email: personalInfo.email }) }).catch(() => {});
   }, [layout, personalInfo.email]);
 
   const pdfTitle = useCallback(() => {
-    const compactName = String(personalInfo.fullName ?? "")
-      .trim()
-      .replace(/\s+/g, "")
-      .replace(/[^\p{L}\p{N}_-]/gu, "");
-    const baseName = compactName.length > 0 ? compactName : "Resume";
-    return `${baseName}Resume`;
+    const compactName = String(personalInfo.fullName ?? "").trim().replace(/\s+/g, "").replace(/[^\p{L}\p{N}_-]/gu, "");
+    return `${compactName.length > 0 ? compactName : "Resume"}Resume`;
   }, [personalInfo.fullName]);
-
-  const isIOSLike = useCallback(() => {
-    if (typeof navigator === "undefined") return false;
-    const ua = navigator.userAgent || "";
-    const iOSDevice = /iP(hone|ad|od)/i.test(ua);
-    const iPadDesktopUA = /Macintosh/i.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
-    return iOSDevice || iPadDesktopUA;
-  }, []);
 
   const handleWindowPrint = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -1629,8 +1448,7 @@ export default function Home() {
               <ResumeDraggableSection
                 key={sec.id}
                 section={sec}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
             ))}
           </>
         );
@@ -1642,7 +1460,6 @@ export default function Home() {
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ))}
           <ResumeDraggableSection
@@ -1653,7 +1470,6 @@ export default function Home() {
             languageItems={splitLanguageItems}
             skillItems={splitSkillItems}
             interestItems={splitInterestItems}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         </>
       );
@@ -1665,7 +1481,6 @@ export default function Home() {
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ))}
         {canCarrySidebarSection && (
@@ -1677,7 +1492,6 @@ export default function Home() {
             languageItems={carriedSidebarSection!.type === "languages" ? languages.slice(0, sidebarCarryItemCount) : undefined}
             skillItems={carriedSidebarSection!.type === "skills" ? skills.slice(0, sidebarCarryItemCount) : undefined}
             interestItems={carriedSidebarSection!.type === "interests" ? interests.slice(0, sidebarCarryItemCount) : undefined}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         )}
       </>
@@ -1697,7 +1511,6 @@ export default function Home() {
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ));
         }
@@ -1737,7 +1550,6 @@ export default function Home() {
               languageItems={splitLanguageItems}
               skillItems={splitSkillItems}
               interestItems={splitInterestItems}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
             {hasSidebarTrailingDetailSplit &&
               chunkIndex === effectiveSidebarDetailChunks.length - 1 &&
@@ -1745,8 +1557,7 @@ export default function Home() {
                 <ResumeDraggableSection
                   key={sec.id}
                   section={sec}
-                  onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                />
+                    />
               ))}
             {hasSidebarTrailingDetailSplit &&
               sidebarTrailingSplitSection &&
@@ -1757,15 +1568,13 @@ export default function Home() {
                   proxyId={`${sidebarTrailingSplitSection.id}-sidebar-transition-${chunkIndex}`}
                   experienceItems={transitionExperienceItems}
                   projectItems={transitionProjectItems}
-                  onPreviewInteract={() => setIsMobileEditorOpen(true)}
-                />
+                    />
               )}
             {!hasSidebarTrailingDetailSplit && chunkIndex === effectiveSidebarDetailChunks.length - 1 && sidebarAfterSplitSections.map((sec) => (
               <ResumeDraggableSection
                 key={sec.id}
                 section={sec}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
             ))}
           </>
         );
@@ -1781,7 +1590,6 @@ export default function Home() {
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ));
       }
@@ -1802,13 +1610,11 @@ export default function Home() {
             proxyId={`${sidebarTrailingSplitSection.id}-sidebar-trailing-${trailingChunkIndex}`}
             experienceItems={trailingExperienceItems}
             projectItems={trailingProjectItems}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
           {trailingChunkIndex === effectiveSidebarTrailingContinuationChunks.length - 1 && sidebarTrailingAfterSections.map((sec) => (
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ))}
         </>
@@ -1832,7 +1638,6 @@ export default function Home() {
               languageItems={carriedSidebarSection!.type === "languages" ? languages.slice(sidebarCarryItemCount) : undefined}
               skillItems={carriedSidebarSection!.type === "skills" ? skills.slice(sidebarCarryItemCount) : undefined}
               interestItems={carriedSidebarSection!.type === "interests" ? interests.slice(sidebarCarryItemCount) : undefined}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           )}
           {remainingSections
@@ -1841,8 +1646,7 @@ export default function Home() {
               <ResumeDraggableSection
                 key={sec.id}
                 section={sec}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
             ))}
         </>
       );
@@ -1852,7 +1656,6 @@ export default function Home() {
       <ResumeDraggableSection
         key={sec.id}
         section={sec}
-        onPreviewInteract={() => setIsMobileEditorOpen(true)}
       />
     ));
   };
@@ -1863,7 +1666,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -1873,7 +1675,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -1890,7 +1691,6 @@ export default function Home() {
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ))}
         </>
@@ -1903,7 +1703,6 @@ export default function Home() {
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ))}
         <ResumeDraggableSection
@@ -1911,7 +1710,6 @@ export default function Home() {
           section={splitSection!}
           experienceItems={splitExperienceItems}
           projectItems={splitProjectItems}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       </>
     );
@@ -1927,7 +1725,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -1960,7 +1757,6 @@ export default function Home() {
             proxyId={`${splitSection!.id}-linear-primary-${chunkIndex}`}
             experienceItems={splitExperienceItems}
             projectItems={splitProjectItems}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
           {hasTrailingDetailSplit &&
             trailingSplitSection &&
@@ -1971,14 +1767,12 @@ export default function Home() {
                 proxyId={`${trailingSplitSection.id}-linear-transition-${chunkIndex}`}
                 experienceItems={transitionExperienceItems}
                 projectItems={transitionProjectItems}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
             )}
           {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ))}
         </>
@@ -1994,7 +1788,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2018,13 +1811,11 @@ export default function Home() {
           proxyId={`${trailingSplitSection.id}-linear-trailing-${trailingChunkIndex}`}
           experienceItems={trailingExperienceItems}
           projectItems={trailingProjectItems}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
         {detailChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ))}
       </>
@@ -2037,7 +1828,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2048,7 +1838,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2063,7 +1852,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2074,7 +1862,6 @@ export default function Home() {
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ))}
         <ResumeDraggableSection
@@ -2082,7 +1869,6 @@ export default function Home() {
           section={splitSection}
           experienceItems={splitExperienceItems}
           projectItems={splitProjectItems}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       </>
     );
@@ -2098,7 +1884,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2131,7 +1916,6 @@ export default function Home() {
             proxyId={`${splitSection.id}-main-primary-${chunkIndex}`}
             experienceItems={splitExperienceItems}
             projectItems={splitProjectItems}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
           {hasTrailingDetailSplit &&
             trailingSplitSection &&
@@ -2142,14 +1926,12 @@ export default function Home() {
                 proxyId={`${trailingSplitSection.id}-main-transition-${chunkIndex}`}
                 experienceItems={transitionExperienceItems}
                 projectItems={transitionProjectItems}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
             )}
           {!hasTrailingDetailSplit && chunkIndex === effectiveContinuationChunks.length - 1 && afterSplit.map((sec) => (
             <ResumeDraggableSection
               key={sec.id}
               section={sec}
-              onPreviewInteract={() => setIsMobileEditorOpen(true)}
             />
           ))}
         </>
@@ -2165,7 +1947,6 @@ export default function Home() {
         <ResumeDraggableSection
           key={sec.id}
           section={sec}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
       ));
     }
@@ -2189,13 +1970,11 @@ export default function Home() {
           proxyId={`${trailingSplitSection.id}-main-trailing-${trailingChunkIndex}`}
           experienceItems={trailingExperienceItems}
           projectItems={trailingProjectItems}
-          onPreviewInteract={() => setIsMobileEditorOpen(true)}
         />
         {detailChunkIndex === effectiveTrailingContinuationChunks.length - 1 && trailingAfterSections.map((sec) => (
           <ResumeDraggableSection
             key={sec.id}
             section={sec}
-            onPreviewInteract={() => setIsMobileEditorOpen(true)}
           />
         ))}
       </>
@@ -2218,14 +1997,6 @@ export default function Home() {
             <h1 className="hidden text-lg font-bold text-white tracking-tight sm:block">{ui.appTitle}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsMobileEditorOpen(true)}
-              className="studio-secondary-button lg:hidden inline-flex items-center justify-center h-10 w-24 text-sm font-medium"
-              aria-label="Open editor"
-            >
-              {ui.edit}
-            </button>
             <Link
               href="/cover"
               className="studio-secondary-button inline-flex h-10 items-center justify-center px-3 text-sm font-semibold"
@@ -2238,7 +2009,6 @@ export default function Home() {
             >
               <span className="hidden xl:inline">Tracking</span><span className="xl:hidden">Jobs</span>
             </Link>
-            <ResumeVersionsWidget />
             <button
               type="button"
               onClick={handleExportPdf}
@@ -2252,214 +2022,14 @@ export default function Home() {
           </div>
         </header>
 
-        <main ref={mainLayoutRef} className="studio-workspace flex flex-col lg:flex-row gap-3 p-3 max-w-[1800px] mx-auto">
-          {isMobileEditorOpen && (
-            <button
-              type="button"
-              onClick={() => setIsMobileEditorOpen(false)}
-              className="fixed inset-0 bg-black/35 z-40 lg:hidden"
-              aria-label="Close sidebar"
-            />
-          )}
+        <ResumeToolMenu onTailored={handleTailoredResume} isTailoring={isTailoring} setIsTailoring={setIsTailoring} message={message} setMessage={setMessage} />
 
-          {/* Editor Sidebar */}
-          <div
-            ref={sidebarRef}
-            className={`studio-editor fixed top-0 left-0 z-50 h-screen w-[88vw] max-w-sm p-3 overflow-y-auto shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:h-auto lg:w-(--editor-pane-width) lg:max-w-none lg:max-h-[calc(100vh-92px)] lg:overflow-y-auto lg:p-3 lg:shadow-none ${isMobileEditorOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-            style={{
-              ["--editor-pane-width" as string]: `${editorPaneWidth}px`,
-            } as React.CSSProperties}
-          >
-            <div className="flex items-center justify-between mb-2 lg:hidden">
-              <p className="text-sm font-semibold text-white">{ui.editor}</p>
-              <button
-                type="button"
-                onClick={() => setIsMobileEditorOpen(false)}
-                className="studio-secondary-button px-2 py-1 text-sm"
-              >
-                {ui.close}
-              </button>
-            </div>
-            {/* Settings Group */}
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={toggleSettings}
-                className={`studio-group-trigger flex items-center justify-between w-full px-3 py-2.5 rounded-xl transition ${settingsCollapsed ? "studio-group-trigger-collapsed" : ""}`}
-              >
-                <p
-                  className="text-xs font-semibold uppercase tracking-widest"
-                >
-                  ⚙️ {ui.settings}
-                </p>
-                <span
-                  className={`text-gray-400 text-sm transition-transform ${settingsCollapsed ? "" : "rotate-180"}`}
-                >
-                  ▾
-                </span>
-              </button>
-              {!settingsCollapsed && (
-                <div className="space-y-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={handleOpenResumeImport}
-                    className="resume-import-button studio-import-button w-full min-h-11 px-3 text-sm"
-                  >
-                    <span aria-hidden="true">↑</span>
-                    Import résumé
-                  </button>
-                  <div className="bg-white rounded-lg shadow">
-                    <CollapsiblePanel
-                      title={ui.language}
-                      persistId="panel-language"
-                      rightAdornment={<span className="text-base leading-none">{selectedLocaleFlag}</span>}
-                    >
-                      <LanguagePickerContent />
-                    </CollapsiblePanel>
-                  </div>
-                  <div className="bg-white rounded-lg shadow">
-                    <CollapsiblePanel title={ui.layout} persistId="panel-layout">
-                      <LayoutPickerContent />
-                    </CollapsiblePanel>
-                  </div>
-                  <div className="bg-white rounded-lg shadow">
-                    <CollapsiblePanel title={ui.style} persistId="panel-style">
-                      <StyleEditor />
-                    </CollapsiblePanel>
-                  </div>
-                  <div className="resume-reset-card">
-                    <div>
-                      <p className="resume-reset-card-title">Start over</p>
-                      <p className="resume-reset-card-copy">Remove all content saved in this browser.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleClearResume}
-                      className="resume-reset-button"
-                    >
-                      <span aria-hidden="true">⌫</span>
-                      Clear résumé
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+        {message && <div className="career-status-message mx-auto max-w-[1800px] px-4 pt-3" role="status"><p className="career-message">{message}</p></div>}
 
-            {/* Sections Group */}
-            <div>
-              <button
-                type="button"
-                onClick={toggleSections}
-                className={`studio-group-trigger flex items-center justify-between w-full px-3 py-2.5 rounded-xl transition ${sectionsCollapsed ? "studio-group-trigger-collapsed" : ""}`}
-              >
-                <p
-                  className="text-xs font-semibold uppercase tracking-widest"
-                >
-                  📄 {ui.sections}
-                </p>
-                <span
-                  className={`text-gray-400 text-sm transition-transform ${sectionsCollapsed ? "" : "rotate-180"}`}
-                >
-                  ▾
-                </span>
-              </button>
-              {!sectionsCollapsed && (
-                <div className="space-y-3">
-                  {/* Non-draggable: Header (Introduction) */}
-                  <div className="section-introduction-panel bg-amber-50 border border-amber-200 rounded-lg" data-panel-id="panel-header">
-                    <CollapsiblePanel
-                      title={`👤 ${ui.introduction}`}
-                      persistId="panel-header"
-                    >
-                      <PersonalInfoContent />
-                    </CollapsiblePanel>
-                  </div>
-
-                  {/* Available sections pool */}
-                  {(() => {
-                    const activeTypes = sectionOrder.map((s) => s.type);
-                    const extraAvailable = ALL_SECTION_TYPES.filter(
-                      (type) => !activeTypes.includes(type),
-                    );
-                    return (
-                      <>
-                        {!!extraAvailable.length && (
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2">
-                              {ui.addToResume}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {extraAvailable.map((type) => (
-                            <button
-                              key={type}
-                              onClick={() => addSectionToResume(type)}
-                              className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                                  combinedSectionFlags[type]
-                                  ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                                  : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-                              }`}
-                            >
-                              {SECTION_ICONS[type]} {getSectionLabel(activeLocale, type)}
-                            </button>
-                              ))}
-                              {!photo.url && (
-                                <button
-                                  type="button"
-                                  onClick={handleAddPhotoFromPill}
-                                  className="text-xs px-2.5 py-1 rounded-full border transition border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 cursor-pointer"
-                                >
-                                  🖼 {ui.photo}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-
-                  {photo.url && (
-                    <div
-                      data-panel-id="panel-header-image"
-                      className="rounded-lg shadow-sm overflow-hidden transition-all bg-emerald-50/60 border border-emerald-200"
-                      style={{ borderLeft: `4px solid ${s.accentColor}` }}
-                    >
-                      <CollapsiblePanel
-                        title={`🖼 ${ui.photo}`}
-                        persistId="panel-header-image"
-                      >
-                        <HeaderImageContent />
-                      </CollapsiblePanel>
-                    </div>
-                  )}
-
-                  {/* Active section editors (draggable) */}
-                  {sectionOrder.map((section) => (
-                    <SidebarDraggablePanel
-                      key={section.id}
-                      section={section}
-                      showBodyIcons={showBodyIcons}
-                        hasData={combinedSectionFlags[section.type]}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="hidden lg:flex items-stretch">
-            <button
-              type="button"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                setIsResizingEditor(true);
-              }}
-              className="studio-resize-handle w-2 rounded cursor-col-resize transition-colors"
-              aria-label="Resize editor pane"
-              title="Drag to resize editor"
-            />
-          </div>
-
+        <main className="career-workspace career-document-workspace mx-auto max-w-[1800px] p-4 lg:p-6" aria-label="Résumé document editor">
+          {tailoredResume && <div className="career-tailored-comparison" role="status"><div><p className="career-kicker">AI comparison ready</p><p className="mt-1 text-sm">Showing the <strong>{activeResumeVersion}</strong> complete résumé. Switch versions before continuing to edit.</p></div><div className="career-preview-version-toggle" role="group" aria-label="Compare original and tailored résumés"><button type="button" className={activeResumeVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showResumeVersion('original')}>Original</button><button type="button" className={activeResumeVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showResumeVersion('tailored')}>Tailored</button></div></div>}
+          <div className="career-preview-shell career-document-shell">
+            <div className="career-preview-toolbar"><div><p className="career-kicker">Editable résumé</p><p className="mt-1 text-xs opacity-70">Click any text directly on the page to edit it. Drag sections to reorder them, and use the toolbar for style, import, tailoring, and saved versions.</p></div><div className="career-preview-zoom" role="group" aria-label="Preview zoom"><button type="button" onClick={() => setPreviewZoom((value) => Math.max(40, value - 10))} disabled={previewZoom <= 40} aria-label="Zoom out">−</button><output>{previewZoom}%</output><button type="button" onClick={() => setPreviewZoom((value) => Math.min(100, value + 10))} disabled={previewZoom >= 100} aria-label="Zoom in">+</button></div></div>
           {/* Hidden measurer - kept outside the scale wrapper so getBoundingClientRect()
               returns natural (1:1) dimensions regardless of preview zoom level.
               Must stay outside resumeRef so it is not cloned by useReactToPrint. */}
@@ -2481,8 +2051,7 @@ export default function Home() {
                 layout={layout}
                 style={s}
                 photo={photo}
-                onPreviewInteract={() => setIsMobileEditorOpen(true)}
-              />
+                />
               {layout === "two-column" ? (
                 <div data-measure-two-column className="flex gap-0" style={{ minHeight: `${twoColumnFirstPageMinHeight}px`, margin: `0 -${PAGE_PAD}px -${PAGE_PAD}px` }}>
                   <div
@@ -2510,13 +2079,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Resume Preview */}
-          <div className="studio-canvas w-full lg:flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="studio-canvas-toolbar">
-              <span className="studio-canvas-status"><span aria-hidden="true">●</span> Live preview · {continuationPageCount + 1} {continuationPageCount === 0 ? 'page' : 'pages'}</span>
-              <span className="hidden sm:inline">Drag sections directly on the page</span>
-            </div>
-            <div className="origin-top w-[92vw] mx-auto lg:w-auto lg:mx-0 scale-[0.45] sm:scale-[0.6] md:scale-[0.8] lg:scale-[0.85] xl:scale-100 print:!scale-100">
+          <div className="career-resume-preview-stage"><div className="career-resume-preview-scale" style={{ zoom: `${previewZoom}%` }}>
             <div
               ref={resumeRef}
               className="resume-pages flex flex-col items-center gap-8 py-4 print:block print:p-0"
@@ -2537,7 +2100,6 @@ export default function Home() {
                       layout={layout}
                       style={s}
                       photo={photo}
-                      onPreviewInteract={() => setIsMobileEditorOpen(true)}
                     />
                     {layout === "two-column" ? (
                       <div
@@ -2617,7 +2179,8 @@ export default function Home() {
                 </DroppableZone>
               </SortableContext>
             </div>
-            </div>
+          </div>
+          </div>
           </div>
         </main>
 

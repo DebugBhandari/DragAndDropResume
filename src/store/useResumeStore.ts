@@ -1080,6 +1080,7 @@ interface ResumeStore extends ResumeData {
   updateInterest: (id: string, data: Partial<Interest>) => void;
   removeInterest: (id: string) => void;
   reorderSections: (sections: ResumeSection[]) => void;
+  updateSectionTitle: (sectionId: string, title: string) => void;
   moveSectionToZone: (sectionId: string, zone: ColumnZone) => void;
   addSectionToResume: (type: SectionType) => void;
   removeSectionFromResume: (sectionId: string) => void;
@@ -1387,6 +1388,9 @@ export const useResumeStore = create<ResumeStore>()(
       removeInterest: (id) => set((s) => ({ interests: s.interests.filter((i) => i.id !== id) })),
 
       reorderSections: (sections) => set({ sectionOrder: sections }),
+      updateSectionTitle: (sectionId, title) => set((s) => ({
+        sectionOrder: s.sectionOrder.map((section) => section.id === sectionId ? { ...section, title } : section),
+      })),
       moveSectionToZone: (sectionId, zone) => set((s) => ({
         sectionOrder: s.sectionOrder.map((sec) => sec.id === sectionId ? { ...sec, zone } : sec),
       })),
