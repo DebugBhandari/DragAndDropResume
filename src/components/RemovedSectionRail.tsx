@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import SectionEditor from '@/components/SectionEditor';
 import { useResumeStore } from '@/store/useResumeStore';
 import type { SectionType } from '@/types/resume';
 import { getSectionLabel } from '@/utils/sectionTranslations';
 
-function RemovedSectionPill({ type, onRestore }: { type: SectionType; onRestore: (type: SectionType) => void }) {
+function RemovedSectionPill({ type, index, onRestore }: { type: SectionType; index: number; onRestore: (type: SectionType) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const { activeLocale } = useResumeStore();
   const label = getSectionLabel(activeLocale, type);
@@ -17,7 +17,7 @@ function RemovedSectionPill({ type, onRestore }: { type: SectionType; onRestore:
   });
 
   return (
-    <div className="removed-section-pill-wrap" onMouseEnter={() => setIsOpen(true)} onMouseLeave={() => setIsOpen(false)}>
+    <div className="removed-section-pill-wrap" style={{ '--removed-section-index': index } as CSSProperties} onMouseEnter={() => setIsOpen(true)} onMouseLeave={() => setIsOpen(false)}>
       <button
         ref={setNodeRef}
         type="button"
@@ -51,12 +51,5 @@ export default function RemovedSectionRail({ onRestore }: { onRestore: (type: Se
   const uniqueSections = [...new Set(removedSections)];
   if (!uniqueSections.length) return null;
 
-  return (
-    <aside className="removed-section-rail print:hidden" aria-label="Removed résumé sections">
-      <p className="removed-section-rail-label">Removed</p>
-      <div className="removed-section-pill-list">
-        {uniqueSections.map((type) => <RemovedSectionPill key={type} type={type} onRestore={onRestore} />)}
-      </div>
-    </aside>
-  );
+  return <>{uniqueSections.map((type, index) => <RemovedSectionPill key={type} type={type} index={index} onRestore={onRestore} />)}</>;
 }
