@@ -1014,6 +1014,13 @@ const isEffectivelyEmptyResume = (state: ResumeStore) => {
   return fullName.length === 0 && summary.length === 0 && state.experience.length === 0 && state.projects.length === 0;
 };
 
+const mergeImportedPersonalInfo = (current: PersonalInfo, imported: Partial<PersonalInfo>): PersonalInfo => {
+  const populatedImport = Object.fromEntries(
+    Object.entries(imported).filter(([, value]) => typeof value !== 'string' || value.trim().length > 0),
+  ) as Partial<PersonalInfo>;
+  return { ...current, ...populatedImport };
+};
+
 const isLocaleCode = (value: unknown): value is LocaleCode =>
   typeof value === 'string' && SUPPORTED_LOCALES.includes(value as LocaleCode);
 
@@ -1272,7 +1279,9 @@ export const useResumeStore = create<ResumeStore>()(
           ? draft.projects.map((item) => ({ ...item, id: uuidv4(), visible: true, descriptionBullets: item.descriptionBullets.length ? item.descriptionBullets : [''] }))
           : s.projects;
         return {
-          personalInfo: selection.personalInfo ? { fullName: '', email: '', phone: '', location: '', linkedin: '', website: '', summary: '', ...draft.personalInfo } : s.personalInfo,
+          // PDF parsers regularly omit individual header fields. Preserve the current
+          // value instead of replacing it with an empty extracted string.
+          personalInfo: selection.personalInfo ? mergeImportedPersonalInfo(s.personalInfo, draft.personalInfo) : s.personalInfo,
           photo: selection.photo ? { ...s.photo, url: draft.photoDataUrl ?? '' } : s.photo,
           experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience),
           projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects),
@@ -1302,7 +1311,7 @@ export const useResumeStore = create<ResumeStore>()(
           ? [...s.projects, ...draft.projects.map((item) => ({ ...item, id: uuidv4(), visible: true, descriptionBullets: item.descriptionBullets.length ? item.descriptionBullets : [''] }))]
           : s.projects;
         return {
-          personalInfo: selection.personalInfo ? { ...s.personalInfo, ...draft.personalInfo } : s.personalInfo,
+          personalInfo: selection.personalInfo ? mergeImportedPersonalInfo(s.personalInfo, draft.personalInfo) : s.personalInfo,
           photo: selection.photo && draft.photoDataUrl ? { ...s.photo, url: draft.photoDataUrl } : s.photo,
           experience: s.experienceManualOrder ? nextExperience : sortWorkExperienceByDateDesc(nextExperience),
           projects: s.projectsManualOrder ? nextProjects : sortProjectsByDateDesc(nextProjects),

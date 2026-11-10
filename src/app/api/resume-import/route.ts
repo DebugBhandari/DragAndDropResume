@@ -359,11 +359,9 @@ function inferDraftFromText(rawText: string): ResumeImportDraft {
     }
   }
   draft.personalInfo.summary = sections.summary.join(' ').slice(0, 1200);
-  if (!draft.personalInfo.summary) {
-    const firstMainSection = lines.findIndex((line) => ['experience', 'projects', 'education', 'skills', 'languages', 'certificates'].includes(sectionHeading(line) || inlineSectionContent(line).section));
-    const openingNarrative = lines.slice(0, firstMainSection < 0 ? 12 : firstMainSection).filter((line) => line.length >= 100 && !isContactLine(line));
-    draft.personalInfo.summary = openingNarrative.join(' ').slice(0, 1200);
-  }
+  // Do not treat arbitrary text before the first section as a professional summary.
+  // That range often contains the title, contact/header details, or a multi-column
+  // extraction artifact, which otherwise ends up rendered inside the résumé header.
   const toolLines = lines.filter((line) => /^\s*(?:[-*]\s*)?(?:tools?|technologies|tech(?:nology)?\s*stack|frameworks?|libraries|platforms?|databases?)\s*:/i.test(line));
   draft.skills = [...skillNames([...sections.skills, ...toolLines]), ...inferTechnicalSkills(normalizedText)]
     .filter((skill, index, skills) => skills.findIndex((candidate) => candidate.name.toLowerCase() === skill.name.toLowerCase()) === index)
