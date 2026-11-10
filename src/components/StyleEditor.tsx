@@ -23,32 +23,18 @@ export default function StyleEditor() {
 
   return (
     <div className="space-y-3">
+      <div className="career-text-palette" role="group" aria-label="Résumé typography and color controls">
+        <label className="career-number-control" title="Font family"><span>Font</span><select aria-label="Font family" value={style.fontFamily} onChange={(event) => setStyle({ fontFamily: event.target.value as typeof style.fontFamily })}><option value="serif">Serif</option><option value="sans-serif">Sans</option><option value="mono">Mono</option></select></label>
+        <label className="career-number-control" title="Font size"><span>Size</span><select aria-label="Font size" value={style.fontSize} onChange={(event) => setStyle({ fontSize: event.target.value as typeof style.fontSize })}><option value="sm">12</option><option value="md">13</option><option value="lg">14</option></select></label>
+        <details className="career-biu-menu">
+          <summary aria-label="Accent color menu" title="Accent color"><span aria-hidden="true" className="h-3 w-3 rounded-full border border-current" style={{ backgroundColor: style.accentColor }} /></summary>
+          <div className="career-biu-menu-content flex-wrap"><span className="sr-only">Accent color</span>{presetColors.map((color) => <button type="button" key={color} aria-label={`Use ${color} as accent color`} title={color} onClick={() => setStyle({ accentColor: color })}><span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-black/15" style={{ backgroundColor: color }} /></button>)}<input type="color" aria-label="Custom accent color" value={style.accentColor} onChange={(event) => setStyle({ accentColor: event.target.value })} className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0" /></div>
+        </details>
+      </div>
       <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
           Theme
         </p>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">
-            {ui.styleAccentColor}
-          </label>
-          <div className="flex gap-1.5 flex-wrap items-center">
-            {presetColors.map((c) => (
-              <button
-                key={c}
-                onClick={() => setStyle({ accentColor: c })}
-                className={`w-6 h-6 rounded-full border-2 transition ${style.accentColor === c ? "border-gray-800 scale-110" : "border-transparent"}`}
-                style={{ background: c }}
-              />
-            ))}
-            <input
-              type="color"
-              value={style.accentColor}
-              onChange={(e) => setStyle({ accentColor: e.target.value })}
-              className="w-6 h-6 rounded cursor-pointer border-0 p-0"
-            />
-          </div>
-        </div>
-
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">
             {ui.styleIcons}
@@ -77,44 +63,6 @@ export default function StyleEditor() {
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          Typography
-        </p>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">
-            {ui.styleFont}
-          </label>
-          <div className="flex gap-2">
-            {(["serif", "sans-serif", "mono"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setStyle({ fontFamily: f })}
-                className={`style-chip ${style.fontFamily === f ? "style-chip-active" : ""}`}
-                style={{ fontFamily: f === "mono" ? "monospace" : f }}
-              >
-                {f === "mono" ? "Mono" : f === "sans-serif" ? "Sans" : "Serif"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">
-            {ui.styleFontSize}
-          </label>
-          <div className="flex gap-2">
-            {(["sm", "md", "lg"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStyle({ fontSize: s })}
-                className={`style-chip ${style.fontSize === s ? "style-chip-active" : ""}`}
-              >
-                {s.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">
             {ui.styleHeadingSize}

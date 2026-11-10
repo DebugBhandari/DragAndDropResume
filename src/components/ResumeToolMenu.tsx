@@ -8,6 +8,8 @@ import StyleEditor from '@/components/StyleEditor';
 import { useResumeStore } from '@/store/useResumeStore';
 import type { ResumeData } from '@/types/resume';
 
+const TAILOR_CHARACTER_LIMIT = 28_000;
+
 type Props = {
   onTailored: (original: ResumeData, tailored: ResumeData) => void;
   isTailoring: boolean;
@@ -47,23 +49,42 @@ export default function ResumeToolMenu({ onTailored, isTailoring, setIsTailoring
     return { personalInfo, education, experience, projects, languages, skills, certificates, awards, volunteer, references, interests, sectionOrder, layout, style, photo };
   }
 
+  function resumeForTailoring(resume: ResumeData): ResumeData {
+    return {
+      ...resume,
+      photo: {
+        ...resume.photo,
+        url: resume.photo.url.startsWith('data:') ? '' : resume.photo.url,
+      },
+    };
+  }
+
+  const tailoringResume = resumeForTailoring(currentResume());
+  const tailoringCharacterCount = JSON.stringify(tailoringResume).length + jobDescription.trim().length;
+  const tailoringCharactersRemaining = TAILOR_CHARACTER_LIMIT - tailoringCharacterCount;
+
   async function tailorResume() {
     if (!jobDescription.trim()) {
       setMessage('Paste a job description before tailoring this résumé.');
+      return;
+    }
+    if (tailoringCharactersRemaining < 0) {
+      setMessage(`Shorten the résumé or job description by ${Math.abs(tailoringCharactersRemaining).toLocaleString()} characters before tailoring.`);
       return;
     }
     setIsTailoring(true);
     setMessage('Preparing your résumé for AI tailoring…');
     try {
       const original = currentResume();
+      const requestResume = resumeForTailoring(original);
       const response = await fetch('/api/resume-tailor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resume: original, jobDescription }),
+        body: JSON.stringify({ resume: requestResume, jobDescription }),
       });
       const payload = await response.json() as { resume?: ResumeData; message?: string };
       if (!response.ok || !payload.resume) throw new Error(payload.message || 'Unable to tailor this résumé.');
-      onTailored(original, payload.resume);
+      onTailored(original, { ...payload.resume, photo: original.photo, layout: original.layout, style: original.style, sectionOrder: original.sectionOrder });
       setMessage('Tailored résumé ready. Compare it with the original before continuing to edit.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to tailor this résumé.');
@@ -95,7 +116,8 @@ export default function ResumeToolMenu({ onTailored, isTailoring, setIsTailoring
         <div className="career-tool-menu-content space-y-3">
           <div><p className="career-kicker">Tailor with AI</p><p className="mt-1 text-sm opacity-75">Paste the job requirements. The tailored version keeps your document structure and facts, then appears on the page for comparison.</p></div>
           <textarea className="input-field min-h-36 resize-y" value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the role responsibilities, requirements, and company context here." />
-          <button type="button" className="career-primary-button" onClick={tailorResume} disabled={isTailoring}>{isTailoring ? 'Tailoring…' : 'Tailor résumé'}</button>
+          <p className={`text-xs ${tailoringCharactersRemaining < 0 ? 'text-red-700' : 'opacity-65'}`} aria-live="polite">{tailoringCharacterCount.toLocaleString()} / {TAILOR_CHARACTER_LIMIT.toLocaleString()} characters{tailoringCharactersRemaining < 0 ? ` · remove ${Math.abs(tailoringCharactersRemaining).toLocaleString()}` : ` · ${tailoringCharactersRemaining.toLocaleString()} remaining`}</p>
+          <button type="button" className="career-primary-button" onClick={tailorResume} disabled={isTailoring || tailoringCharactersRemaining < 0}>{isTailoring ? 'Tailoring…' : 'Tailor résumé'}</button>
           {message && <p className="career-message" role="status">{message}</p>}
         </div>
       </details>

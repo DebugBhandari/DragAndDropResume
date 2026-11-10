@@ -7,6 +7,16 @@ const ollamaBaseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
 const model = process.env.OLLAMA_RESUME_MODEL ?? 'qwen2.5:3b';
 const MAX_LENGTH = 28_000;
 
+function resumeForTailoring(resume: ResumeData): ResumeData {
+  return {
+    ...resume,
+    photo: {
+      ...resume.photo,
+      url: resume.photo.url.startsWith('data:') ? '' : resume.photo.url,
+    },
+  };
+}
+
 function parseResume(content: string): ResumeData {
   const json = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').match(/\{[\s\S]*\}/)?.[0];
   if (!json) throw new Error('The server AI did not return a tailored résumé format.');
@@ -21,7 +31,7 @@ export async function POST(request: Request) {
     const payload = await request.json() as { resume?: ResumeData; jobDescription?: unknown };
     const jobDescription = typeof payload.jobDescription === 'string' ? payload.jobDescription.trim() : '';
     if (!payload.resume || !jobDescription) return Response.json({ message: 'Add both a résumé and job description first.' }, { status: 400 });
-    const source = JSON.stringify(payload.resume);
+    const source = JSON.stringify(resumeForTailoring(payload.resume));
     if (source.length + jobDescription.length > MAX_LENGTH) return Response.json({ message: 'Keep the résumé and job description under 28,000 characters combined.' }, { status: 400 });
     const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(75_000),
