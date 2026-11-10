@@ -392,6 +392,12 @@
   .career-text-palette .career-palette-color { width: 1.15rem; height: 1.15rem; margin: 0 .12rem; border: 2px solid #fff; border-radius: 999px; background: var(--palette-color); box-shadow: 0 0 0 1px var(--form-border); }
   .career-text-palette button[aria-label="Center text"] { text-align: center; }
   .career-text-palette button[aria-label="Align right"] { text-align: right; }
+  .career-biu-menu { position: relative; }
+  .career-biu-menu > summary { display: flex; align-items: center; gap: .08rem; width: 2.3rem; height: 1.8rem; padding: 0 .28rem; border: 1px solid transparent; border-radius: .4rem; color: var(--form-text); cursor: pointer; font-size: .7rem; list-style: none; }
+  .career-biu-menu > summary::-webkit-details-marker { display: none; }
+  .career-biu-menu > summary:hover, .career-biu-menu[open] > summary { border-color: var(--sage-green); background: color-mix(in srgb, var(--yellow-green) 26%, transparent); }
+  .career-biu-menu-content { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; display: flex; gap: .2rem; padding: .3rem; border: 1px solid var(--form-border); border-radius: .5rem; background: var(--form-surface-strong); box-shadow: 0 10px 24px -14px var(--studio-shadow, rgba(28,45,32,.75)); }
+  .career-pinch-zoom-stage { touch-action: pan-x pan-y; overscroll-behavior: contain; }
   .career-preview-zoom { display: none; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
   .career-preview-zoom-frame { zoom: 1; }

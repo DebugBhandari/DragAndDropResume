@@ -24,6 +24,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 import FeedbackWidget from "@/components/FeedbackWidget";
+import { usePreviewPinchZoom } from "@/hooks/usePreviewPinchZoom";
 import ResumeToolMenu from "@/components/ResumeToolMenu";
 import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, getFontFamily } from "@/components/ResumePreview";
 import { RESUME_STORAGE_KEY, useResumeStore } from "@/store/useResumeStore";
@@ -223,10 +224,12 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
 // ─── Main Page ───
 export default function Home() {
   const resumeRef = useRef<HTMLDivElement>(null);
+  const previewStageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [previewZoom, setPreviewZoom] = useState(100);
+  usePreviewPinchZoom(previewStageRef, { min: 40, max: 100, zoom: previewZoom, setZoom: setPreviewZoom, enabled: mounted });
   const [isTailoring, setIsTailoring] = useState(false);
   const [message, setMessage] = useState("");
   const [tailoredResume, setTailoredResume] = useState<ResumeData | null>(null);
@@ -2079,7 +2082,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="career-resume-preview-stage"><div className="career-resume-preview-scale" style={{ zoom: `${previewZoom}%` }}>
+          <div ref={previewStageRef} className="career-resume-preview-stage career-pinch-zoom-stage"><div className="career-resume-preview-scale" style={{ zoom: `${previewZoom}%` }}>
             <div
               ref={resumeRef}
               className="resume-pages flex flex-col items-center gap-8 py-4 print:block print:p-0"
