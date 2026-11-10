@@ -24,7 +24,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 import FeedbackWidget from "@/components/FeedbackWidget";
-import { usePreviewPinchZoom } from "@/hooks/usePreviewPinchZoom";
 import ResumeEditorSidebar from "@/components/ResumeEditorSidebar";
 import ResumeToolMenu from "@/components/ResumeToolMenu";
 import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, getFontFamily } from "@/components/ResumePreview";
@@ -211,12 +210,9 @@ function DragOverlayContent({ sectionId }: { sectionId: string | null }) {
 // ─── Main Page ───
 export default function Home() {
   const resumeRef = useRef<HTMLDivElement>(null);
-  const previewStageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [previewZoom, setPreviewZoom] = useState(100);
-  usePreviewPinchZoom(previewStageRef, { min: 40, max: 100, zoom: previewZoom, setZoom: setPreviewZoom, enabled: mounted });
   const [isTailoring, setIsTailoring] = useState(false);
   const [message, setMessage] = useState("");
   const [tailoredResume, setTailoredResume] = useState<ResumeData | null>(null);
@@ -2020,9 +2016,8 @@ export default function Home() {
           <div className="resume-editor-layout">
             <ResumeEditorSidebar />
             <div className="career-preview-shell career-document-shell">
-            <div className="career-preview-toolbar"><div><p className="career-kicker">Editable résumé</p><p className="mt-1 text-xs opacity-70">Click any text directly on the page to edit it. Drag sections to reorder them, and use the toolbar for style, import, tailoring, and saved versions.</p></div><div className="career-preview-zoom" role="group" aria-label="Preview zoom"><button type="button" onClick={() => setPreviewZoom((value) => Math.max(40, value - 10))} disabled={previewZoom <= 40} aria-label="Zoom out">−</button><output>{previewZoom}%</output><button type="button" onClick={() => setPreviewZoom((value) => Math.min(100, value + 10))} disabled={previewZoom >= 100} aria-label="Zoom in">+</button></div></div>
           {/* Hidden measurer - kept outside the scale wrapper so getBoundingClientRect()
-              returns natural (1:1) dimensions regardless of preview zoom level.
+              returns natural (1:1) dimensions.
               Must stay outside resumeRef so it is not cloned by useReactToPrint. */}
           <div
             style={{
@@ -2071,7 +2066,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div ref={previewStageRef} className="career-resume-preview-stage career-pinch-zoom-stage"><div className="career-resume-preview-scale" style={{ zoom: `${previewZoom}%` }}>
+          <div className="career-resume-preview-stage"><div className="career-resume-preview-scale">
             <div
               ref={resumeRef}
               className="resume-pages flex flex-col items-center gap-8 py-4 print:block print:p-0"
