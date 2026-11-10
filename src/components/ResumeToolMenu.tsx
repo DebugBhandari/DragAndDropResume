@@ -24,6 +24,7 @@ export default function ResumeToolMenu({ onTailored, isTailoring, setIsTailoring
   const store = useResumeStore();
   const [jobDescription, setJobDescription] = useState('');
   const [versionName, setVersionName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     const closeMenus = (event: PointerEvent) => {
@@ -85,12 +86,12 @@ export default function ResumeToolMenu({ onTailored, isTailoring, setIsTailoring
       </details>
 
       <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}>
-        <summary aria-label="Import résumé" title="Import résumé"><span className="career-tool-icon" aria-hidden="true">↥</span><span className="career-tool-label">Import</span></summary>
-        <div className="career-tool-menu-content"><ResumeImportContent /></div>
+        <summary aria-label={isImporting ? "Importing résumé" : "Import résumé"} title={isImporting ? "Importing résumé" : "Import résumé"}><span className="career-tool-icon" aria-hidden="true">↥</span><span className="career-tool-label">{isImporting ? 'Importing…' : 'Import'}</span></summary>
+        <div className="career-tool-menu-content"><ResumeImportContent onImportingChange={setIsImporting} /></div>
       </details>
 
       <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}>
-        <summary aria-label="Tailor résumé with AI" title="Tailor résumé with AI"><span className="career-tool-icon" aria-hidden="true">✦</span><span className="career-tool-label">Tailor</span></summary>
+        <summary aria-label={isTailoring ? "Tailoring résumé with AI" : "Tailor résumé with AI"} title={isTailoring ? "Tailoring résumé with AI" : "Tailor résumé with AI"}><span className="career-tool-icon" aria-hidden="true">✦</span><span className="career-tool-label">{isTailoring ? 'Tailoring…' : 'Tailor'}</span></summary>
         <div className="career-tool-menu-content space-y-3">
           <div><p className="career-kicker">Tailor with AI</p><p className="mt-1 text-sm opacity-75">Paste the job requirements. The tailored version keeps your document structure and facts, then appears on the page for comparison.</p></div>
           <textarea className="input-field min-h-36 resize-y" value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the role responsibilities, requirements, and company context here." />

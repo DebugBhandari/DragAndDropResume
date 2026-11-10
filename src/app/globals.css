@@ -397,7 +397,7 @@
   .career-biu-menu > summary::-webkit-details-marker { display: none; }
   .career-biu-menu > summary:hover, .career-biu-menu[open] > summary { border-color: var(--sage-green); background: color-mix(in srgb, var(--yellow-green) 26%, transparent); }
   .career-biu-menu-content { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; display: flex; gap: .2rem; padding: .3rem; border: 1px solid var(--form-border); border-radius: .5rem; background: var(--form-surface-strong); box-shadow: 0 10px 24px -14px var(--studio-shadow, rgba(28,45,32,.75)); }
-  .career-pinch-zoom-stage { touch-action: pan-x pan-y; overscroll-behavior: contain; }
+  .career-pinch-zoom-stage { touch-action: pan-x pan-y; }
   .career-preview-zoom { display: none; }
   .career-preview-scale { display: flex; justify-content: center; min-width: 650px; padding: .5rem 0 2rem; }
   .career-preview-zoom-frame { zoom: 1; }

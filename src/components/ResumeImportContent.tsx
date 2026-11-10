@@ -11,7 +11,11 @@ function formatElapsedTime(milliseconds: number) {
   return minutes ? `${minutes} min ${seconds} sec` : `${totalSeconds} sec`;
 }
 
-export default function ResumeImportContent() {
+type Props = {
+  onImportingChange?: (isImporting: boolean) => void;
+};
+
+export default function ResumeImportContent({ onImportingChange }: Props) {
   const { replaceImportDraft, captureImportPreviewSnapshot, restoreImportPreviewSnapshot, saveResumeVersion } = useResumeStore();
   const [extractedDraft, setExtractedDraft] = useState<ResumeImportDraft | null>(null);
   const [enhancedDraft, setEnhancedDraft] = useState<ResumeImportDraft | null>(null);
@@ -34,6 +38,10 @@ export default function ResumeImportContent() {
     const interval = window.setInterval(updateElapsed, 1_000);
     return () => window.clearInterval(interval);
   }, [importStartedAt, status]);
+
+  useEffect(() => {
+    onImportingChange?.(status === 'uploading');
+  }, [onImportingChange, status]);
 
   function restoreImportPreview() {
     if (!previewSnapshotRef.current) return;
@@ -69,6 +77,7 @@ export default function ResumeImportContent() {
     importRunRef.current = importRun;
     restoreImportPreview();
     setStatus('uploading');
+    onImportingChange?.(true);
     setImportStartedAt(Date.now());
     setElapsedMilliseconds(0);
     setBackendStageName('Uploading PDF');
@@ -159,11 +168,15 @@ export default function ResumeImportContent() {
       processEvent(buffer);
       if (streamError) throw new Error(streamError);
       if (!receivedDraft) throw new Error('No résumé details could be extracted from this file.');
-      if (importRunRef.current === importRun) setStatus('idle');
+      if (importRunRef.current === importRun) {
+        setStatus('idle');
+        onImportingChange?.(false);
+      }
     } catch (error) {
       if (importRunRef.current !== importRun) return;
       restoreImportPreview();
       setStatus('error');
+      onImportingChange?.(false);
       setIsAiRefining(false);
       setMessage(error instanceof Error ? error.message : 'Unable to import this résumé.');
     }
