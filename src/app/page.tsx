@@ -2242,10 +2242,12 @@ export default function Home() {
             <button
               type="button"
               onClick={handleExportPdf}
-              className="studio-export-button inline-flex items-center justify-center h-10 w-28 lg:w-auto px-4 text-sm font-semibold whitespace-nowrap"
+              className="studio-export-button studio-mobile-export-button inline-flex items-center justify-center h-10 w-28 lg:w-auto px-4 text-sm font-semibold whitespace-nowrap"
+              aria-label={ui.exportPdf}
+              title={ui.exportPdf}
             >
               <span aria-hidden="true">↓</span>
-              {ui.exportPdf}
+              <span className="studio-mobile-export-label">{ui.exportPdf}</span>
             </button>
           </div>
         </header>
