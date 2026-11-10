@@ -2064,7 +2064,6 @@ export default function Home() {
               )}
             </div>
             </div>
-          </div>
 
           <div className="career-resume-preview-stage"><div className="career-resume-preview-scale">
             <div
@@ -2166,6 +2165,7 @@ export default function Home() {
                 </DroppableZone>
               </SortableContext>
             </div>
+          </div>
           </div>
           </div>
           </div>
