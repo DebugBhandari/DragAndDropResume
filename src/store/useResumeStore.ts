@@ -1018,7 +1018,14 @@ const mergeImportedPersonalInfo = (current: PersonalInfo, imported: Partial<Pers
   const populatedImport = Object.fromEntries(
     Object.entries(imported).filter(([, value]) => typeof value !== 'string' || value.trim().length > 0),
   ) as Partial<PersonalInfo>;
-  return { ...current, ...populatedImport };
+  return {
+    ...current,
+    ...populatedImport,
+    // A selected import replaces the résumé summary. If the PDF does not have an
+    // explicit Summary/Profile section, remove any prior starter or misparsed text
+    // rather than leaving it below the newly imported contact details.
+    summary: imported.summary?.trim() ?? '',
+  };
 };
 
 const isLocaleCode = (value: unknown): value is LocaleCode =>
