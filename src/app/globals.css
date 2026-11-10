@@ -341,7 +341,6 @@
   .career-tool-menu-item[open] > summary { border-color: var(--hunter-green); background: color-mix(in srgb, var(--yellow-green) 26%, var(--form-surface)); }
   .career-tool-menu-item[open] > summary::after { transform: rotate(225deg) translate(-.12rem, -.12rem); }
   .career-tool-menu-content { position: absolute; z-index: 70; top: calc(100% + .45rem); left: 0; width: min(680px, calc(100vw - 2rem)); max-height: min(calc(100dvh - 9rem), 680px); padding: .9rem; overflow: auto; border: 1px solid color-mix(in srgb, var(--hunter-green) 36%, var(--form-border)); border-radius: .9rem; background: var(--form-surface); box-shadow: 0 20px 46px -22px var(--studio-shadow, rgba(28,45,32,.65)); }
-  .career-tool-menu-item:nth-last-child(-n + 2) .career-tool-menu-content { position: fixed; top: 7.7rem; right: 1rem; left: auto; width: min(560px, calc(100vw - 2rem)); max-height: calc(100dvh - 8.7rem); }
   .career-clear-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.35rem; padding: .5rem .8rem; border: 1px solid color-mix(in srgb, var(--blushed-brick) 78%, var(--form-border)); border-radius: .65rem; color: #842f32; background: color-mix(in srgb, var(--blushed-brick) 14%, var(--form-surface)); font-size: .8rem; font-weight: 800; white-space: nowrap; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease; }
   .career-clear-button:hover { border-color: var(--blushed-brick); color: #fffaf0; background: var(--blushed-brick); transform: translateY(-1px); }
   .resume-studio[data-theme="dark"] .career-clear-button { border-color: color-mix(in srgb, #f28b82 68%, var(--form-border)); color: #ffd1cb; background: color-mix(in srgb, #bc4749 38%, var(--form-surface)); }
@@ -352,6 +351,7 @@
   .career-text-toolbar .style-chip { padding: .35rem .5rem; font-size: .7rem; }
   .career-style-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
   .career-style-control-grid > div > span { display: block; margin-bottom: .3rem; color: var(--form-muted); font-size: .68rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+  .career-style-control-grid > div > span b { margin-right: .3rem; color: var(--sage-green); }
   .career-style-control-grid > div > div { display: flex; flex-wrap: wrap; gap: .3rem; }
   .career-style-control-grid .style-chip { padding: .35rem .48rem; font-size: .7rem; }
   .career-kicker { color: var(--sage-green); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
