@@ -97,12 +97,10 @@ export default function ResumeToolMenu({ onTailored, isTailoring, setIsTailoring
     <div className="career-tool-menu" aria-label="Résumé tools">
       <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}>
         <summary aria-label="Document style" title="Document style"><span className="career-tool-icon" aria-hidden="true">◫</span><span className="career-tool-label">Style</span></summary>
-        <div className="career-tool-menu-content space-y-4">
-          <div><p className="career-kicker">Document style</p><p className="mt-1 text-sm opacity-75">Choose the résumé layout, typography, colors, language, and header image.</p></div>
-          <LayoutPickerContent />
-          <LanguagePickerContent />
+        <div className="career-tool-menu-content space-y-3">
           <StyleEditor />
-          <HeaderImageContent />
+          <details className="career-disclosure"><summary className="career-disclosure-summary"><span><strong>Layout & language</strong><small>Template, column settings, and locale</small></span></summary><div className="space-y-4 px-3 pb-3"><LayoutPickerContent /><LanguagePickerContent /></div></details>
+          <details className="career-disclosure"><summary className="career-disclosure-summary"><span><strong>Header image</strong><small>Photo and placement controls</small></span></summary><div className="px-3 pb-3"><HeaderImageContent /></div></details>
         </div>
       </details>
 

@@ -25,6 +25,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { usePreviewPinchZoom } from "@/hooks/usePreviewPinchZoom";
+import RemovedSectionRail from "@/components/RemovedSectionRail";
 import ResumeToolMenu from "@/components/ResumeToolMenu";
 import { PersonalHeader, ResumeDraggableSection, ResumeProxyDraggableSection, ResumeStaticSection, getFontFamily } from "@/components/ResumePreview";
 import { RESUME_STORAGE_KEY, useResumeStore } from "@/store/useResumeStore";
@@ -447,6 +448,7 @@ export default function Home() {
     const { active, over } = event;
     if (!over) return;
     const data = active.data.current;
+    if (data?.origin === "removed-section") return;
     const sectionId = data?.sectionId ?? (active.id as string);
     const overId = over.id as string;
     const activeSection = sectionOrder.find((sec) => sec.id === sectionId);
@@ -468,6 +470,16 @@ export default function Home() {
     const { active, over } = event;
     if (!over) return;
     const data = active.data.current;
+    if (data?.origin === "removed-section") {
+      const type = data.sectionType as SectionType | undefined;
+      const zone = over.id === "zone-sidebar" ? "sidebar" : "main";
+      if (type && (over.id === "zone-main" || over.id === "zone-sidebar")) {
+        addSectionToResume(type);
+        const restored = useResumeStore.getState().sectionOrder.find((section) => section.type === type);
+        if (restored) moveSectionToZone(restored.id, zone);
+      }
+      return;
+    }
     const sectionId = data?.sectionId ?? (active.id as string);
     const overId = over.id as string;
     if (overId === "zone-main" || overId === "zone-sidebar") return;
@@ -2031,7 +2043,9 @@ export default function Home() {
 
         <main className="career-workspace career-document-workspace mx-auto max-w-[1800px] p-4 lg:p-6" aria-label="Résumé document editor">
           {tailoredResume && <div className="career-tailored-comparison" role="status"><div><p className="career-kicker">AI comparison ready</p><p className="mt-1 text-sm">Showing the <strong>{activeResumeVersion}</strong> complete résumé. Switch versions before continuing to edit.</p></div><div className="career-preview-version-toggle" role="group" aria-label="Compare original and tailored résumés"><button type="button" className={activeResumeVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showResumeVersion('original')}>Original</button><button type="button" className={activeResumeVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showResumeVersion('tailored')}>Tailored</button></div></div>}
-          <div className="career-preview-shell career-document-shell">
+          <div className="career-preview-with-removed-rail">
+            <RemovedSectionRail onRestore={addSectionToResume} />
+            <div className="career-preview-shell career-document-shell">
             <div className="career-preview-toolbar"><div><p className="career-kicker">Editable résumé</p><p className="mt-1 text-xs opacity-70">Click any text directly on the page to edit it. Drag sections to reorder them, and use the toolbar for style, import, tailoring, and saved versions.</p></div><div className="career-preview-zoom" role="group" aria-label="Preview zoom"><button type="button" onClick={() => setPreviewZoom((value) => Math.max(40, value - 10))} disabled={previewZoom <= 40} aria-label="Zoom out">−</button><output>{previewZoom}%</output><button type="button" onClick={() => setPreviewZoom((value) => Math.min(100, value + 10))} disabled={previewZoom >= 100} aria-label="Zoom in">+</button></div></div>
           {/* Hidden measurer - kept outside the scale wrapper so getBoundingClientRect()
               returns natural (1:1) dimensions regardless of preview zoom level.
@@ -2079,6 +2093,7 @@ export default function Home() {
                   <ResumeStaticSection key={sec.id} section={sec} />
                 ))
               )}
+            </div>
             </div>
           </div>
 

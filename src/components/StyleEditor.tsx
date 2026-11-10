@@ -31,6 +31,9 @@ export default function StyleEditor() {
           <div className="career-biu-menu-content flex-wrap"><span className="sr-only">Accent color</span>{presetColors.map((color) => <button type="button" key={color} aria-label={`Use ${color} as accent color`} title={color} onClick={() => setStyle({ accentColor: color })}><span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-black/15" style={{ backgroundColor: color }} /></button>)}<input type="color" aria-label="Custom accent color" value={style.accentColor} onChange={(event) => setStyle({ accentColor: event.target.value })} className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0" /></div>
         </details>
       </div>
+      <details className="career-disclosure">
+        <summary className="career-disclosure-summary"><span><strong>More style</strong><small>Icons, headings, spacing, and header layout</small></span></summary>
+        <div className="space-y-3 px-3 pb-3">
       <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
           Theme
@@ -193,6 +196,8 @@ export default function StyleEditor() {
           />
         </div>
       </div>
+        </div>
+      </details>
     </div>
   );
 }
