@@ -23,6 +23,7 @@ export interface CoverLetterStyle {
   fontFamily: CoverLetterFontFamily;
   fontSize: CoverLetterFontSize;
   paragraphSpacing: CoverLetterSpacing;
+  wordSpacing: CoverLetterSpacing;
   headerSpacing: CoverLetterSpacing;
 }
 

@@ -26,6 +26,7 @@ const defaultCoverLetterStyle = (): CoverLetterStyle => ({
   fontFamily: 'sans-serif',
   fontSize: 'md',
   paragraphSpacing: 'md',
+  wordSpacing: 'md',
   headerSpacing: 'md',
 });
 
@@ -41,6 +42,7 @@ function normalizeCoverLetterStyle(style?: Partial<CoverLetterStyle>): CoverLett
     ...style,
     documentFormat: style?.documentFormat === 'body-only' || style?.documentFormat === 'body-footer' ? style.documentFormat : 'header-body-footer',
     paragraphSpacing: normalizeCoverLetterSpacing(style?.paragraphSpacing),
+    wordSpacing: normalizeCoverLetterSpacing(style?.wordSpacing),
     headerSpacing: normalizeCoverLetterSpacing(style?.headerSpacing),
   };
 }

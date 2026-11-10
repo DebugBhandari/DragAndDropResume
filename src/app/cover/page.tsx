@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, type CSSProperties, type FocusEvent, type SyntheticEvent, useCallback, useRef, useState } from 'react';
+import { ChangeEvent, type CSSProperties, type FocusEvent, type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useCareerStore } from '@/store/useCareerStore';
 import { useUIStore } from '@/store/useUIStore';
 import type { CoverLetterData, CoverLetterDocumentFormat, CoverLetterFontFamily, CoverLetterFontSize, CoverLetterLayout, CoverLetterSpacing, CoverLetterStyle } from '@/types/career';
@@ -19,6 +19,7 @@ const documentFormatOptions: Array<{ value: CoverLetterDocumentFormat; label: st
   { value: 'body-footer', label: 'Body & footer', detail: 'Closing without a header' },
 ];
 const accentColors = ['#386641', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#1f2937'];
+const resumeTextColors = ['#1c2d20', '#386641', '#6a994e', '#a7c957', '#bc4749'];
 type PendingTailoredLetter = Pick<CoverLetterData, 'companyName' | 'roleTitle'> & { originalBody: string; tailoredBody: string };
 type LetterBodyVersion = 'original' | 'tailored';
 
@@ -116,6 +117,7 @@ function CoverLetterDocument({ coverLetter, coverLetterStyle }: { coverLetter: C
     'data-font': coverLetterStyle.fontFamily,
     'data-font-size': coverLetterStyle.fontSize,
     'data-paragraph-spacing': coverLetterStyle.paragraphSpacing,
+    'data-word-spacing': coverLetterStyle.wordSpacing,
     'data-header-spacing': coverLetterStyle.headerSpacing,
     style: { '--cover-accent': coverLetterStyle.accentColor } as CSSProperties,
   };
@@ -162,6 +164,15 @@ export default function CoverLetterPage() {
     });
   }, [activeLetterBodyVersion, updateCoverLetter]);
   const clearTailoredCandidate = () => { setPendingTailoredLetter(null); setActiveLetterBodyVersion(null); };
+  useEffect(() => {
+    const closeToolMenusOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('.career-tool-menu-item')) return;
+      document.querySelectorAll<HTMLDetailsElement>('.career-tool-menu-item[open]').forEach((menu) => { menu.open = false; });
+    };
+    document.addEventListener('pointerdown', closeToolMenusOnOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', closeToolMenusOnOutsidePointerDown);
+  }, []);
   const persistPreviewEdits = useCallback((event: FocusEvent<HTMLElement>) => {
     const nextTarget = event.relatedTarget as Node | null;
     if (nextTarget && event.currentTarget.contains(nextTarget)) return;
@@ -185,6 +196,16 @@ export default function CoverLetterPage() {
     const fieldsChanged = Object.entries(changes).some(([key, value]) => coverLetter[key as keyof CoverLetterData] !== value);
     if (fieldsChanged) updateCoverLetter(changes);
   }, [coverLetter, updateCoverLetter, updateDisplayedLetterBody]);
+  const applyTextCommand = useCallback((command: 'bold' | 'italic' | 'underline' | 'foreColor' | 'justifyLeft' | 'justifyCenter' | 'justifyRight', value?: string) => {
+    const preview = previewRef.current;
+    const selection = window.getSelection();
+    if (!preview || !selection?.rangeCount || !preview.contains(selection.getRangeAt(0).commonAncestorContainer)) return;
+    document.execCommand(command, false, value);
+    const body = sanitizeEditableMarkup(preview.querySelector<HTMLElement>('[data-cover-body]')?.innerHTML ?? '');
+    const footer = sanitizeFooterMarkup(preview.querySelector<HTMLElement>('[data-cover-footer]')?.innerHTML ?? '');
+    if (body !== coverLetter.body) updateDisplayedLetterBody(body);
+    if (footer !== coverLetter.footer) updateCoverLetter({ footer });
+  }, [coverLetter.body, coverLetter.footer, updateCoverLetter, updateDisplayedLetterBody]);
   async function copyPreviewLetter() {
     const text = bodyHtmlToPlainText(coverLetter.body);
     if (!text) {
@@ -264,6 +285,9 @@ export default function CoverLetterPage() {
       .cover-letter-preview[data-font-size="sm"] { font-size: 12.5px; }
       .cover-letter-preview[data-font-size="md"] { font-size: 14px; }
       .cover-letter-preview[data-font-size="lg"] { font-size: 15.5px; }
+      .cover-letter-preview[data-word-spacing="sm"] { word-spacing: -.04em; }
+      .cover-letter-preview[data-word-spacing="md"] { word-spacing: normal; }
+      .cover-letter-preview[data-word-spacing="lg"] { word-spacing: .12em; }
       .cover-letter-preview[data-paragraph-spacing="sm"] { --cover-paragraph-space: 3mm; }
       .cover-letter-preview[data-paragraph-spacing="md"] { --cover-paragraph-space: 5mm; }
       .cover-letter-preview[data-paragraph-spacing="lg"] { --cover-paragraph-space: 7mm; }
@@ -429,7 +453,8 @@ export default function CoverLetterPage() {
           <summary>Document style</summary>
           <div className="career-tool-menu-content space-y-3">
             <div><span className="career-field-label">Document parts</span><div className="grid gap-2 sm:grid-cols-3">{documentFormatOptions.map((format) => <button type="button" key={format.value} onClick={() => updateCoverLetterStyle({ documentFormat: format.value })} className={`career-document-format-option ${coverLetterStyle.documentFormat === format.value ? 'career-document-format-option-active' : ''}`}><span className="font-bold">{format.label}</span><span>{format.detail}</span></button>)}</div></div>
-            <div className="grid gap-3 md:grid-cols-2"><div><span className="career-field-label">Page layout</span><div className="grid grid-cols-2 gap-2">{layoutOptions.map((layout) => <button type="button" key={layout.value} onClick={() => updateCoverLetterStyle({ layout: layout.value })} className={`career-layout-option ${coverLetterStyle.layout === layout.value ? 'career-layout-option-active' : ''}`}><span className={`career-layout-thumbnail career-layout-thumbnail-${layout.value}`} style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><i /><b /></span><span className="mt-1 block text-xs font-bold">{layout.label}</span><span className="block text-[11px] opacity-70">{layout.detail}</span></button>)}</div></div><div className="space-y-3"><div><span className="career-field-label">Accent color</span><div className="flex flex-wrap gap-2">{accentColors.map((color) => <button type="button" aria-label={`Use ${color} as accent color`} key={color} onClick={() => updateCoverLetterStyle({ accentColor: color })} className={`career-color-swatch ${coverLetterStyle.accentColor === color ? 'career-color-swatch-active' : ''}`} style={{ backgroundColor: color }} />)}<input type="color" aria-label="Custom accent color" value={coverLetterStyle.accentColor} onChange={(event) => updateCoverLetterStyle({ accentColor: event.target.value })} className="h-7 w-8 cursor-pointer rounded border-0 bg-transparent p-0" /></div></div><div className="grid gap-3 sm:grid-cols-2"><div><span className="career-field-label">Font family</span><div className="flex flex-wrap gap-1.5">{(['serif', 'sans-serif', 'mono'] as CoverLetterFontFamily[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontFamily: value })} className={`style-chip ${coverLetterStyle.fontFamily === value ? 'style-chip-active' : ''}`}>{value === 'sans-serif' ? 'Sans' : value === 'mono' ? 'Mono' : 'Serif'}</button>)}</div></div><div><span className="career-field-label">Font size</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterFontSize[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontSize: value })} className={`style-chip ${coverLetterStyle.fontSize === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div><div><span className="career-field-label">Paragraph spacing</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ paragraphSpacing: value })} className={`style-chip ${coverLetterStyle.paragraphSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div><div><span className="career-field-label">Header spacing</span><div className="flex flex-wrap gap-1.5">{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ headerSpacing: value })} className={`style-chip ${coverLetterStyle.headerSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div></div></div></div></div>
+            <div><span className="career-field-label">Page layout</span><div className="grid grid-cols-2 gap-2">{layoutOptions.map((layout) => <button type="button" key={layout.value} onClick={() => updateCoverLetterStyle({ layout: layout.value })} className={`career-layout-option ${coverLetterStyle.layout === layout.value ? 'career-layout-option-active' : ''}`}><span className={`career-layout-thumbnail career-layout-thumbnail-${layout.value}`} style={{ '--cover-accent': coverLetterStyle.accentColor } as CSSProperties}><i /><b /></span><span className="mt-1 block text-xs font-bold">{layout.label}</span><span className="block text-[11px] opacity-70">{layout.detail}</span></button>)}</div></div>
+            <div><span className="career-field-label">Document accent</span><div className="flex flex-wrap gap-2">{accentColors.map((color) => <button type="button" aria-label={`Use ${color} as accent color`} key={color} onClick={() => updateCoverLetterStyle({ accentColor: color })} className={`career-color-swatch ${coverLetterStyle.accentColor === color ? 'career-color-swatch-active' : ''}`} style={{ backgroundColor: color }} />)}<input type="color" aria-label="Custom accent color" value={coverLetterStyle.accentColor} onChange={(event) => updateCoverLetterStyle({ accentColor: event.target.value })} className="h-7 w-8 cursor-pointer rounded border-0 bg-transparent p-0" /></div></div>
           </div>
         </details>
         <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}>
@@ -439,6 +464,14 @@ export default function CoverLetterPage() {
         <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}><summary>Import</summary><div className="career-tool-menu-content space-y-3"><div><p className="career-kicker">Import a PDF letter</p><p className="mt-1 text-sm opacity-75">Upload a PDF you already wrote. Its text is extracted into this editable document; review the wording and formatting after import before exporting or tailoring.</p></div><label className={`career-secondary-button inline-flex cursor-pointer ${(isImporting || isTailoring) ? 'pointer-events-none opacity-60' : ''}`}><input className="sr-only" type="file" accept="application/pdf" onChange={handleImport} />{isImporting ? 'Importing with Docling…' : 'Upload PDF'}</label></div></details>
         <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}><summary>Versions</summary><div className="career-tool-menu-content space-y-3"><div className="resume-version-save-grid"><input className="input-field" value={versionName} onChange={(event) => setVersionName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && versionName.trim()) { saveCoverLetterVersion(versionName); setVersionName(''); } }} placeholder="Name this cover-letter version" /><button type="button" className="resume-version-load" disabled={!versionName.trim()} onClick={() => { saveCoverLetterVersion(versionName); setVersionName(''); }}>Save current</button></div>{coverLetterVersions.length === 0 ? <p className="resume-version-empty text-sm">No saved cover letters yet.</p> : <div className="space-y-2">{coverLetterVersions.map((version) => <div className="resume-version-item" key={version.id}><div className="min-w-0"><p className="truncate text-sm font-semibold">{version.name}</p><p className="mt-0.5 text-xs opacity-70">Saved {formatSavedAt(version.savedAt)}</p></div><div className="flex shrink-0 gap-2"><button type="button" className="resume-version-load" onClick={() => { loadCoverLetterVersion(version.id); clearTailoredCandidate(); }}>Open</button><button type="button" className="resume-version-delete" onClick={() => deleteCoverLetterVersion(version.id)}>Delete</button></div></div>)}</div>}</div></details>
         <details className="career-tool-menu-item" onToggle={closeOtherToolMenus}><summary>More</summary><div className="career-tool-menu-content space-y-3"><button type="button" className="resume-reset-button" onClick={() => { if (window.confirm('Clear the current cover letter? Saved versions remain available.')) { clearCoverLetter(); clearTailoredCandidate(); } }}>Clear current letter</button>{isImporting && <div className="career-activity" role="status" aria-live="polite"><div className="career-activity-title"><span className="resume-import-status-dot inline-block h-2 w-2 animate-pulse rounded-full" aria-hidden="true" />{activityStage || 'Working'}</div><p className="mt-1">{activityDetail || 'The server is processing your request…'}</p></div>}{message && <p className="career-message" role="status">{message}</p>}</div></details>
+      </div>
+
+      <div className="career-text-toolbar" aria-label="Text formatting controls">
+        <div className="career-text-toolbar-group"><span>Font</span>{(['serif', 'sans-serif', 'mono'] as CoverLetterFontFamily[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontFamily: value })} className={`style-chip ${coverLetterStyle.fontFamily === value ? 'style-chip-active' : ''}`}>{value === 'sans-serif' ? 'Sans' : value === 'mono' ? 'Mono' : 'Serif'}</button>)}</div>
+        <div className="career-text-toolbar-group"><span>Size</span>{(['sm', 'md', 'lg'] as CoverLetterFontSize[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ fontSize: value })} className={`style-chip ${coverLetterStyle.fontSize === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div>
+        <div className="career-text-toolbar-group"><span>Paragraph</span>{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ paragraphSpacing: value })} className={`style-chip ${coverLetterStyle.paragraphSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div>
+        <div className="career-text-toolbar-group"><span>Word space</span>{(['sm', 'md', 'lg'] as CoverLetterSpacing[]).map((value) => <button type="button" key={value} onClick={() => updateCoverLetterStyle({ wordSpacing: value })} className={`style-chip ${coverLetterStyle.wordSpacing === value ? 'style-chip-active' : ''}`}>{value.toUpperCase()}</button>)}</div>
+        <div className="career-text-palette" role="group" aria-label="Selected text formatting"><button type="button" aria-label="Bold selected text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('bold')}><strong>B</strong></button><button type="button" aria-label="Italic selected text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('italic')}><em>I</em></button><button type="button" aria-label="Underline selected text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('underline')}><u>U</u></button><span className="career-palette-divider" aria-hidden="true" />{resumeTextColors.map((color) => <button type="button" aria-label={`Use ${color} for selected text`} key={color} onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('foreColor', color)}><span className="career-palette-color" style={{ '--palette-color': color } as CSSProperties} /></button>)}<span className="career-palette-divider" aria-hidden="true" /><button type="button" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyLeft')}>≡</button><button type="button" aria-label="Center text" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyCenter')}>≡</button><button type="button" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextCommand('justifyRight')}>≡</button></div>
       </div>
 
       <section className="career-workspace career-document-workspace mx-auto max-w-[1800px] p-4 lg:p-6" aria-label="Cover letter document editor"><div className="career-preview-shell career-document-shell"><div className="career-preview-toolbar"><div><p className="career-kicker">Editable document</p><p className="mt-1 text-xs opacity-70">{pendingTailoredLetter ? `Showing the ${activeLetterBodyVersion === 'tailored' ? 'tailored' : 'original'} letter. Use Tailor to switch versions.` : 'Click anywhere on the page to type, paste, select, copy, or delete. Changes save when you leave the document.'}</p></div><div className="flex items-center gap-2">{pendingTailoredLetter && <div className="career-preview-version-toggle" role="group" aria-label="Choose the letter shown in the document"><button type="button" className={activeLetterBodyVersion === 'original' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('original')}>Original</button><button type="button" className={activeLetterBodyVersion === 'tailored' ? 'career-preview-version-toggle-active' : ''} onClick={() => showLetterBodyVersion('tailored')}>Tailored</button></div>}<button type="button" className="career-preview-copy-letter" onClick={copyPreviewLetter}>Copy letter</button></div></div><div className="career-preview-scale"><div ref={previewRef} contentEditable suppressContentEditableWarning onBlur={persistPreviewEdits} className="career-preview-pages career-document-pages"><CoverLetterDocument key={activeLetterBodyVersion ?? 'current'} coverLetter={coverLetter} coverLetterStyle={coverLetterStyle} /></div></div></div></section>
